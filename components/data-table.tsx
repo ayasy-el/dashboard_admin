@@ -246,7 +246,7 @@ function MetricsTable({
   return (
     <Card className="gap-0 overflow-hidden py-0">
       <CardContent className="flex flex-col gap-4 p-0">
-        <Table className="[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-15 [&_th:first-child]:pl-16 [&_td:first-child]:pl-16 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12">
+        <Table className="[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-15 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12">
           <TableHeader className="bg-muted/60 text-muted-foreground">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

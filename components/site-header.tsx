@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { IconFileExport, IconTableImport } from "@tabler/icons-react";
 
 export function SiteHeader() {
   return (
@@ -11,11 +11,14 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <h1 className="text-base font-medium">Overview</h1>
-        <div className="ml-auto flex items-center gap-6">
+        <div className="ml-auto flex items-center gap-3">
+          <ThemeToggle />
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+            <IconTableImport />
             Import CSV
           </Button>
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+            <IconFileExport />
             Export
           </Button>
         </div>
