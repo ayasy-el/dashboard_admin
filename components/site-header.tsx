@@ -18,16 +18,6 @@ export function SiteHeader() {
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
             Export
           </Button>
-          <div className="hidden items-center gap-2 text-sm md:flex">
-            <Avatar className="h-7 w-7 rounded-full">
-              <AvatarImage src="/avatars/shadcn.jpg" alt="Admin" />
-              <AvatarFallback>AD</AvatarFallback>
-            </Avatar>
-            <div className="grid leading-tight">
-              <span className="text-xs font-medium">Admin</span>
-              <span className="text-muted-foreground text-xs">admin@demo.id</span>
-            </div>
-          </div>
         </div>
       </div>
     </header>
