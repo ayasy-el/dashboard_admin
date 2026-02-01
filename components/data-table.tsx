@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconChevronUp,
-} from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import {
   flexRender,
   getCoreRowModel,
@@ -20,7 +13,7 @@ import {
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { TableCard } from "@/components/table-card";
 import {
   Table,
   TableBody,
@@ -244,43 +237,44 @@ function MetricsTable({
   });
 
   return (
-    <Card className="gap-0 overflow-hidden py-0">
-      <CardContent className="flex flex-col gap-4 p-0">
-        <Table className="[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-15 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12">
-          <TableHeader className="bg-muted/60 text-muted-foreground">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} colSpan={header.colSpan}>
+    <TableCard contentClassName="flex flex-col gap-4">
+      <Table className="[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-15 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12 [&_th]:text-center [&_td]:text-center [&_th:first-child]:text-left [&_td:first-child]:text-left">
+        <TableHeader className="bg-muted/60 text-muted-foreground">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} colSpan={header.colSpan}>
+                  <b>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+                  </b>
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className={cn(row.original.isChild && "bg-muted/20")}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
               </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className={cn(row.original.isChild && "bg-muted/20")}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-        {/*
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                No results.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      {/*
         <div className="flex items-center justify-between px-4 pb-4">
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
@@ -346,8 +340,7 @@ function MetricsTable({
           </div>
         </div>
         */}
-      </CardContent>
-    </Card>
+    </TableCard>
   );
 }
 

@@ -2,9 +2,10 @@
 
 import * as React from "react";
 
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
+// import { ChartAreaInteractive } from "@/components/chart-area-interactive";
+import { DataTable } from "@/components/data-table";
 import { OverviewTransactions } from "@/components/overview-transactions";
-import { SectionCards } from "@/components/section-cards";
+import { SectionCards, type StatCard } from "@/components/section-cards";
 import {
   Select,
   SelectContent,
@@ -14,15 +15,80 @@ import {
 } from "@/components/ui/select";
 import { formatMonthValue, getMonthLabel } from "@/lib/dashboard-metrics";
 
-const buildMonthOptions = (count: number) => {
-  const options = [];
+type MonthOption = {
+  value: string;
+  label: string;
+};
+
+type OverviewResponse = {
+  month: string;
+  monthLabel: string;
+  previousMonth: string;
+  previousMonthLabel: string;
+  cards: {
+    totalPoinPelanggan: number;
+    totalTransaksi: number;
+    totalPoin: number;
+    totalRedeemer: number;
+    previous: {
+      totalPoinPelanggan: number;
+      totalTransaksi: number;
+      totalPoin: number;
+      totalRedeemer: number;
+    };
+  };
+  dailyPoints: { date: string; value: number }[];
+  dailyTransactions: { date: string; value: number }[];
+  dailyRedeemer: { date: string; value: number }[];
+  monthlyTransactions: { month: string; value: number }[];
+  categoryBreakdown: { name: string; value: number; percent: number }[];
+  branchTable: {
+    branches: {
+      id: number;
+      name: string;
+      totalMerchant: number;
+      uniqueMerchant: number;
+      totalPoint: number;
+      totalTransaksi: number;
+      uniqueRedeemer: number;
+      merchantAktif: number;
+      merchantProduktif: number;
+      children: {
+        id: number;
+        name: string;
+        totalMerchant: number;
+        uniqueMerchant: number;
+        totalPoint: number;
+        totalTransaksi: number;
+        uniqueRedeemer: number;
+        merchantAktif: number;
+        merchantProduktif: number;
+      }[];
+    }[];
+  };
+  categoryTable: {
+    id: number;
+    name: string;
+    totalMerchant: number;
+    uniqueMerchant: number;
+    totalPoint: number;
+    totalTransaksi: number;
+    uniqueRedeemer: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+  }[];
+};
+
+const fallbackMonthOptions = () => {
+  const options: MonthOption[] = [];
   const now = new Date();
 
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < 6; i += 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = formatMonthValue(date);
     options.push({
-      value: formatMonthValue(date),
-      label: getMonthLabel(formatMonthValue(date)),
+      value,
+      label: getMonthLabel(value),
     });
   }
 
@@ -30,10 +96,118 @@ const buildMonthOptions = (count: number) => {
 };
 
 export function OverviewContent() {
-  const monthOptions = React.useMemo(() => buildMonthOptions(6), []);
+  const [monthOptions, setMonthOptions] = React.useState<MonthOption[]>(() =>
+    fallbackMonthOptions(),
+  );
   const [selectedMonth, setSelectedMonth] = React.useState(
     monthOptions[0]?.value ?? formatMonthValue(new Date()),
   );
+  const [data, setData] = React.useState<OverviewResponse | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+
+    const loadMonths = async () => {
+      try {
+        const response = await fetch("/api/overview/months");
+        if (!response.ok) {
+          throw new Error("Failed to load month options");
+        }
+        const payload = (await response.json()) as { months: MonthOption[] };
+        if (active && payload.months.length) {
+          setMonthOptions(payload.months);
+          setSelectedMonth(payload.months[0].value);
+        }
+      } catch (error) {
+        if (active) {
+          console.error(error);
+        }
+      }
+    };
+
+    loadMonths();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/overview?month=${selectedMonth}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to load overview data");
+        }
+        const payload = (await response.json()) as OverviewResponse;
+        if (active) {
+          setData(payload);
+        }
+      } catch (error) {
+        if (active) {
+          console.error(error);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    if (selectedMonth) {
+      load();
+    }
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [selectedMonth]);
+
+  const stats: StatCard[] = React.useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        id: "customer-points",
+        label: "Total Poin Pelanggan",
+        unit: "poin",
+        currentTotal: data.cards.totalPoinPelanggan,
+        previousTotal: data.cards.previous.totalPoinPelanggan,
+        series: data.dailyPoints,
+      },
+      {
+        id: "transactions",
+        label: "Total Transaksi",
+        unit: "transaksi",
+        currentTotal: data.cards.totalTransaksi,
+        previousTotal: data.cards.previous.totalTransaksi,
+        series: data.dailyTransactions,
+      },
+      {
+        id: "total-points",
+        label: "Total Poin",
+        unit: "poin",
+        currentTotal: data.cards.totalPoin,
+        previousTotal: data.cards.previous.totalPoin,
+        series: data.dailyPoints,
+      },
+      {
+        id: "redeemers",
+        label: "Total Redeemer",
+        unit: "redeemer",
+        currentTotal: data.cards.totalRedeemer,
+        previousTotal: data.cards.previous.totalRedeemer,
+        series: data.dailyRedeemer,
+      },
+    ];
+  }, [data]);
 
   return (
     <>
@@ -52,11 +226,41 @@ export function OverviewContent() {
           </SelectContent>
         </Select>
       </div>
-      <SectionCards month={selectedMonth} />
-      {/* <div className="px-4 lg:px-6">
-        <ChartAreaInteractive month={selectedMonth} />
-      </div> */}
-      <OverviewTransactions month={selectedMonth} />
+      {data ? (
+        <>
+          <SectionCards
+            monthLabel={data.monthLabel}
+            previousMonthLabel={data.previousMonthLabel}
+            stats={stats}
+          />
+          {/* <div className="px-4 lg:px-6">
+            <ChartAreaInteractive
+              monthLabel={data.monthLabel}
+              total={data.cards.totalPoin}
+              series={data.dailyPoints}
+            />
+          </div> */}
+          <OverviewTransactions
+            monthLabel={data.monthLabel}
+            previousMonthLabel={data.previousMonthLabel}
+            categoryBreakdown={data.categoryBreakdown}
+            dailySeries={data.dailyTransactions}
+            monthlySeries={data.monthlyTransactions}
+            totalDaily={data.cards.totalTransaksi}
+            totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
+          />
+          <DataTable
+            data={{
+              cluster: data.branchTable.branches,
+              category: data.categoryTable,
+            }}
+          />
+        </>
+      ) : (
+        <div className="px-4 text-sm text-muted-foreground lg:px-6">
+          {loading ? "Memuat data..." : "Tidak ada data"}
+        </div>
+      )}
     </>
   );
 }

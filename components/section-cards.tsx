@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardAction,
+  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -18,71 +19,41 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  buildDailySeries,
-  formatNumber,
-  formatPercent,
-  getMonthLabel,
-  getPreviousMonth,
-  sumSeries,
-} from "@/lib/dashboard-metrics"
+import { formatNumber, formatPercent } from "@/lib/dashboard-metrics"
+import { cn } from "@/lib/utils"
 
-type SectionCardsProps = {
-  month: string
-}
-
-type StatDefinition = {
+export type StatCard = {
   id: string
   label: string
   unit: string
-  scale: number
+  currentTotal: number
+  previousTotal: number
+  series: { date: string; value: number }[]
 }
 
-const stats: StatDefinition[] = [
-  {
-    id: "customer-points",
-    label: "Total Poin Pelanggan",
-    unit: "poin",
-    scale: 6.5,
-  },
-  {
-    id: "transactions",
-    label: "Total Transaksi",
-    unit: "transaksi",
-    scale: 3.2,
-  },
-  {
-    id: "total-points",
-    label: "Total Poin",
-    unit: "poin",
-    scale: 9.5,
-  },
-  {
-    id: "redeemers",
-    label: "Total Redeemer",
-    unit: "redeemer",
-    scale: 1.8,
-  },
-]
+type SectionCardsProps = {
+  monthLabel: string
+  previousMonthLabel: string
+  stats: StatCard[]
+  className?: string
+}
 
-export function SectionCards({ month }: SectionCardsProps) {
-  const previousMonth = getPreviousMonth(month)
-  const monthLabel = getMonthLabel(month)
-  const previousMonthLabel = getMonthLabel(previousMonth)
-
+export function SectionCards({
+  monthLabel,
+  previousMonthLabel,
+  stats,
+  className,
+}: SectionCardsProps) {
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div
+      className={cn(
+        "*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4",
+        className
+      )}
+    >
       {stats.map((stat) => {
-        const currentSeries = buildDailySeries(month, stat.id, {
-          scale: stat.scale,
-        })
-        const previousSeries = buildDailySeries(previousMonth, stat.id, {
-          scale: stat.scale,
-        })
-        const currentTotal = sumSeries(currentSeries)
-        const previousTotal = sumSeries(previousSeries)
-        const delta = previousTotal
-          ? ((currentTotal - previousTotal) / previousTotal) * 100
+        const delta = stat.previousTotal
+          ? ((stat.currentTotal - stat.previousTotal) / stat.previousTotal) * 100
           : 0
         const isPositive = delta >= 0
         const TrendIcon = isPositive ? IconTrendingUp : IconTrendingDown
@@ -98,7 +69,7 @@ export function SectionCards({ month }: SectionCardsProps) {
             <CardHeader>
               <CardDescription>{stat.label}</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                {formatNumber(currentTotal)}
+                {formatNumber(stat.currentTotal)}
               </CardTitle>
               <CardAction>
                 <Badge variant="outline">
@@ -108,24 +79,9 @@ export function SectionCards({ month }: SectionCardsProps) {
                 </Badge>
               </CardAction>
             </CardHeader>
-            <CardFooter className="flex-col items-start gap-1 text-xs">
-              <div className="flex w-full items-center justify-between gap-2 font-medium text-foreground/90">
-                <span className="truncate">{monthLabel}</span>
-                <span className="tabular-nums">
-                  {formatNumber(currentTotal)} {stat.unit}
-                </span>
-              </div>
-              <div className="flex w-full items-center justify-between gap-2 text-muted-foreground">
-                <span className="truncate">{previousMonthLabel}</span>
-                <span className="tabular-nums">
-                  {formatNumber(previousTotal)} {stat.unit}
-                </span>
-              </div>
-              <ChartContainer
-                config={chartConfig}
-                className="mt-2 h-[56px] w-full"
-              >
-                <AreaChart data={currentSeries} margin={{ left: 0, right: 0 }}>
+            <CardContent className="px-6 pt-0">
+              <ChartContainer config={chartConfig} className="h-[96px] w-full">
+                <AreaChart data={stat.series}>
                   <defs>
                     <linearGradient
                       id={`fill-${stat.id}`}
@@ -135,14 +91,14 @@ export function SectionCards({ month }: SectionCardsProps) {
                       y2="1"
                     >
                       <stop
-                        offset="0%"
+                        offset="10%"
                         stopColor="var(--color-value)"
-                        stopOpacity={0.18}
+                        stopOpacity={0.9}
                       />
                       <stop
-                        offset="100%"
+                        offset="95%"
                         stopColor="var(--color-value)"
-                        stopOpacity={0}
+                        stopOpacity={0.1}
                       />
                     </linearGradient>
                   </defs>
@@ -173,6 +129,20 @@ export function SectionCards({ month }: SectionCardsProps) {
                   />
                 </AreaChart>
               </ChartContainer>
+            </CardContent>
+            <CardFooter className="flex-col items-start gap-1 text-xs">
+              <div className="flex w-full items-center justify-between gap-2 font-medium text-foreground/90">
+                <span className="truncate">{monthLabel}</span>
+                <span className="tabular-nums">
+                  {formatNumber(stat.currentTotal)} {stat.unit}
+                </span>
+              </div>
+              <div className="flex w-full items-center justify-between gap-2 text-muted-foreground">
+                <span className="truncate">{previousMonthLabel}</span>
+                <span className="tabular-nums">
+                  {formatNumber(stat.previousTotal)} {stat.unit}
+                </span>
+              </div>
             </CardFooter>
           </Card>
         )

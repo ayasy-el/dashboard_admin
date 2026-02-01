@@ -17,17 +17,14 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  buildDailySeries,
-  formatNumber,
-  getMonthLabel,
-  sumSeries,
-} from "@/lib/dashboard-metrics"
+import { formatNumber } from "@/lib/dashboard-metrics"
 
 export const description = "An interactive area chart"
 
 type ChartAreaInteractiveProps = {
-  month: string
+  monthLabel: string
+  total: number
+  series: { date: string; value: number }[]
 }
 
 const chartConfig = {
@@ -37,11 +34,11 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function ChartAreaInteractive({ month }: ChartAreaInteractiveProps) {
-  const chartData = buildDailySeries(month, "overview-trend", { scale: 8.5 })
-  const total = sumSeries(chartData)
-  const monthLabel = getMonthLabel(month)
-
+export function ChartAreaInteractive({
+  monthLabel,
+  total,
+  series,
+}: ChartAreaInteractiveProps) {
   return (
     <Card className="@container/card">
       <CardHeader>
@@ -56,7 +53,7 @@ export function ChartAreaInteractive({ month }: ChartAreaInteractiveProps) {
           config={chartConfig}
           className="aspect-auto h-[250px] w-full"
         >
-          <AreaChart data={chartData}>
+          <AreaChart data={series}>
             <defs>
               <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
                 <stop

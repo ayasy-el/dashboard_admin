@@ -1,0 +1,518 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.dim_merchant": {
+      "name": "dim_merchant",
+      "schema": "",
+      "columns": {
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "keyword_code": {
+          "name": "keyword_code",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "merchant_name": {
+          "name": "merchant_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uniq_merchant_key": {
+          "name": "uniq_merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "dim_merchant_index_3": {
+          "name": "dim_merchant_index_3",
+          "columns": [
+            {
+              "expression": "keyword_code",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dim_merchant_merchant": {
+          "name": "dim_merchant_merchant",
+          "columns": [
+            {
+              "expression": "uniq_merchant_key",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_dim_merchant_uniq_merchant_key_dim_uniq_merchant_uniq_mer": {
+          "name": "fk_dim_merchant_uniq_merchant_key_dim_uniq_merchant_uniq_mer",
+          "tableFrom": "dim_merchant",
+          "tableTo": "dim_uniq_merchant",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "uniq_merchant_key"
+          ],
+          "columnsTo": [
+            "uniq_merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "dim_merchant_keyword_code_key": {
+          "columns": [
+            "keyword_code"
+          ],
+          "nullsNotDistinct": false,
+          "name": "dim_merchant_keyword_code_key"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.fact_transaction": {
+      "name": "fact_transaction",
+      "schema": "",
+      "columns": {
+        "transaction_key": {
+          "name": "transaction_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uniq_merchant_key": {
+          "name": "uniq_merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "transaction_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qty": {
+          "name": "qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "msisdn": {
+          "name": "msisdn",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fact_transaction_index_6": {
+          "name": "fact_transaction_index_6",
+          "columns": [
+            {
+              "expression": "msisdn",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_merchant": {
+          "name": "fact_transaction_merchant",
+          "columns": [
+            {
+              "expression": "merchant_key",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_rule": {
+          "name": "fact_transaction_rule",
+          "columns": [
+            {
+              "expression": "rule_key",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_timestamp": {
+          "name": "fact_transaction_timestamp",
+          "columns": [
+            {
+              "expression": "timestamp",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "timestamp_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_uniq_merchant": {
+          "name": "fact_transaction_uniq_merchant",
+          "columns": [
+            {
+              "expression": "uniq_merchant_key",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_fact_transaction_merchant_key_dim_merchant_merchant_key": {
+          "name": "fk_fact_transaction_merchant_key_dim_merchant_merchant_key",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_merchant",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "merchant_key"
+          ],
+          "columnsTo": [
+            "merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_fact_transaction_rule_key_dim_rule_rule_key": {
+          "name": "fk_fact_transaction_rule_key_dim_rule_rule_key",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_rule",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "rule_key"
+          ],
+          "columnsTo": [
+            "rule_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_fact_transaction_uniq_merchant_key_dim_uniq_merchant_uniq": {
+          "name": "fk_fact_transaction_uniq_merchant_key_dim_uniq_merchant_uniq",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_uniq_merchant",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "uniq_merchant_key"
+          ],
+          "columnsTo": [
+            "uniq_merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.dim_rule": {
+      "name": "dim_rule",
+      "schema": "",
+      "columns": {
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rule_merchant": {
+          "name": "rule_merchant",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_period": {
+          "name": "start_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_period": {
+          "name": "end_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "dim_rule_index_3": {
+          "name": "dim_rule_index_3",
+          "columns": [
+            {
+              "expression": "rule_merchant",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "start_period",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "end_period",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dim_rule_period": {
+          "name": "dim_rule_period",
+          "columns": [
+            {
+              "expression": "start_period",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "end_period",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_dim_rule_rule_merchant_dim_merchant_merchant_key": {
+          "name": "fk_dim_rule_rule_merchant_dim_merchant_merchant_key",
+          "tableFrom": "dim_rule",
+          "tableTo": "dim_merchant",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "rule_merchant"
+          ],
+          "columnsTo": [
+            "merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.dim_uniq_merchant": {
+      "name": "dim_uniq_merchant",
+      "schema": "",
+      "columns": {
+        "uniq_merchant_key": {
+          "name": "uniq_merchant_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "uniq_merchant": {
+          "name": "uniq_merchant",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch": {
+          "name": "branch",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_dim_uniq_merchant_category_id_category_category_id": {
+          "name": "fk_dim_uniq_merchant_category_id_category_category_id",
+          "tableFrom": "dim_uniq_merchant",
+          "tableTo": "category",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.category": {
+      "name": "category",
+      "schema": "",
+      "columns": {
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.transaction_status": {
+      "name": "transaction_status",
+      "values": [
+        "success",
+        "failed"
+      ],
+      "schema": "public"
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {}
+  }
+}
