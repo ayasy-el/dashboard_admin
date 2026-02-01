@@ -19,23 +19,46 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  buildDailySeries,
-  formatMonthValue,
-  formatNumber,
-  getMonthLabel,
-  getMonthDays,
-  getPreviousMonth,
-  sumSeries,
-} from "@/lib/dashboard-metrics"
 
 type MonthOption = {
   value: string
   label: string
 }
 
+type OperationalResponse = {
+  month: string
+  monthLabel: string
+  previousMonth: string
+  previousMonthLabel: string
+  cards: {
+    success: {
+      current: number
+      previous: number
+      series: { date: string; value: number }[]
+    }
+    failed: {
+      current: number
+      previous: number
+      series: { date: string; value: number }[]
+    }
+  }
+  topMerchants: {
+    merchant: string
+    keyword: string
+    totalTransactions: number
+    uniqMerchant: number
+    uniqRedeemer: number
+  }[]
+  expiredRules: {
+    merchant: string
+    keyword: string
+    startPeriod: string
+    endPeriod: string
+  }[]
+}
+
 const tableClassName =
-  "[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-14 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12 [&_th]:text-center [&_td]:text-center [&_th:first-child]:text-left [&_td:first-child]:text-left"
+  "[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-14 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12"
 
 const fallbackMonthOptions = () => {
   const options: MonthOption[] = []
@@ -43,141 +66,121 @@ const fallbackMonthOptions = () => {
 
   for (let i = 0; i < 6; i += 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const value = formatMonthValue(date)
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
     options.push({
       value,
-      label: getMonthLabel(value),
+      label: date.toLocaleDateString("id-ID", { month: "long", year: "numeric" }),
     })
   }
 
   return options
 }
 
-const getOperationalStats = (monthValue: string) => {
-  const previousMonth = getPreviousMonth(monthValue)
-  const monthLabel = getMonthLabel(monthValue)
-  const previousMonthLabel = getMonthLabel(previousMonth)
-
-  const successSeries = buildDailySeries(monthValue, "transaction-success", {
-    scale: 1.2,
-  })
-  const failedSeries = buildDailySeries(monthValue, "transaction-failed", {
-    scale: 0.35,
-  })
-  const successPrevSeries = buildDailySeries(previousMonth, "transaction-success", {
-    scale: 1.1,
-  })
-  const failedPrevSeries = buildDailySeries(previousMonth, "transaction-failed", {
-    scale: 0.32,
-  })
-
-  const stats: StatCard[] = [
-    {
-      id: "transaction-success",
-      label: "Transaction Success",
-      unit: "transaksi",
-      currentTotal: sumSeries(successSeries),
-      previousTotal: sumSeries(successPrevSeries),
-      series: successSeries,
-    },
-    {
-      id: "transaction-failed",
-      label: "Transaction Failed",
-      unit: "transaksi",
-      currentTotal: sumSeries(failedSeries),
-      previousTotal: sumSeries(failedPrevSeries),
-      series: failedSeries,
-    },
-  ]
-
-  return { monthLabel, previousMonthLabel, stats }
-}
-
-const hashString = (value: string) => {
-  let hash = 0
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) % 10000
-  }
-  return hash
-}
-
-const formatDate = (date: Date) =>
-  date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-
-const buildTopMerchants = (monthValue: string) => {
-  const seed = hashString(monthValue)
-  const rows = [
-    { merchant: "Kopi Senja", keyword: "promo-minum", base: 1800 },
-    { merchant: "Saji Nusantara", keyword: "makan-hemat", base: 1520 },
-    { merchant: "Urban Mart", keyword: "grocery-sale", base: 1310 },
-    { merchant: "Style Avenue", keyword: "fashion-week", base: 1180 },
-    { merchant: "Elektronika Plus", keyword: "tech-bonus", base: 990 },
-  ]
-
-  return rows.map((row, index) => {
-    const offset = (seed + index * 137) % 180
-    const totalTransactions = row.base + offset
-    const uniqMerchant = Math.max(40, Math.round(totalTransactions * 0.07))
-    const uniqRedeemer = Math.max(220, Math.round(totalTransactions * 0.38))
-    return {
-      merchant: row.merchant,
-      uniqMerchant,
-      keyword: row.keyword,
-      totalTransactions,
-      uniqRedeemer,
-    }
-  })
-}
-
-const buildExpiredThisMonth = (monthValue: string) => {
-  const [year, month] = monthValue.split("-").map(Number)
-  const totalDays = getMonthDays(monthValue)
-  const starts = [2, 5, 8, 11, 15]
-  const ends = [10, 17, 20, 23, 27]
-  const rows = [
-    { merchant: "Nusa Grill", keyword: "weekend-bbq" },
-    { merchant: "Daily Fresh", keyword: "fresh-morning" },
-    { merchant: "Gadget Hub", keyword: "new-year-tech" },
-    { merchant: "Kopi Tengah", keyword: "coffee-boost" },
-    { merchant: "Rasa Timur", keyword: "spice-up" },
-  ]
-
-  return rows.map((row, index) => {
-    const startDay = Math.min(starts[index], totalDays)
-    const endDay = Math.min(ends[index], totalDays)
-    const startPeriod = formatDate(new Date(year, month - 1, startDay))
-    const endPeriod = formatDate(new Date(year, month - 1, endDay))
-    return {
-      merchant: row.merchant,
-      keyword: row.keyword,
-      startPeriod,
-      endPeriod,
-    }
-  })
-}
-
 export function OperationalContent() {
-  const [monthOptions] = React.useState<MonthOption[]>(() => fallbackMonthOptions())
+  const [monthOptions, setMonthOptions] = React.useState<MonthOption[]>(() =>
+    fallbackMonthOptions()
+  )
   const [selectedMonth, setSelectedMonth] = React.useState(
-    monthOptions[0]?.value ?? formatMonthValue(new Date())
+    monthOptions[0]?.value ?? monthOptions[0]?.value
   )
+  const [data, setData] = React.useState<OperationalResponse | null>(null)
+  const [loading, setLoading] = React.useState(false)
 
-  const { monthLabel, previousMonthLabel, stats } = React.useMemo(
-    () => getOperationalStats(selectedMonth),
-    [selectedMonth]
-  )
-  const topMerchants = React.useMemo(
-    () => buildTopMerchants(selectedMonth),
-    [selectedMonth]
-  )
-  const expiredThisMonth = React.useMemo(
-    () => buildExpiredThisMonth(selectedMonth),
-    [selectedMonth]
-  )
+  React.useEffect(() => {
+    let active = true
+
+    const loadMonths = async () => {
+      try {
+        const response = await fetch("/api/overview/months")
+        if (!response.ok) {
+          throw new Error("Failed to load month options")
+        }
+        const payload = (await response.json()) as { months: MonthOption[] }
+        if (active && payload.months.length) {
+          setMonthOptions(payload.months)
+          setSelectedMonth(payload.months[0].value)
+        }
+      } catch (error) {
+        if (active) {
+          console.error(error)
+        }
+      }
+    }
+
+    loadMonths()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  React.useEffect(() => {
+    let active = true
+    const controller = new AbortController()
+
+    const load = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/operational?month=${selectedMonth}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          throw new Error("Failed to load operational data")
+        }
+        const payload = (await response.json()) as OperationalResponse
+        if (active) {
+          setData(payload)
+        }
+      } catch (error) {
+        if (active) {
+          console.error(error)
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    if (selectedMonth) {
+      load()
+    }
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [selectedMonth])
+
+  const stats: StatCard[] = React.useMemo(() => {
+    if (!data) return []
+    return [
+      {
+        id: "transaction-success",
+        label: "Transaction Success",
+        unit: "transaksi",
+        currentTotal: data.cards.success.current,
+        previousTotal: data.cards.success.previous,
+        series: data.cards.success.series,
+      },
+      {
+        id: "transaction-failed",
+        label: "Transaction Failed",
+        unit: "transaksi",
+        currentTotal: data.cards.failed.current,
+        previousTotal: data.cards.failed.previous,
+        series: data.cards.failed.series,
+      },
+    ]
+  }, [data])
+
+  if (!data) {
+    return (
+      <div className="px-4 text-sm text-muted-foreground lg:px-6">
+        {loading ? "Memuat data..." : "Tidak ada data"}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -197,8 +200,8 @@ export function OperationalContent() {
         </Select>
       </div>
       <SectionCards
-        monthLabel={monthLabel}
-        previousMonthLabel={previousMonthLabel}
+        monthLabel={data.monthLabel}
+        previousMonthLabel={data.previousMonthLabel}
         stats={stats}
         className="mx-auto w-full max-w-4xl px-0 sm:grid-cols-2 @xl/main:grid-cols-2 @5xl/main:grid-cols-2"
       />
@@ -208,46 +211,40 @@ export function OperationalContent() {
           <Table className={tableClassName}>
             <TableHeader className="bg-muted/60 text-muted-foreground">
               <TableRow>
-                <TableHead><b>Nama Merchant</b></TableHead>
-                <TableHead><b>Uniq Merchant</b></TableHead>
-                <TableHead><b>Keyword</b></TableHead>
-                <TableHead><b>Jumlah Transaksi</b></TableHead>
-                <TableHead><b>Uniq Redeemer</b></TableHead>
+                <TableHead>Nama Merchant</TableHead>
+                <TableHead>Uniq Merchant</TableHead>
+                <TableHead>Keyword</TableHead>
+                <TableHead>Jumlah Transaksi</TableHead>
+                <TableHead>Uniq Redeemer</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topMerchants.map((row) => (
+              {data.topMerchants.map((row) => (
                 <TableRow key={`${row.merchant}-${row.keyword}`}>
                   <TableCell className="font-medium">{row.merchant}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {formatNumber(row.uniqMerchant)}
-                  </TableCell>
+                  <TableCell>{row.uniqMerchant}</TableCell>
                   <TableCell>{row.keyword}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {formatNumber(row.totalTransactions)}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {formatNumber(row.uniqRedeemer)}
-                  </TableCell>
+                  <TableCell>{row.totalTransactions}</TableCell>
+                  <TableCell>{row.uniqRedeemer}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableCard>
 
-        <TableCard title="Expired This Month">
+        <TableCard title="Rule Expired Bulan Ini">
           <Table className={tableClassName}>
             <TableHeader className="bg-muted/60 text-muted-foreground">
               <TableRow>
-                <TableHead><b>Merchant</b></TableHead>
-                <TableHead><b>Keyword</b></TableHead>
-                <TableHead><b>Start Period</b></TableHead>
-                <TableHead><b>End Period</b></TableHead>
+                <TableHead>Nama Merchant</TableHead>
+                <TableHead>Keyword</TableHead>
+                <TableHead>Mulai</TableHead>
+                <TableHead>Berakhir</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expiredThisMonth.map((row) => (
-                <TableRow key={`${row.merchant}-${row.keyword}`}>
+              {data.expiredRules.map((row) => (
+                <TableRow key={`${row.merchant}-${row.keyword}-${row.endPeriod}`}>
                   <TableCell className="font-medium">{row.merchant}</TableCell>
                   <TableCell>{row.keyword}</TableCell>
                   <TableCell>{row.startPeriod}</TableCell>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { and, eq, gte, lt, sql } from "drizzle-orm"
 
 import { db } from "@/lib/db"
-import { category, dimUniqMerchant, factTransaction } from "@/lib/db/schema"
+import { dimCategory, dimCluster, dimMerchant, factTransaction } from "@/lib/db/schema"
 
 const PRODUCTIVE_THRESHOLD = 5
 
@@ -52,14 +52,14 @@ export async function GET(request: Request) {
 
   const baseWhere = and(
     eq(factTransaction.status, "success"),
-    gte(factTransaction.timestamp, start),
-    lt(factTransaction.timestamp, end)
+    gte(factTransaction.transactionAt, start),
+    lt(factTransaction.transactionAt, end)
   )
 
   const previousWhere = and(
     eq(factTransaction.status, "success"),
-    gte(factTransaction.timestamp, previousStart),
-    lt(factTransaction.timestamp, previousEnd)
+    gte(factTransaction.transactionAt, previousStart),
+    lt(factTransaction.transactionAt, previousEnd)
   )
 
   const [summary] = await db
@@ -82,50 +82,50 @@ export async function GET(request: Request) {
 
   const dailyPoints = await db
     .select({
-      date: sql<string>`date(${factTransaction.timestamp})`,
+      date: sql<string>`date(${factTransaction.transactionAt})`,
       value: sql<number>`coalesce(sum(${factTransaction.qty} * ${factTransaction.pointRedeem}), 0)`,
     })
     .from(factTransaction)
     .where(baseWhere)
-    .groupBy(sql`date(${factTransaction.timestamp})`)
-    .orderBy(sql`date(${factTransaction.timestamp})`)
+    .groupBy(sql`date(${factTransaction.transactionAt})`)
+    .orderBy(sql`date(${factTransaction.transactionAt})`)
 
   const dailyTransactions = await db
     .select({
-      date: sql<string>`date(${factTransaction.timestamp})`,
+      date: sql<string>`date(${factTransaction.transactionAt})`,
       value: sql<number>`count(*)`,
     })
     .from(factTransaction)
     .where(baseWhere)
-    .groupBy(sql`date(${factTransaction.timestamp})`)
-    .orderBy(sql`date(${factTransaction.timestamp})`)
+    .groupBy(sql`date(${factTransaction.transactionAt})`)
+    .orderBy(sql`date(${factTransaction.transactionAt})`)
 
   const dailyRedeemer = await db
     .select({
-      date: sql<string>`date(${factTransaction.timestamp})`,
+      date: sql<string>`date(${factTransaction.transactionAt})`,
       value: sql<number>`count(distinct ${factTransaction.msisdn})`,
     })
     .from(factTransaction)
     .where(baseWhere)
-    .groupBy(sql`date(${factTransaction.timestamp})`)
-    .orderBy(sql`date(${factTransaction.timestamp})`)
+    .groupBy(sql`date(${factTransaction.transactionAt})`)
+    .orderBy(sql`date(${factTransaction.transactionAt})`)
 
   const rangeStart = addMonths(start, -5)
   const monthlyTransactionsRaw = await db
     .select({
-      month: sql<string>`to_char(date_trunc('month', ${factTransaction.timestamp}), 'YYYY-MM')`,
+      month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
       value: sql<number>`count(*)`,
     })
     .from(factTransaction)
     .where(
       and(
         eq(factTransaction.status, "success"),
-        gte(factTransaction.timestamp, rangeStart),
-        lt(factTransaction.timestamp, end)
+        gte(factTransaction.transactionAt, rangeStart),
+        lt(factTransaction.transactionAt, end)
       )
     )
-    .groupBy(sql`date_trunc('month', ${factTransaction.timestamp})`)
-    .orderBy(sql`date_trunc('month', ${factTransaction.timestamp})`)
+    .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
+    .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
 
   const monthlyMap = new Map(
     monthlyTransactionsRaw.map((row) => [row.month, toNumber(row.value)])
@@ -141,17 +141,17 @@ export async function GET(request: Request) {
 
   const categoryRaw = await db
     .select({
-      name: category.category,
+      name: dimCategory.category,
       value: sql<number>`count(*)`,
     })
     .from(factTransaction)
     .innerJoin(
-      dimUniqMerchant,
-      eq(dimUniqMerchant.uniqMerchantKey, factTransaction.uniqMerchantKey)
+      dimMerchant,
+      eq(dimMerchant.merchantKey, factTransaction.merchantKey)
     )
-    .innerJoin(category, eq(category.categoryId, dimUniqMerchant.categoryId))
+    .innerJoin(dimCategory, eq(dimCategory.categoryId, dimMerchant.categoryId))
     .where(baseWhere)
-    .groupBy(category.categoryId, category.category)
+    .groupBy(dimCategory.categoryId, dimCategory.category)
     .orderBy(sql`count(*) desc`)
 
   const totalCategory = categoryRaw.reduce(
@@ -166,45 +166,47 @@ export async function GET(request: Request) {
 
   const branchClusterRows = await db.execute(sql`
     select
-      dum.branch as branch,
-      dum.region as region,
+      dc.branch as branch,
+      dc.cluster as cluster,
       count(distinct ft.merchant_key)::int as total_merchant,
-      count(distinct ft.uniq_merchant_key)::int as unique_merchant,
+      count(distinct dm.uniq_merchant)::int as unique_merchant,
       coalesce(sum(ft.qty * ft.point_redeem), 0)::int as total_point,
       count(*)::int as total_transaksi,
       count(distinct ft.msisdn)::int as unique_redeemer,
-      count(distinct ft.uniq_merchant_key)::int as merchant_aktif
+      count(distinct ft.merchant_key)::int as merchant_aktif
     from fact_transaction ft
-    join dim_uniq_merchant dum on dum.uniq_merchant_key = ft.uniq_merchant_key
+    join dim_merchant dm on dm.merchant_key = ft.merchant_key
+    join dim_cluster dc on dc.cluster_id = dm.cluster_id
     where ft.status = 'success'
-      and ft.timestamp >= ${start}
-      and ft.timestamp < ${end}
-    group by dum.branch, dum.region
-    order by dum.branch, dum.region
+      and ft.transaction_at >= ${start}
+      and ft.transaction_at < ${end}
+    group by dc.branch, dc.cluster
+    order by dc.branch, dc.cluster
   `)
 
   const produktifRows = await db.execute(sql`
-    select branch, region, count(*)::int as merchant_productif
+    select branch, cluster, count(*)::int as merchant_productif
     from (
       select
-        dum.branch as branch,
-        dum.region as region,
-        ft.uniq_merchant_key as uniq_merchant_key,
+        dc.branch as branch,
+        dc.cluster as cluster,
+        ft.merchant_key as merchant_key,
         count(*)::int as tx_count
       from fact_transaction ft
-      join dim_uniq_merchant dum on dum.uniq_merchant_key = ft.uniq_merchant_key
+      join dim_merchant dm on dm.merchant_key = ft.merchant_key
+      join dim_cluster dc on dc.cluster_id = dm.cluster_id
       where ft.status = 'success'
-        and ft.timestamp >= ${start}
-        and ft.timestamp < ${end}
-      group by dum.branch, dum.region, ft.uniq_merchant_key
+        and ft.transaction_at >= ${start}
+        and ft.transaction_at < ${end}
+      group by dc.branch, dc.cluster, ft.merchant_key
     ) t
     where t.tx_count >= ${PRODUCTIVE_THRESHOLD}
-    group by branch, region
+    group by branch, cluster
   `)
 
   const produktifMap = new Map<string, number>()
   for (const row of produktifRows.rows as any[]) {
-    produktifMap.set(`${row.branch}||${row.region}`, toNumber(row.merchant_productif))
+    produktifMap.set(`${row.branch}||${row.cluster}`, toNumber(row.merchant_productif))
   }
 
   const branchMap = new Map<string, any>()
@@ -213,7 +215,7 @@ export async function GET(request: Request) {
 
   for (const row of branchClusterRows.rows as any[]) {
     const branchName = row.branch
-    const regionName = row.region
+    const clusterName = row.cluster
     if (!branchMap.has(branchName)) {
       branchMap.set(branchName, {
         id: branchId++,
@@ -222,10 +224,10 @@ export async function GET(request: Request) {
       })
     }
 
-    const produktif = produktifMap.get(`${branchName}||${regionName}`) ?? 0
+    const produktif = produktifMap.get(`${branchName}||${clusterName}`) ?? 0
     branchMap.get(branchName).children.push({
       id: clusterId++,
-      name: regionName,
+      name: clusterName,
       totalMerchant: toNumber(row.total_merchant),
       uniqueMerchant: toNumber(row.unique_merchant),
       totalPoint: toNumber(row.total_point),
@@ -238,20 +240,20 @@ export async function GET(request: Request) {
 
   const categoryTableRaw = await db.execute(sql`
     select
-      c.category as name,
+      dc.category as name,
       count(distinct ft.merchant_key)::int as total_merchant,
-      count(distinct ft.uniq_merchant_key)::int as unique_merchant,
+      count(distinct dm.uniq_merchant)::int as unique_merchant,
       coalesce(sum(ft.qty * ft.point_redeem), 0)::int as total_point,
       count(*)::int as total_transaksi,
       count(distinct ft.msisdn)::int as unique_redeemer,
-      count(distinct ft.uniq_merchant_key)::int as merchant_aktif
+      count(distinct ft.merchant_key)::int as merchant_aktif
     from fact_transaction ft
-    join dim_uniq_merchant dum on dum.uniq_merchant_key = ft.uniq_merchant_key
-    join category c on c.category_id = dum.category_id
+    join dim_merchant dm on dm.merchant_key = ft.merchant_key
+    join dim_category dc on dc.category_id = dm.category_id
     where ft.status = 'success'
-      and ft.timestamp >= ${start}
-      and ft.timestamp < ${end}
-    group by c.category
+      and ft.transaction_at >= ${start}
+      and ft.transaction_at < ${end}
+    group by dc.category
     order by total_transaksi desc
   `)
 
@@ -259,16 +261,16 @@ export async function GET(request: Request) {
     select category, count(*)::int as merchant_productif
     from (
       select
-        c.category as category,
-        ft.uniq_merchant_key as uniq_merchant_key,
+        dc.category as category,
+        ft.merchant_key as merchant_key,
         count(*)::int as tx_count
       from fact_transaction ft
-      join dim_uniq_merchant dum on dum.uniq_merchant_key = ft.uniq_merchant_key
-      join category c on c.category_id = dum.category_id
+      join dim_merchant dm on dm.merchant_key = ft.merchant_key
+      join dim_category dc on dc.category_id = dm.category_id
       where ft.status = 'success'
-        and ft.timestamp >= ${start}
-        and ft.timestamp < ${end}
-      group by c.category, ft.uniq_merchant_key
+        and ft.transaction_at >= ${start}
+        and ft.transaction_at < ${end}
+      group by dc.category, ft.merchant_key
     ) t
     where t.tx_count >= ${PRODUCTIVE_THRESHOLD}
     group by category

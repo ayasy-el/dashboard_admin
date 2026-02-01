@@ -15,12 +15,12 @@ const monthLabel = (value: string) => {
 export async function GET() {
   const rows = await db
     .select({
-      month: sql<string>`to_char(date_trunc('month', ${factTransaction.timestamp}), 'YYYY-MM')`,
+      month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
     })
     .from(factTransaction)
     .where(eq(factTransaction.status, "success"))
-    .groupBy(sql`date_trunc('month', ${factTransaction.timestamp})`)
-    .orderBy(sql`date_trunc('month', ${factTransaction.timestamp}) desc`)
+    .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
+    .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt}) desc`)
 
   const months = rows.map((row) => ({
     value: row.month,
