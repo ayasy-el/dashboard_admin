@@ -117,14 +117,14 @@ export async function GET(request: Request) {
       dm.merchant_name as merchant,
       dm.keyword_code as keyword,
       count(*)::int as total_transactions,
-      count(distinct dm.uniq_merchant)::int as uniq_merchant,
+      dm.uniq_merchant as uniq_merchant,
       count(distinct ft.msisdn)::int as uniq_redeemer
     from fact_transaction ft
     join dim_merchant dm on dm.merchant_key = ft.merchant_key
     where ft.status = 'success'
       and ft.transaction_at >= ${start}
       and ft.transaction_at < ${end}
-    group by dm.merchant_name, dm.keyword_code
+    group by dm.merchant_name, dm.keyword_code, dm.uniq_merchant
     order by total_transactions desc
     limit 5
   `)
@@ -170,7 +170,7 @@ export async function GET(request: Request) {
       merchant: row.merchant,
       keyword: row.keyword,
       totalTransactions: toNumber(row.total_transactions),
-      uniqMerchant: toNumber(row.uniq_merchant),
+      uniqMerchant: row.uniq_merchant,
       uniqRedeemer: toNumber(row.uniq_redeemer),
     })),
     expiredRules: (expiredRules.rows as any[]).map((row) => ({

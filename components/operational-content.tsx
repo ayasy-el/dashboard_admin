@@ -46,7 +46,7 @@ type OperationalResponse = {
     merchant: string
     keyword: string
     totalTransactions: number
-    uniqMerchant: number
+    uniqMerchant: string
     uniqRedeemer: number
   }[]
   expiredRules: {
