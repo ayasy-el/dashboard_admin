@@ -110,7 +110,7 @@ export async function GET(request: Request) {
     .groupBy(sql`date(${factTransaction.transactionAt})`)
     .orderBy(sql`date(${factTransaction.transactionAt})`)
 
-  const rangeStart = addMonths(start, -5)
+  const rangeStart = addMonths(start, -11)  // Change from -5 to -11 to get 12 months
   const monthlyTransactionsRaw = await db
     .select({
       month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
   const monthlyMap = new Map(
     monthlyTransactionsRaw.map((row) => [row.month, toNumber(row.value)])
   )
-  const monthlyTransactions = Array.from({ length: 6 }, (_, index) => {
+  const monthlyTransactions = Array.from({ length: 12 }, (_, index) => {  // Change from 6 to 12
     const date = addMonths(rangeStart, index)
     const monthKey = formatMonth(date)
     return {
@@ -171,17 +171,19 @@ export async function GET(request: Request) {
       count(distinct ft.merchant_key)::int as total_merchant,
       count(distinct dm.uniq_merchant)::int as unique_merchant,
       coalesce(sum(ft.qty * ft.point_redeem), 0)::int as total_point,
-      count(*)::int as total_transaksi,
+      coalesce(count(ft.*), 0)::int as total_transaksi,
       count(distinct ft.msisdn)::int as unique_redeemer,
       count(distinct ft.merchant_key)::int as merchant_aktif
-    from fact_transaction ft
-    join dim_merchant dm on dm.merchant_key = ft.merchant_key
-    join dim_cluster dc on dc.cluster_id = dm.cluster_id
-    where ft.status = 'success'
-      and ft.transaction_at >= ${start}
-      and ft.transaction_at < ${end}
+    from dim_cluster dc
+    left join dim_merchant dm 
+        on dm.cluster_id = dc.cluster_id
+    left join fact_transaction ft 
+        on ft.merchant_key = dm.merchant_key
+        and ft.status = 'success'
+        and ft.transaction_at >= ${start}
+        and ft.transaction_at < ${end}
     group by dc.branch, dc.cluster
-    order by dc.branch, dc.cluster
+    order by dc.branch, dc.cluster;
   `)
 
   const produktifRows = await db.execute(sql`

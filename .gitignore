@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+public/screenshot/image.png
+public/screenshot/image2.png
+Screenshot reference 1.png
+Screenshot reference 2.png
+public/screenshot/image3.png
+ref1.txt
+ref2.txt

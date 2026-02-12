@@ -46,6 +46,8 @@ type DisplayRow = MetricRow & {
   isChild?: boolean;
   parentId?: number;
   children?: MetricRow[];
+  activePercentage?: number;
+  productivePercentage?: number;
 };
 
 type DataTableProps = {
@@ -58,7 +60,7 @@ type DataTableProps = {
 const formatNumber = (value: number) => new Intl.NumberFormat("id-ID").format(value);
 
 const sumField = (rows: MetricRow[], key: keyof MetricRow) =>
-  rows.reduce((total, row) => total + row[key], 0);
+  rows.reduce((total, row) => total + Number(row[key]), 0);
 
 const buildParentTotals = (row: ClusterRow): MetricRow => {
   if (!row.children || row.children.length === 0) {
@@ -157,11 +159,35 @@ function buildColumns(
       ),
     },
     {
+      accessorKey: "activePercentage",
+      header: () => <div>% Aktif</div>,
+      cell: ({ row }) => {
+        const percentage = row.original.totalMerchant > 0 
+          ? (row.original.merchantAktif / row.original.totalMerchant) * 100 
+          : 0;
+        return (
+          <div className="tabular-nums">{percentage.toFixed(2)}%</div>
+        );
+      },
+    },
+    {
       accessorKey: "merchantProduktif",
       header: () => <div>Merchant Produktif</div>,
       cell: ({ row }) => (
         <div className="tabular-nums">{formatNumber(row.original.merchantProduktif)}</div>
       ),
+    },
+    {
+      accessorKey: "productivePercentage",
+      header: () => <div>% Produktif</div>,
+      cell: ({ row }) => {
+        const percentage = row.original.totalMerchant > 0 
+          ? (row.original.merchantProduktif / row.original.totalMerchant) * 100 
+          : 0;
+        return (
+          <div className="tabular-nums">{percentage.toFixed(2)}%</div>
+        );
+      },
     },
   ];
 }
@@ -192,7 +218,12 @@ function MetricsTable({
 
   const tableData = React.useMemo<DisplayRow[]>(() => {
     if (!enableCollapse) {
-      return data as DisplayRow[];
+      // Calculate percentages for flat data
+      return (data as MetricRow[]).map(row => ({
+        ...row,
+        activePercentage: row.totalMerchant > 0 ? (row.merchantAktif / row.totalMerchant) * 100 : 0,
+        productivePercentage: row.totalMerchant > 0 ? (row.merchantProduktif / row.totalMerchant) * 100 : 0,
+      }));
     }
 
     const rows: DisplayRow[] = [];
@@ -200,12 +231,16 @@ function MetricsTable({
       const parentTotals = buildParentTotals(branch);
       rows.push({
         ...parentTotals,
+        activePercentage: parentTotals.totalMerchant > 0 ? (parentTotals.merchantAktif / parentTotals.totalMerchant) * 100 : 0,
+        productivePercentage: parentTotals.totalMerchant > 0 ? (parentTotals.merchantProduktif / parentTotals.totalMerchant) * 100 : 0,
         children: branch.children,
       });
       if (branch.children && expandedRows.has(branch.id)) {
         branch.children.forEach((child) => {
           rows.push({
             ...child,
+            activePercentage: child.totalMerchant > 0 ? (child.merchantAktif / child.totalMerchant) * 100 : 0,
+            productivePercentage: child.totalMerchant > 0 ? (child.merchantProduktif / child.totalMerchant) * 100 : 0,
             isChild: true,
             parentId: branch.id,
           });

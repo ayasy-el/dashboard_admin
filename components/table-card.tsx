@@ -29,7 +29,7 @@ export function TableCard({
   return (
     <Card className={cn("gap-0 overflow-hidden py-0", className)}>
       {(title || description) && (
-        <CardHeader className={cn("border-b px-10 py-8", headerClassName)}>
+        <CardHeader className={cn("border-b border-border/70 px-8 py-6", headerClassName)}>
           {title ? <CardTitle className="text-base font-semibold">{title}</CardTitle> : null}
           {description ? <CardDescription>{description}</CardDescription> : null}
         </CardHeader>

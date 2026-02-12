@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 export default function Page() {
   return (
     <SidebarProvider
+      className="operational-theme"
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 72)",

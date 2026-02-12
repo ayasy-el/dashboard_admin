@@ -12,6 +12,17 @@ const monthLabel = (value: string) => {
   })
 }
 
+const formatMonth = (date: Date) => {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+  return `${year}-${month}`
+}
+
+const monthToDateUtc = (value: string) => {
+  const [year, month] = value.split("-").map(Number)
+  return new Date(Date.UTC(year, month - 1, 1))
+}
+
 export async function GET() {
   const rows = await db
     .select({
@@ -22,10 +33,31 @@ export async function GET() {
     .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
     .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt}) desc`)
 
-  const months = rows.map((row) => ({
-    value: row.month,
-    label: monthLabel(row.month),
-  }))
+  const now = new Date()
+  const currentMonth = formatMonth(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)))
+  const earliestDataMonth = rows.at(-1)?.month
+
+  const months: { value: string; label: string }[] = []
+
+  if (!earliestDataMonth) {
+    months.push({
+      value: currentMonth,
+      label: monthLabel(currentMonth),
+    })
+    return NextResponse.json({ months })
+  }
+
+  let cursor = monthToDateUtc(currentMonth)
+  const min = monthToDateUtc(earliestDataMonth)
+
+  while (cursor >= min) {
+    const monthValue = formatMonth(cursor)
+    months.push({
+      value: monthValue,
+      label: monthLabel(monthValue),
+    })
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 1))
+  }
 
   return NextResponse.json({ months })
 }
