@@ -80,8 +80,8 @@ export function OverviewTransactions({
   );
 
   return (
-    <div className="grid gap-4 px-4 lg:grid-cols-12 lg:px-6">
-      <Card className="gap-0 border border-border/80 py-0 shadow-sm lg:col-span-5">
+    <div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-12">
+      <Card className="gap-0 border border-border/80 py-0 shadow-sm xl:col-span-5">
         <Tabs defaultValue="monthly">
           <CardHeader className="border-b px-6 py-5">
             <div className="flex items-start justify-between gap-4">
@@ -225,7 +225,7 @@ export function OverviewTransactions({
         </Tabs>
       </Card>
 
-      <Card className="gap-0 border border-border/80 py-0 shadow-sm lg:col-span-7">
+      <Card className="gap-0 border border-border/80 py-0 shadow-sm xl:col-span-7">
         <CardHeader className="border-b px-6 py-5">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-1">

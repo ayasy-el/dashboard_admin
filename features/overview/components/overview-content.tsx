@@ -50,16 +50,16 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
       />
       <div className="space-y-6 px-4 lg:px-6">
-        <div className="grid gap-6 lg:grid-cols-12">
+        <div className="grid gap-6 xl:grid-cols-12">
           <DistributionPieCard
-            className="lg:col-span-4"
+            className="xl:col-span-4"
             title="Merchant Categories"
             icon={<IconWand className="size-4 text-secondary" />}
             data={categoryData}
             minLabelPercent={10}
           />
           <ComparisonProgressTableCard
-            className="lg:col-span-8"
+            className="xl:col-span-8"
             title="POIN Redeem Region Jatim"
             icon={<IconSun className="size-4 text-secondary" />}
             headers={["REGION", "KEYWORD", "STATUS REDEEM", "UNIQUE REEDEEM"]}
@@ -71,7 +71,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             pagination={{ enabled: true, pageSize: 6, keepFirstRow: true }}
           />
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
           <RankedMetricsTableCard
             title="Merchant Active"
             tone="green"
