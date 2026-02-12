@@ -37,6 +37,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
     const previousStartTs = toSqlTimestamp(previousStart);
     const previousEndTs = toSqlTimestamp(previousEnd);
     const startDate = toSqlDate(start);
+    const endDate = toSqlDate(end);
     const previousStartDate = toSqlDate(previousStart);
 
     const baseWhere = and(
@@ -209,6 +210,73 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       group by category
     `);
 
+    const notActiveMerchantRaw = await db.execute(sql`
+      with tx as (
+        select
+          ft.merchant_key as merchant_key,
+          count(*)::int as trx_count
+        from fact_transaction ft
+        where ft.status = 'success'
+          and ft.transaction_at >= ${startTs}
+          and ft.transaction_at < ${endTs}
+        group by ft.merchant_key
+      )
+      select
+        dc.branch as branch,
+        dm.merchant_name as merchant,
+        dm.keyword_code as keyword
+      from dim_rule dr
+      join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+      join dim_cluster dc on dc.cluster_id = dm.cluster_id
+      left join tx on tx.merchant_key = dm.merchant_key
+      where dr.start_period < ${endDate}
+        and dr.end_period >= ${startDate}
+        and coalesce(tx.trx_count, 0) = 0
+      order by dc.branch, dm.merchant_name
+    `);
+
+    const merchantPerMonthRaw = await db.execute(sql`
+      with tx as (
+        select
+          ft.merchant_key as merchant_key,
+          count(*)::int as redeem,
+          count(distinct ft.msisdn)::int as unique_redeem
+        from fact_transaction ft
+        where ft.status = 'success'
+          and ft.transaction_at >= ${startTs}
+          and ft.transaction_at < ${endTs}
+        group by ft.merchant_key
+      ),
+      active_rule as (
+        select
+          dr.rule_merchant as merchant_key,
+          min(dr.start_period)::date as start_period,
+          max(dr.end_period)::date as end_period,
+          max(dr.point_redeem)::int as point
+        from dim_rule dr
+        where dr.start_period < ${endDate}
+          and dr.end_period >= ${startDate}
+        group by dr.rule_merchant
+      )
+      select
+        dc.category as category,
+        dcl.branch as branch,
+        dm.merchant_name as merchant,
+        dm.keyword_code as keyword,
+        ar.start_period as start_period,
+        ar.end_period as end_period,
+        ar.point as point,
+        coalesce(tx.redeem, 0)::int as redeem,
+        coalesce(tx.unique_redeem, 0)::int as unique_redeem
+      from active_rule ar
+      join dim_merchant dm on dm.merchant_key = ar.merchant_key
+      join dim_category dc on dc.category_id = dm.category_id
+      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+      left join tx on tx.merchant_key = dm.merchant_key
+      order by redeem desc, unique_redeem desc, dm.merchant_name
+      limit 200
+    `);
+
     const [clusterPointCurrent] = await db
       .select({
         total: sql<number>`coalesce(sum(${factClusterPoint.totalPoint}), 0)`,
@@ -254,9 +322,9 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         name: row.name,
         value: toNumber(row.value),
       })),
-      branchClusterRows: (branchClusterRows.rows as any[]).map((row) => ({
-        branch: row.branch,
-        cluster: row.cluster,
+      branchClusterRows: (branchClusterRows.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
+        cluster: String(row.cluster ?? ""),
         total_merchant: toNumber(row.total_merchant),
         unique_merchant: toNumber(row.unique_merchant),
         total_point: toNumber(row.total_point),
@@ -264,13 +332,13 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         unique_redeemer: toNumber(row.unique_redeemer),
         merchant_aktif: toNumber(row.merchant_aktif),
       })),
-      produktifRows: (produktifRows.rows as any[]).map((row) => ({
-        branch: row.branch,
-        cluster: row.cluster,
+      produktifRows: (produktifRows.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
+        cluster: String(row.cluster ?? ""),
         merchant_productif: toNumber(row.merchant_productif),
       })),
-      categoryTableRaw: (categoryTableRaw.rows as any[]).map((row) => ({
-        name: row.name,
+      categoryTableRaw: (categoryTableRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        name: String(row.name ?? ""),
         total_merchant: toNumber(row.total_merchant),
         unique_merchant: toNumber(row.unique_merchant),
         total_point: toNumber(row.total_point),
@@ -278,9 +346,25 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         unique_redeemer: toNumber(row.unique_redeemer),
         merchant_aktif: toNumber(row.merchant_aktif),
       })),
-      categoryProduktifRaw: (categoryProduktifRaw.rows as any[]).map((row) => ({
-        category: row.category,
+      categoryProduktifRaw: (categoryProduktifRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        category: String(row.category ?? ""),
         merchant_productif: toNumber(row.merchant_productif),
+      })),
+      notActiveMerchantRaw: (notActiveMerchantRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
+        merchant: String(row.merchant ?? ""),
+        keyword: String(row.keyword ?? ""),
+      })),
+      merchantPerMonthRaw: (merchantPerMonthRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        category: String(row.category ?? ""),
+        branch: String(row.branch ?? ""),
+        merchant: String(row.merchant ?? ""),
+        keyword: String(row.keyword ?? ""),
+        startPeriod: String(row.start_period ?? ""),
+        endPeriod: String(row.end_period ?? ""),
+        point: toNumber(row.point),
+        redeem: toNumber(row.redeem),
+        uniqueRedeem: toNumber(row.unique_redeem),
       })),
       clusterPointCurrent: toNumber(clusterPointCurrent?.total),
       clusterPointPrevious: toNumber(clusterPointPrevious?.total),

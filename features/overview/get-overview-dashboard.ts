@@ -9,6 +9,24 @@ import {
 
 const MONTHLY_WINDOW = 12;
 
+type BranchChild = {
+  id: number;
+  name: string;
+  totalMerchant: number;
+  uniqueMerchant: number;
+  totalPoint: number;
+  totalTransaksi: number;
+  uniqueRedeemer: number;
+  merchantAktif: number;
+  merchantProduktif: number;
+};
+
+type BranchAggregate = {
+  id: number;
+  name: string;
+  children: BranchChild[];
+};
+
 export async function getOverviewDashboard(
   repo: OverviewRepository,
   monthQuery: string | null
@@ -50,7 +68,7 @@ export async function getOverviewDashboard(
     produktifMap.set(`${row.branch}||${row.cluster}`, row.merchant_productif);
   }
 
-  const branchMap = new Map<string, any>();
+  const branchMap = new Map<string, BranchAggregate>();
   let branchId = 1;
   let clusterId = 1000;
 
@@ -63,8 +81,11 @@ export async function getOverviewDashboard(
       });
     }
 
+    const branchEntry = branchMap.get(row.branch);
+    if (!branchEntry) continue;
+
     const produktif = produktifMap.get(`${row.branch}||${row.cluster}`) ?? 0;
-    branchMap.get(row.branch).children.push({
+    branchEntry.children.push({
       id: clusterId++,
       name: row.cluster,
       totalMerchant: row.total_merchant,
@@ -79,19 +100,19 @@ export async function getOverviewDashboard(
 
   const branches = Array.from(branchMap.values()).map((branch) => {
     const children = branch.children ?? [];
-    const sum = (key: string) =>
-      children.reduce((total: number, item: any) => total + Number(item[key] ?? 0), 0);
+    const sum = (selector: (item: BranchChild) => number) =>
+      children.reduce((total, item) => total + selector(item), 0);
 
     return {
       id: branch.id,
       name: branch.name,
-      totalMerchant: sum("totalMerchant"),
-      uniqueMerchant: sum("uniqueMerchant"),
-      totalPoint: sum("totalPoint"),
-      totalTransaksi: sum("totalTransaksi"),
-      uniqueRedeemer: sum("uniqueRedeemer"),
-      merchantAktif: sum("merchantAktif"),
-      merchantProduktif: sum("merchantProduktif"),
+      totalMerchant: sum((item) => item.totalMerchant),
+      uniqueMerchant: sum((item) => item.uniqueMerchant),
+      totalPoint: sum((item) => item.totalPoint),
+      totalTransaksi: sum((item) => item.totalTransaksi),
+      uniqueRedeemer: sum((item) => item.uniqueRedeemer),
+      merchantAktif: sum((item) => item.merchantAktif),
+      merchantProduktif: sum((item) => item.merchantProduktif),
       children,
     };
   });
@@ -111,6 +132,24 @@ export async function getOverviewDashboard(
     uniqueRedeemer: row.unique_redeemer,
     merchantAktif: row.merchant_aktif,
     merchantProduktif: categoryProduktifMap.get(row.name) ?? 0,
+  }));
+
+  const notActiveMerchants = raw.notActiveMerchantRaw.map((row) => ({
+    branch: row.branch,
+    merchant: row.merchant,
+    keyword: row.keyword,
+  }));
+
+  const merchantPerMonth = raw.merchantPerMonthRaw.map((row) => ({
+    category: row.category,
+    branch: row.branch,
+    merchant: row.merchant,
+    keyword: row.keyword,
+    startPeriod: formatDisplayDate(row.startPeriod),
+    endPeriod: formatDisplayDate(row.endPeriod),
+    point: row.point,
+    redeem: row.redeem,
+    uniqueRedeem: row.uniqueRedeem,
   }));
 
   return {
@@ -139,5 +178,15 @@ export async function getOverviewDashboard(
       branches,
     },
     categoryTable,
+    notActiveMerchants,
+    merchantPerMonth,
   };
 }
+const formatDisplayDate = (value: string) => {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};

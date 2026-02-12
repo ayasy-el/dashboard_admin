@@ -49,6 +49,22 @@ export type OverviewRawData = {
     category: string;
     merchant_productif: number;
   }[];
+  notActiveMerchantRaw: {
+    branch: string;
+    merchant: string;
+    keyword: string;
+  }[];
+  merchantPerMonthRaw: {
+    category: string;
+    branch: string;
+    merchant: string;
+    keyword: string;
+    startPeriod: string;
+    endPeriod: string;
+    point: number;
+    redeem: number;
+    uniqueRedeem: number;
+  }[];
   clusterPointCurrent: number;
   clusterPointPrevious: number;
 };

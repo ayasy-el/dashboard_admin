@@ -66,6 +66,16 @@ const rgbToHex = (r: number, g: number, b: number) =>
     .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
     .join("")}`;
 
+const mixHex = (from: string, to: string, amount: number) => {
+  const left = hexToRgb(from);
+  const right = hexToRgb(to);
+  return rgbToHex(
+    left.r + (right.r - left.r) * amount,
+    left.g + (right.g - left.g) * amount,
+    left.b + (right.b - left.b) * amount,
+  );
+};
+
 const luminance = (hex: string) => {
   const { r, g, b } = hexToRgb(hex);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -88,11 +98,20 @@ const buildDynamicPieColors = (count: number) => {
     const leftRgb = hexToRgb(sortedStops[left]);
     const rightRgb = hexToRgb(sortedStops[right]);
 
-    return rgbToHex(
+    const interpolated = rgbToHex(
       leftRgb.r + (rightRgb.r - leftRgb.r) * progress,
       leftRgb.g + (rightRgb.g - leftRgb.g) * progress,
       leftRgb.b + (rightRgb.b - leftRgb.b) * progress,
     );
+
+    // Boost contrast while preserving the original palette character.
+    if (position <= 0.5) {
+      const darkAmount = 0.24 * (1 - position * 2);
+      return mixHex(interpolated, "#000000", darkAmount);
+    }
+
+    const lightAmount = 0.2 * ((position - 0.5) * 2);
+    return mixHex(interpolated, "#ffffff", lightAmount);
   });
 };
 
@@ -156,79 +175,81 @@ export function DistributionPieCard({
           {icon}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6 pt-1">
-        <div className="flex items-center justify-between gap-3">
-          <ChartContainer config={chartConfig} className="h-[230px] w-[230px] shrink-0">
-            <PieChart>
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    hideIndicator
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.name ?? "Label"}
-                    formatter={(_, __, ___, ____, payload) => {
-                      const amount = Number(payload?.amount ?? 0);
-                      const percent = Number(payload?.percent ?? 0);
+      <CardContent className="px-6 pb-6 pt-1 h-full content-center">
+        <div className="flex justify-center">
+          <div className="flex w-fit items-center gap-6">
+            <ChartContainer config={chartConfig} className="h-[230px] w-[230px] shrink-0">
+              <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      hideIndicator
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.name ?? "Label"}
+                      formatter={(_, __, item) => {
+                        const amount = Number(item?.payload?.amount ?? 0);
+                        const percent = Number(item?.payload?.percent ?? 0);
 
-                      return (
-                        <div className="grid min-w-[10rem] gap-1">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">{valueLabel}</span>
-                            <span className="font-mono font-medium tabular-nums text-foreground">
-                              {formatNumber(amount)}
-                            </span>
+                        return (
+                          <div className="grid min-w-[10rem] gap-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-muted-foreground">{valueLabel}</span>
+                              <span className="font-mono font-medium tabular-nums text-foreground">
+                                {formatNumber(amount)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-muted-foreground">{percentLabel}</span>
+                              <span className="font-mono font-medium tabular-nums text-foreground">
+                                {percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">{percentLabel}</span>
-                            <span className="font-mono font-medium tabular-nums text-foreground">
-                              {percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                }
-              />
-              <Pie
-                data={chartData}
-                dataKey="percent"
-                nameKey="name"
-                innerRadius={46}
-                outerRadius={94}
-                startAngle={90}
-                endAngle={-270}
-                labelLine={false}
-                label={renderLabel}
-                activeIndex={activeIndex}
-                activeShape={(props: React.ComponentProps<typeof Sector>) => (
-                  <Sector {...props} outerRadius={(props.outerRadius ?? 0) + 8} />
-                )}
-                onMouseEnter={(_, index) => setActiveIndex(index)}
-                onMouseLeave={() => setActiveIndex(-1)}
-              >
-                {chartData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ChartContainer>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Pie
+                  data={chartData}
+                  dataKey="percent"
+                  nameKey="name"
+                  innerRadius={46}
+                  outerRadius={94}
+                  startAngle={90}
+                  endAngle={-270}
+                  labelLine={false}
+                  label={renderLabel}
+                  activeIndex={activeIndex}
+                  activeShape={(props: React.ComponentProps<typeof Sector>) => (
+                    <Sector {...props} outerRadius={(props.outerRadius ?? 0) + 8} />
+                  )}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(-1)}
+                >
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
 
-          <div className="grid w-[130px] gap-1.5 text-sm text-muted-foreground">
-            {chartData.map((item, index) => (
-              <div
-                key={item.name}
-                className={cn(
-                  "flex items-center gap-2",
-                  activeIndex === index ? "font-semibold text-foreground" : undefined,
-                )}
-                onMouseEnter={() => setActiveIndex(index)}
-                onMouseLeave={() => setActiveIndex(-1)}
-              >
-                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <span>{item.name}</span>
-              </div>
-            ))}
+            <div className="grid w-[130px] gap-1.5 text-sm text-muted-foreground">
+              {chartData.map((item, index) => (
+                <div
+                  key={item.name}
+                  className={cn(
+                    "flex items-center gap-2",
+                    activeIndex === index ? "font-semibold text-foreground" : undefined,
+                  )}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(-1)}
+                >
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span>{item.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </CardContent>

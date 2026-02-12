@@ -1,5 +1,14 @@
+"use client";
+
 import * as React from "react";
 
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -20,6 +29,11 @@ type DataTableCardProps = {
   headerCellClassName?: string;
   rowKey?: (row: React.ReactNode[], index: number) => React.Key;
   columnClassNames?: string[];
+  pagination?: {
+    enabled?: boolean;
+    pageSize?: number;
+    pageSizeOptions?: number[];
+  };
 };
 
 export function DataTableCard({
@@ -31,14 +45,51 @@ export function DataTableCard({
   headerCellClassName,
   rowKey,
   columnClassNames,
+  pagination,
 }: DataTableCardProps) {
+  const isPaginationEnabled = Boolean(pagination?.enabled);
+  const [rowsPerPage, setRowsPerPage] = React.useState(pagination?.pageSize ?? 6);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageInput, setPageInput] = React.useState("1");
+
+  const totalRows = rows.length;
+  const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(totalRows / rowsPerPage)) : 1;
+
+  React.useEffect(() => {
+    if (!isPaginationEnabled) return;
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, isPaginationEnabled, totalPages]);
+
+  React.useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const startIndex = isPaginationEnabled ? (currentPage - 1) * rowsPerPage : 0;
+  const endIndex = isPaginationEnabled ? Math.min(startIndex + rowsPerPage, totalRows) : totalRows;
+  const visibleRows = isPaginationEnabled ? rows.slice(startIndex, endIndex) : rows;
+  const pageSizeOptions = pagination?.pageSizeOptions?.length
+    ? pagination.pageSizeOptions
+    : [6, 10, 20, 50];
+
+  const commitPageInput = () => {
+    const parsed = Number.parseInt(pageInput, 10);
+    if (Number.isNaN(parsed)) {
+      setPageInput(String(currentPage));
+      return;
+    }
+    const nextPage = Math.min(totalPages, Math.max(1, parsed));
+    setCurrentPage(nextPage);
+  };
+
   return (
     <Card className={cn("gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
       <CardHeader className="border-b px-6 py-5">
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className={cn("bg-muted/40 hover:bg-muted/40", headerRowClassName)}>
@@ -53,21 +104,101 @@ export function DataTableCard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, rowIndex) => (
-                <TableRow key={rowKey ? rowKey(row, rowIndex) : rowIndex}>
+              {visibleRows.map((row, rowIndex) => {
+                const absoluteIndex = startIndex + rowIndex;
+                return (
+                <TableRow key={rowKey ? rowKey(row, absoluteIndex) : absoluteIndex}>
                   {row.map((cell, cellIndex) => (
                     <TableCell
-                      key={`${rowIndex}-${cellIndex}`}
+                      key={`${absoluteIndex}-${cellIndex}`}
                       className={cn("px-4", columnClassNames?.[cellIndex])}
                     >
                       {cell}
                     </TableCell>
                   ))}
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         </div>
+        {isPaginationEnabled && totalPages > 1 ? (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {totalRows === 0 ? 0 : startIndex + 1} - {endIndex} of {totalRows}
+              </span>
+              <select
+                className="h-7 rounded-md border bg-background px-1 text-xs"
+                value={rowsPerPage}
+                onChange={(event) => {
+                  setRowsPerPage(Number(event.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {pageSizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Halaman pertama"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+              >
+                <IconChevronsLeft className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Halaman sebelumnya"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              >
+                <IconChevronLeft className="size-4" />
+              </Button>
+              <input
+                className="h-8 w-10 rounded-md border bg-background text-center text-sm"
+                inputMode="numeric"
+                value={pageInput}
+                onChange={(event) => setPageInput(event.target.value.replace(/[^\d]/g, ""))}
+                onBlur={commitPageInput}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    commitPageInput();
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">of {totalPages}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Halaman berikutnya"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              >
+                <IconChevronRight className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Halaman terakhir"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+              >
+                <IconChevronsRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

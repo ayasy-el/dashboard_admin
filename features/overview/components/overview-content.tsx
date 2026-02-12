@@ -1,67 +1,16 @@
 import { MonthSelect } from "@/features/shared/components/month-select";
-import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
+import { SectionCards } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
-import { OverviewExtraPanels } from "@/features/overview/components/overview-extra-panels";
 import { OverviewTransactions } from "@/features/overview/components/overview-transactions";
-
-export type OverviewResponse = {
-  month: string;
-  monthLabel: string;
-  previousMonth: string;
-  previousMonthLabel: string;
-  cards: {
-    totalPoinPelanggan: number;
-    totalTransaksi: number;
-    totalPoin: number;
-    totalRedeemer: number;
-    previous: {
-      totalPoinPelanggan: number;
-      totalTransaksi: number;
-      totalPoin: number;
-      totalRedeemer: number;
-    };
-  };
-  dailyPoints: { date: string; value: number }[];
-  dailyTransactions: { date: string; value: number }[];
-  dailyRedeemer: { date: string; value: number }[];
-  monthlyTransactions: { month: string; value: number }[];
-  categoryBreakdown: { name: string; value: number; percent: number }[];
-  branchTable: {
-    branches: {
-      id: number;
-      name: string;
-      totalMerchant: number;
-      uniqueMerchant: number;
-      totalPoint: number;
-      totalTransaksi: number;
-      uniqueRedeemer: number;
-      merchantAktif: number;
-      merchantProduktif: number;
-      children: {
-        id: number;
-        name: string;
-        totalMerchant: number;
-        uniqueMerchant: number;
-        totalPoint: number;
-        totalTransaksi: number;
-        uniqueRedeemer: number;
-        merchantAktif: number;
-        merchantProduktif: number;
-      }[];
-    }[];
-  };
-  categoryTable: {
-    id: number;
-    name: string;
-    totalMerchant: number;
-    uniqueMerchant: number;
-    totalPoint: number;
-    totalTransaksi: number;
-    uniqueRedeemer: number;
-    merchantAktif: number;
-    merchantProduktif: number;
-  }[];
-};
+import {
+  ComparisonProgressTableCard,
+} from "@/features/shared/components/comparison-progress-table-card";
+import { DataTableCard } from "@/features/shared/components/data-table-card";
+import { DistributionPieCard } from "@/features/shared/components/distribution-pie-card";
+import { RankedMetricsTableCard } from "@/features/shared/components/ranked-metrics-table-card";
+import { IconCircleCheck, IconCircleOff, IconSun, IconTrophy, IconWand } from "@tabler/icons-react";
+import { buildOverviewContentViewModel } from "@/features/overview/overview-content.viewmodel";
+import type { OverviewResponse } from "@/features/overview/overview.types";
 
 type OverviewContentProps = {
   data: OverviewResponse;
@@ -70,40 +19,15 @@ type OverviewContentProps = {
 };
 
 export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewContentProps) {
-  const stats: StatCard[] = [
-    {
-      id: "customer-points",
-      label: "Poin Pelanggan",
-      unit: "poin",
-      currentTotal: data.cards.totalPoinPelanggan,
-      previousTotal: data.cards.previous.totalPoinPelanggan,
-      // series: ,
-    },
-    {
-      id: "transactions",
-      label: "Total Transaksi",
-      unit: "transaksi",
-      currentTotal: data.cards.totalTransaksi,
-      previousTotal: data.cards.previous.totalTransaksi,
-      series: data.dailyTransactions,
-    },
-    {
-      id: "burning-points",
-      label: "Burning Poin",
-      unit: "poin",
-      currentTotal: data.cards.totalPoin,
-      previousTotal: data.cards.previous.totalPoin,
-      series: data.dailyPoints,
-    },
-    {
-      id: "redeemers",
-      label: "Unique Redeemer",
-      unit: "redeemer",
-      currentTotal: data.cards.totalRedeemer,
-      previousTotal: data.cards.previous.totalRedeemer,
-      series: data.dailyRedeemer,
-    },
-  ];
+  const {
+    stats,
+    categoryData,
+    regionRows,
+    activeRows,
+    productiveRows,
+    inactiveRows,
+    merchantPerMonthRows,
+  } = buildOverviewContentViewModel(data);
 
   return (
     <div className="space-y-6 pb-8">
@@ -125,12 +49,85 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         totalDaily={data.cards.totalTransaksi}
         totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
       />
-      <OverviewExtraPanels
-        monthLabel={data.monthLabel}
-        previousMonthLabel={data.previousMonthLabel}
-        trendSeries={data.dailyTransactions}
-        trendTotal={data.cards.totalTransaksi}
-      />
+      <div className="space-y-6 px-4 lg:px-6">
+        <div className="grid gap-6 lg:grid-cols-12">
+          <DistributionPieCard
+            className="lg:col-span-4"
+            title="Merchant Categories"
+            icon={<IconWand className="size-4 text-secondary" />}
+            data={categoryData}
+            minLabelPercent={10}
+          />
+          <ComparisonProgressTableCard
+            className="lg:col-span-8"
+            title="POIN Redeem Region Jatim"
+            icon={<IconSun className="size-4 text-secondary" />}
+            headers={["REGION", "KEYWORD", "STATUS REDEEM", "UNIQUE REEDEEM"]}
+            rows={regionRows}
+            darkHeader
+            splitLabel="Branch"
+            leftBarClassName="bg-red-400"
+            rightBarClassName="bg-yellow-500"
+            pagination={{ enabled: true, pageSize: 6, keepFirstRow: true }}
+          />
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          <RankedMetricsTableCard
+            title="Merchant Active"
+            tone="green"
+            icon={<IconCircleCheck className="size-4 text-green-500" />}
+            headerCols={["BRANCH", "OA", "TRX", "UNIQ REDEEMER"]}
+            rows={activeRows}
+            pagination={{ enabled: true, pageSize: 6 }}
+          />
+          <RankedMetricsTableCard
+            title="Merchant Productive"
+            tone="yellow"
+            icon={<IconTrophy className="size-4 text-yellow-500" />}
+            headerCols={["BRANCH", "OP", "TRX", "UNIQ REDEEMER"]}
+            rows={productiveRows}
+            pagination={{ enabled: true, pageSize: 6 }}
+          />
+          <RankedMetricsTableCard
+            title="Merchant Not Active"
+            tone="red"
+            icon={<IconCircleOff className="size-4 text-primary" />}
+            headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
+            rows={inactiveRows}
+            pagination={{ enabled: true, pageSize: 6 }}
+            paginationInfo={`Total: ${inactiveRows.length}`}
+          />
+        </div>
+        <DataTableCard
+          title="Detail List Merchant 🏷️"
+          headers={[
+            "#",
+            "MERCHANT CATEGORY",
+            "BRANCH",
+            "MERCHANT",
+            "KEYWORD",
+            "START PERIOD",
+            "END PERIOD",
+            "POIN",
+            "REDEEM",
+            "UNIQE REDEEM",
+          ]}
+          rows={merchantPerMonthRows}
+          pagination={{ enabled: true, pageSize: 10 }}
+          columnClassNames={[
+            "",
+            "font-medium",
+            "",
+            "",
+            "font-medium",
+            "text-muted-foreground",
+            "text-muted-foreground",
+            "text-right",
+            "text-right font-semibold",
+            "text-right font-semibold",
+          ]}
+        />
+      </div>
     </div>
   );
 }
