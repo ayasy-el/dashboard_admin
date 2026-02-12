@@ -2,7 +2,13 @@ import { NextResponse } from "next/server"
 import { and, eq, gte, lt, sql } from "drizzle-orm"
 
 import { db } from "@/lib/db"
-import { dimCategory, dimCluster, dimMerchant, factTransaction } from "@/lib/db/schema"
+import {
+  dimCategory,
+  dimCluster,
+  dimMerchant,
+  factClusterPoint,
+  factTransaction,
+} from "@/lib/db/schema"
 
 const PRODUCTIVE_THRESHOLD = 5
 
@@ -293,6 +299,20 @@ export async function GET(request: Request) {
     merchantProduktif: categoryProduktifMap.get(row.name) ?? 0,
   }))
 
+  const [clusterPointCurrent] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${factClusterPoint.totalPoint}), 0)`,
+    })
+    .from(factClusterPoint)
+    .where(eq(factClusterPoint.monthYear, start))
+
+  const [clusterPointPrevious] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${factClusterPoint.totalPoint}), 0)`,
+    })
+    .from(factClusterPoint)
+    .where(eq(factClusterPoint.monthYear, previousStart))
+
   const totalPoint = toNumber(summary?.totalPoint)
   const totalPointPrev = toNumber(previousSummary?.totalPoint)
   const totalTransaksi = toNumber(summary?.totalTransaksi)
@@ -300,8 +320,8 @@ export async function GET(request: Request) {
   const totalRedeemer = toNumber(summary?.totalRedeemer)
   const totalRedeemerPrev = toNumber(previousSummary?.totalRedeemer)
 
-  const totalPoinPelanggan = Math.round(totalPoint * 0.7)
-  const totalPoinPelangganPrev = Math.round(totalPointPrev * 0.7)
+  const totalPoinPelanggan = toNumber(clusterPointCurrent?.total)
+  const totalPoinPelangganPrev = toNumber(clusterPointPrevious?.total)
 
   const branches = Array.from(branchMap.values()).map((branch) => {
     const children = branch.children ?? []

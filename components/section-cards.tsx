@@ -1,6 +1,6 @@
 "use client"
 
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { Area, AreaChart, XAxis } from "recharts"
 import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -47,11 +47,11 @@ export function SectionCards({
   return (
     <div
       className={cn(
-        "*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4",
+        "grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4",
         className
       )}
     >
-      {stats.map((stat) => {
+      {stats.map((stat, index) => {
         const delta = stat.previousTotal
           ? ((stat.currentTotal - stat.previousTotal) / stat.previousTotal) * 100
           : 0
@@ -65,14 +65,20 @@ export function SectionCards({
         }
 
         return (
-          <Card className="@container/card" key={stat.id}>
-            <CardHeader>
+          <Card
+            className={cn(
+              "@container/card border-t-4",
+              index % 2 === 0 ? "border-t-primary" : "border-t-secondary"
+            )}
+            key={stat.id}
+          >
+            <CardHeader className="pb-2">
               <CardDescription>{stat.label}</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
                 {formatNumber(stat.currentTotal)}
               </CardTitle>
               <CardAction>
-                <Badge variant="outline">
+                <Badge className="border-green-100 bg-green-50 text-green-700" variant="outline">
                   <TrendIcon />
                   {isPositive ? "+" : ""}
                   {formatPercent(Math.abs(delta))}%
@@ -80,7 +86,7 @@ export function SectionCards({
               </CardAction>
             </CardHeader>
             <CardContent className="px-6 pt-0">
-              <ChartContainer config={chartConfig} className="h-[96px] w-full">
+              <ChartContainer config={chartConfig} className="h-[64px] w-full">
                 <AreaChart data={stat.series}>
                   <defs>
                     <linearGradient
@@ -102,7 +108,6 @@ export function SectionCards({
                       />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} horizontal={false} />
                   <XAxis dataKey="date" hide />
                   <ChartTooltip
                     cursor={false}

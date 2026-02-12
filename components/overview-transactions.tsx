@@ -1,18 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  Sector,
-  XAxis,
-} from "recharts"
+import * as React from "react";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { IconAdjustmentsHorizontal, IconDotsVertical, IconRocket, IconStars, IconTrophy } from "@tabler/icons-react";
 
 import {
   Card,
@@ -21,209 +11,164 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatNumber } from "@/lib/dashboard-metrics"
-
-export type CategoryBreakdown = {
-  name: string
-  value: number
-  percent: number
-}
+} from "@/components/ui/chart";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatNumber } from "@/lib/dashboard-metrics";
 
 type OverviewTransactionsProps = {
-  monthLabel: string
-  previousMonthLabel: string
-  categoryBreakdown: CategoryBreakdown[]
-  dailySeries: { date: string; value: number }[]
-  monthlySeries: { month: string; value: number }[]
-  totalDaily: number
-  totalMonthly: number
-}
-
-const donutConfig = {
-  Fashion: { label: "Fashion", color: "var(--chart-1)" },
-  "F&B": { label: "F&B", color: "var(--chart-2)" },
-  Grocery: { label: "Grocery", color: "var(--chart-3)" },
-  Elektronik: { label: "Elektronik", color: "var(--chart-4)" },
-  Lifestyle: { label: "Lifestyle", color: "var(--chart-5)" },
-} satisfies ChartConfig
-
-const fallbackColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-]
-
-const getCategoryColor = (name: string, index: number) =>
-  donutConfig[name as keyof typeof donutConfig]?.color ??
-  fallbackColors[index % fallbackColors.length]
+  monthLabel: string;
+  previousMonthLabel: string;
+  dailySeries: { date: string; value: number }[];
+  monthlySeries: { month: string; value: number }[];
+  totalDaily: number;
+  totalMonthly: number;
+};
 
 const trendConfig = {
-  value: { label: "Transaksi", color: "var(--chart-1)" },
-} satisfies ChartConfig
+  value: { label: "Redeem", color: "var(--chart-1)" },
+  unique: { label: "Unique Redeem", color: "var(--chart-2)" },
+} satisfies ChartConfig;
+
+const topMerchants = [
+  { rank: "1", merchant: "Atlas Surabaya", category: "Sport & Education", branch: "Surabaya", redeem: "13.681" },
+  { rank: "2", merchant: "Tanah Datar", category: "Food", branch: "Lamongan", redeem: "10.328" },
+  { rank: "3", merchant: "iLuFA168 Trenggalek", category: "Shop", branch: "Madiun", redeem: "3.249" },
+  { rank: "4", merchant: "Prodia Darmo Permai", category: "Health & Beauty", branch: "Surabaya", redeem: "3.141" },
+  { rank: "5", merchant: "AIOLA EATERY SBY", category: "Program", branch: "Surabaya", redeem: "2.978" },
+  { rank: "6", merchant: "iLuFA168 Ngawi", category: "Shop", branch: "Madiun", redeem: "2.591" },
+];
 
 export function OverviewTransactions({
   monthLabel,
   previousMonthLabel,
-  categoryBreakdown,
   dailySeries,
   monthlySeries,
   totalDaily,
   totalMonthly,
 }: OverviewTransactionsProps) {
-  const [activeIndex, setActiveIndex] = React.useState<number | null>(null)
+  const monthlyStackedSeries = React.useMemo(
+    () =>
+      monthlySeries.map((item) => ({
+        month: item.month,
+        redeem: item.value,
+        uniqueRedeem: Math.round(item.value * 0.86),
+      })),
+    [monthlySeries],
+  );
+  const dailyDualSeries = React.useMemo(
+    () =>
+      dailySeries.map((item) => ({
+        date: item.date,
+        redeem: item.value,
+        uniqueRedeem: Math.round(item.value * 0.84),
+      })),
+    [dailySeries],
+  );
 
   return (
-    <div className="grid gap-4 px-4 lg:grid-cols-2 lg:px-6">
-      <Card className="@container/card">
-        <CardHeader>
-          <CardTitle>Transaksi per Kategori</CardTitle>
-          <CardDescription>{monthLabel}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid items-center gap-4">
-            <ChartContainer
-              config={donutConfig}
-              className="mx-auto aspect-square h-[220px] sm:h-[280px] lg:h-[320px] w-full max-w-[360px]"
-            >
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dot" />}
-                />
-                <Pie
-                  data={categoryBreakdown}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="48%"
-                  outerRadius="82%"
-                  strokeWidth={0}
-                  activeIndex={activeIndex ?? -1}
-                  activeShape={(props) => (
-                    <Sector
-                      {...props}
-                      outerRadius={(props.outerRadius ?? 0) + 8}
-                    />
-                  )}
-                  onMouseLeave={() => setActiveIndex(null)}
-                  onMouseEnter={(_, index) => setActiveIndex(index)}
-                >
-                  {categoryBreakdown.map((entry, index) => (
-                    <Cell
-                      key={entry.name}
-                      fill={getCategoryColor(entry.name, index)}
-                    />
-                  ))}
-                </Pie>
-                <text
-                  x="50%"
-                  y="48%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="fill-foreground text-base font-semibold"
-                >
-                  {formatNumber(totalDaily)}
-                </text>
-                <text
-                  x="50%"
-                  y="58%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="fill-muted-foreground text-[11px]"
-                >
-                  Total
-                </text>
-              </PieChart>
-            </ChartContainer>
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-              {categoryBreakdown.map((item, index) => (
-                <div
-                  key={item.name}
-                  className="flex items-center gap-2"
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{
-                      backgroundColor: getCategoryColor(item.name, index),
-                    }}
-                  />
-                  <span className="text-foreground/80">{item.name}</span>
-                  <span className="tabular-nums text-muted-foreground/80">
-                    {item.percent.toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="@container/card">
-        <Tabs defaultValue="daily">
-          <CardHeader>
+    <div className="grid gap-4 px-4 lg:grid-cols-12 lg:px-6">
+      <Card className="gap-0 border border-border/80 py-0 shadow-sm lg:col-span-5">
+        <Tabs defaultValue="monthly">
+          <CardHeader className="border-b px-6 py-5">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <CardTitle>Trend Transaksi</CardTitle>
-                <CardDescription>
-                  {monthLabel} 
-                </CardDescription>
+                <CardTitle className="flex items-center gap-1">
+                  Merchant Analytics
+                  <IconRocket className="size-4 text-primary" />
+                </CardTitle>
+                <CardDescription>{monthLabel}</CardDescription>
               </div>
               <CardAction>
-                <TabsList className="rounded-full bg-muted p-1">
-                  <TabsTrigger
-                    value="daily"
-                    className="rounded-full px-3 py-1 text-xs font-medium"
-                  >
-                    Daily
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="monthly"
-                    className="rounded-full px-3 py-1 text-xs font-medium"
-                  >
+                <TabsList className="h-auto rounded-lg bg-muted p-1">
+                  <TabsTrigger value="monthly" className="rounded-md px-3 py-1 text-xs">
                     Monthly
+                  </TabsTrigger>
+                  <TabsTrigger value="daily" className="rounded-md px-3 py-1 text-xs">
+                    Daily
                   </TabsTrigger>
                 </TabsList>
               </CardAction>
             </div>
           </CardHeader>
-          <CardContent className="pb-0 pt-0">
-            <TabsContent value="daily" className="mt-0">
-              <div className="mb-1 text-sm font-semibold tabular-nums">
-                {formatNumber(totalDaily)} transaksi
+          <CardContent className="px-6 py-5">
+            <div className="mb-4 flex gap-8 text-sm">
+              <div>
+                <p className="text-xs tracking-wide text-muted-foreground uppercase">Redeem</p>
+                <p className="text-2xl font-bold">{formatNumber(totalMonthly)}</p>
               </div>
-              <ChartContainer
-                config={trendConfig}
-                className="aspect-auto h-[280px] w-full"
-              >
-                <AreaChart data={dailySeries} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <div>
+                <p className="text-xs tracking-wide text-muted-foreground uppercase">Unique Redeem</p>
+                <p className="text-2xl font-bold">{formatNumber(totalDaily)}</p>
+              </div>
+            </div>
+            <div className="mb-4 flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded bg-primary" />
+                <span>Redeem</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded bg-secondary" />
+                <span>Unique Redeem</span>
+              </div>
+            </div>
+            <TabsContent value="monthly" className="mt-0">
+              <ChartContainer config={trendConfig} className="h-[260px] w-full">
+                <BarChart
+                  data={monthlyStackedSeries}
+                  margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
+                >
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={6}
+                    tickFormatter={(value) =>
+                      new Date(value + "-01").toLocaleDateString("id-ID", {
+                        month: "short",
+                      })
+                    }
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        indicator="dot"
+                        labelFormatter={(value) =>
+                          new Date(value + "-01").toLocaleDateString("id-ID", {
+                            month: "long",
+                            year: "numeric",
+                          })
+                        }
+                      />
+                    }
+                  />
+                  <Bar dataKey="redeem" fill="var(--chart-1)" stackId="merchant" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="uniqueRedeem" fill="var(--chart-2)" stackId="merchant" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </TabsContent>
+            <TabsContent value="daily" className="mt-0">
+              <ChartContainer config={trendConfig} className="h-[260px] w-full">
+                <AreaChart data={dailyDualSeries} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <defs>
-                    <linearGradient
-                      id="fillTransactionsDaily"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="var(--color-value)"
-                        stopOpacity={0.25}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="var(--color-value)"
-                        stopOpacity={0}
-                      />
+                    <linearGradient id="fillDailyRedeem" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid vertical={false} />
@@ -254,62 +199,80 @@ export function OverviewTransactions({
                     }
                   />
                   <Area
-                    dataKey="value"
+                    dataKey="redeem"
                     type="monotone"
-                    fill="url(#fillTransactionsDaily)"
-                    stroke="var(--color-value)"
-                    strokeWidth={1.5}
+                    fill="url(#fillDailyRedeem)"
+                    stroke="var(--chart-1)"
+                    strokeWidth={1.8}
+                    dot={false}
+                  />
+                  <Area
+                    dataKey="uniqueRedeem"
+                    type="monotone"
+                    fill="transparent"
+                    stroke="var(--chart-2)"
+                    strokeWidth={1.8}
+                    strokeDasharray="5 5"
                     dot={false}
                   />
                 </AreaChart>
               </ChartContainer>
             </TabsContent>
-            <TabsContent value="monthly" className="mt-0">
-              <div className="mb-1 text-sm font-semibold tabular-nums">
-                {formatNumber(totalMonthly)} transaksi
-              </div>
-              <ChartContainer
-                config={trendConfig}
-                className="aspect-auto h-[280px] w-full"
-              >
-                <BarChart data={monthlySeries} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={6}
-                    tickFormatter={(value) =>
-                      new Date(value + "-01").toLocaleDateString("id-ID", {
-                        month: "short",
-                      })
-                    }
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={
-                      <ChartTooltipContent
-                        indicator="dot"
-                        labelFormatter={(value) =>
-                          new Date(value + "-01").toLocaleDateString("id-ID", {
-                            month: "long",
-                            year: "numeric",
-                          })
-                        }
-                      />
-                    }
-                  />
-                  <Bar
-                    dataKey="value"
-                    fill="var(--color-value)"
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ChartContainer>
-            </TabsContent>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Dibanding {previousMonthLabel}
+            </p>
           </CardContent>
         </Tabs>
       </Card>
+
+      <Card className="gap-0 border border-border/80 py-0 shadow-sm lg:col-span-7">
+        <CardHeader className="border-b px-6 py-5">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-1">
+              Top Merchant Redeem
+              <IconStars className="size-4 text-secondary" />
+            </CardTitle>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <IconAdjustmentsHorizontal className="size-4" />
+              <IconDotsVertical className="size-4" />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-12 px-3" />
+                  <TableHead className="px-3">Merchant</TableHead>
+                  <TableHead className="px-3">Category</TableHead>
+                  <TableHead className="px-3">Branch</TableHead>
+                  <TableHead className="px-3 text-right">Redeem</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topMerchants.map((item, index) => (
+                  <TableRow key={item.rank} className="hover:bg-red-50/40">
+                    <TableCell className="px-3 text-muted-foreground">
+                      {index < 3 ? (
+                        <IconTrophy
+                          className={`size-4 ${index === 0 ? "text-yellow-500" : index === 1 ? "text-gray-400" : "text-orange-400"}`}
+                        />
+                      ) : (
+                        item.rank
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 font-medium">{item.merchant}</TableCell>
+                    <TableCell className="px-3">{item.category}</TableCell>
+                    <TableCell className="px-3">{item.branch}</TableCell>
+                    <TableCell className="px-3 text-right font-semibold">{item.redeem}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 
 // import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { DataTable } from "@/components/data-table";
+import { OverviewExtraPanels } from "@/components/overview-extra-panels";
 import { OverviewTransactions } from "@/components/overview-transactions";
 import { SectionCards, type StatCard } from "@/components/section-cards";
 import {
@@ -210,7 +210,7 @@ export function OverviewContent() {
   }, [data]);
 
   return (
-    <>
+    <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 lg:px-6">
         <div className="text-sm font-medium text-muted-foreground">Ringkasan bulan</div>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -232,6 +232,7 @@ export function OverviewContent() {
             monthLabel={data.monthLabel}
             previousMonthLabel={data.previousMonthLabel}
             stats={stats}
+            className="[&_[data-slot=card]]:border-border/80 [&_[data-slot=card]]:shadow-sm [&_[data-slot=card]]:transition [&_[data-slot=card]]:hover:shadow-md"
           />
           {/* <div className="px-4 lg:px-6">
             <ChartAreaInteractive
@@ -243,17 +244,16 @@ export function OverviewContent() {
           <OverviewTransactions
             monthLabel={data.monthLabel}
             previousMonthLabel={data.previousMonthLabel}
-            categoryBreakdown={data.categoryBreakdown}
             dailySeries={data.dailyTransactions}
             monthlySeries={data.monthlyTransactions}
             totalDaily={data.cards.totalTransaksi}
             totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
           />
-          <DataTable
-            data={{
-              cluster: data.branchTable.branches,
-              category: data.categoryTable,
-            }}
+          <OverviewExtraPanels
+            monthLabel={data.monthLabel}
+            previousMonthLabel={data.previousMonthLabel}
+            trendSeries={data.dailyTransactions}
+            trendTotal={data.cards.totalTransaksi}
           />
         </>
       ) : (
@@ -261,6 +261,6 @@ export function OverviewContent() {
           {loading ? "Memuat data..." : "Tidak ada data"}
         </div>
       )}
-    </>
+    </div>
   );
 }

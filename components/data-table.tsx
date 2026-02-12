@@ -170,10 +170,14 @@ function MetricsTable({
   title,
   data,
   enableCollapse = false,
+  tableTitle,
+  darkHeader = false,
 }: {
   title: string;
   data: ClusterRow[] | MetricRow[];
   enableCollapse?: boolean;
+  tableTitle?: string;
+  darkHeader?: boolean;
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [expandedRows, setExpandedRows] = React.useState<Set<number>>(() => new Set());
@@ -237,9 +241,9 @@ function MetricsTable({
   });
 
   return (
-    <TableCard contentClassName="flex flex-col gap-4">
+    <TableCard title={tableTitle} contentClassName="flex flex-col gap-4">
       <Table className="[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-15 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12 [&_th]:text-center [&_td]:text-center [&_th:first-child]:text-left [&_td:first-child]:text-left">
-        <TableHeader className="bg-muted/60 text-muted-foreground">
+        <TableHeader className={cn(darkHeader ? "bg-black text-white" : "bg-muted/60 text-muted-foreground")}>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
@@ -347,8 +351,14 @@ function MetricsTable({
 export function DataTable({ data }: DataTableProps) {
   return (
     <div className="flex flex-col gap-8 px-4 lg:px-6">
-      <MetricsTable title="Cluster" data={data.cluster} enableCollapse />
-      <MetricsTable title="Category" data={data.category} />
+      <MetricsTable
+        title="Cluster"
+        tableTitle="Detail List Merchant"
+        darkHeader
+        data={data.cluster}
+        enableCollapse
+      />
+      <MetricsTable title="Category" tableTitle="Summary by Category" data={data.category} />
     </div>
   );
 }

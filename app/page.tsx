@@ -8,7 +8,7 @@ export default function Page() {
     <SidebarProvider
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--sidebar-width": "16rem",
           "--header-height": "calc(var(--spacing) * 12)",
         } as React.CSSProperties
       }
@@ -16,10 +16,13 @@ export default function Page() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col bg-background">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <OverviewContent />
+              <p className="pb-2 text-center text-xs text-muted-foreground">
+                © 2026 Telkomsel Internal Analytics. All rights reserved.
+              </p>
             </div>
           </div>
         </div>
