@@ -31,16 +31,73 @@ type OverviewExtraPanelsProps = {
 };
 
 const categoryData = [
-  { name: "Health", value: 15, color: "#E00024" },
-  { name: "Food", value: 42, color: "#990019" },
-  { name: "Shop", value: 14, color: "#FDB813" },
-  { name: "Program", value: 10, color: "#FF6B00" },
-  { name: "Dining", value: 19, color: "#FF9F43" },
+  { name: "Health", value: 150 },
+  { name: "Food", value: 80 },
+  { name: "Shop", value: 70 },
+  { name: "Program", value: 180 },
+  { name: "Dining", value: 50 },
+  { name: "Dining", value: 50 },
 ];
 
 const categoryConfig = {
   value: { label: "Kategori", color: "var(--chart-1)" },
 } satisfies ChartConfig;
+
+const BASE_PIE_COLORS = ["#E00024", "#990019", "#FDB813", "#FF6B00", "#FF9F43"];
+const MIN_LABEL_PERCENT = 10;
+
+const hexToRgb = (hex: string) => {
+  const cleaned = hex.replace("#", "");
+  const normalized =
+    cleaned.length === 3
+      ? cleaned
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : cleaned;
+
+  const value = Number.parseInt(normalized, 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+};
+
+const rgbToHex = (r: number, g: number, b: number) =>
+  `#${[r, g, b]
+    .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+    .join("")}`;
+
+const luminance = (hex: string) => {
+  const { r, g, b } = hexToRgb(hex);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const buildDynamicPieColors = (count: number) => {
+  if (count <= 0) return [];
+
+  const sortedStops = [...BASE_PIE_COLORS].sort((a, b) => luminance(a) - luminance(b));
+  if (count === 1) return [sortedStops[0]];
+  if (sortedStops.length === 1) return Array.from({ length: count }, () => sortedStops[0]);
+
+  return Array.from({ length: count }, (_, index) => {
+    const position = index / (count - 1);
+    const segment = position * (sortedStops.length - 1);
+    const left = Math.floor(segment);
+    const right = Math.min(left + 1, sortedStops.length - 1);
+    const progress = segment - left;
+
+    const leftRgb = hexToRgb(sortedStops[left]);
+    const rightRgb = hexToRgb(sortedStops[right]);
+
+    return rgbToHex(
+      leftRgb.r + (rightRgb.r - leftRgb.r) * progress,
+      leftRgb.g + (rightRgb.g - leftRgb.g) * progress,
+      leftRgb.b + (rightRgb.b - leftRgb.b) * progress,
+    );
+  });
+};
 
 type PieLabelProps = {
   cx?: number;
@@ -225,19 +282,29 @@ export function OverviewExtraPanels({
   );
 
   const total = sortedCategoryData.reduce((acc, d) => acc + d.value, 0);
-  const largestValue = sortedCategoryData[0]?.value ?? 0;
-  const largestAngle = total ? (largestValue / total) * 360 : 0;
+  const pieColors = React.useMemo(
+    () => buildDynamicPieColors(sortedCategoryData.length),
+    [sortedCategoryData.length],
+  );
+  const categoryChartData = React.useMemo(
+    () =>
+      sortedCategoryData.map((item, index) => ({
+        ...item,
+        amount: item.value,
+        percent: total ? (item.value / total) * 100 : 0,
+        color: pieColors[index],
+      })),
+    [sortedCategoryData, total, pieColors],
+  );
 
-  // pengin MID slice terbesar di kanan (jam 3)
-  const desiredMid = 15;
-
-  const startAngle = desiredMid + largestAngle / 2;
-  const endAngle = startAngle - 360;
+  // Urut searah jarum jam dari jam 12: terbesar -> terkecil.
+  const startAngle = 90;
+  const endAngle = -270;
 
   const renderCategoryLabel = (props: PieLabelProps) => {
     const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, value = 0 } = props;
 
-    if (value < 15) return null;
+    if (value < MIN_LABEL_PERCENT) return null;
 
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -253,7 +320,7 @@ export function OverviewExtraPanels({
         dominantBaseline="central"
         className="text-[10px] font-semibold"
       >
-        {value}%
+        {Number(value).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
       </text>
     );
   };
@@ -272,10 +339,39 @@ export function OverviewExtraPanels({
             <div className="flex items-center justify-between gap-3">
               <ChartContainer config={categoryConfig} className="h-[230px] w-[230px] shrink-0">
                 <PieChart>
-                  <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        hideIndicator
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.name ?? "Kategori"}
+                        formatter={(_, __, ___, ____, payload) => {
+                          const amount = Number(payload?.amount ?? 0);
+                          const percent = Number(payload?.percent ?? 0);
+
+                          return (
+                            <div className="grid min-w-[10rem] gap-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Jumlah</span>
+                                <span className="font-mono font-medium tabular-nums text-foreground">
+                                  {formatNumber(amount)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">Persentase</span>
+                                <span className="font-mono font-medium tabular-nums text-foreground">
+                                  {percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                    }
+                  />
                   <Pie
-                    data={sortedCategoryData}
-                    dataKey="value"
+                    data={categoryChartData}
+                    dataKey="percent"
                     nameKey="name"
                     innerRadius={46}
                     outerRadius={94}
@@ -284,20 +380,20 @@ export function OverviewExtraPanels({
                     labelLine={false}
                     label={renderCategoryLabel}
                     activeIndex={activeCategoryIndex}
-                    activeShape={(props) => (
+                    activeShape={(props: React.ComponentProps<typeof Sector>) => (
                       <Sector {...props} outerRadius={(props.outerRadius ?? 0) + 8} />
                     )}
                     onMouseEnter={(_, index) => setActiveCategoryIndex(index)}
                     onMouseLeave={() => setActiveCategoryIndex(-1)}
                   >
-                    {sortedCategoryData.map((entry) => (
+                    {categoryChartData.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
                 </PieChart>
               </ChartContainer>
               <div className="grid w-[130px] gap-1.5 text-sm text-muted-foreground">
-                {sortedCategoryData.map((item, index) => (
+                {categoryChartData.map((item, index) => (
                   <div
                     key={item.name}
                     className={`flex items-center gap-2 ${activeCategoryIndex === index ? "font-semibold text-foreground" : ""}`}
@@ -450,113 +546,6 @@ export function OverviewExtraPanels({
           </div>
         </CardContent>
       </Card>
-
-      {/* <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="gap-0 border border-border/80 py-0 shadow-sm">
-          <CardHeader className="px-6 py-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-lg">Trend Transaksi</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {monthLabel} • dibanding {previousMonthLabel}
-                </p>
-              </div>
-              <Tabs defaultValue="daily">
-                <TabsList className="h-auto rounded-lg bg-muted p-1">
-                  <TabsTrigger value="daily" className="rounded-md px-3 py-1 text-xs">Daily</TabsTrigger>
-                  <TabsTrigger value="monthly" className="rounded-md px-3 py-1 text-xs">Monthly</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent className="px-6 pb-6 pt-0">
-            <p className="mb-3 text-2xl font-bold">
-              {formatNumber(trendTotal)} <span className="text-sm font-normal text-muted-foreground">transaksi</span>
-            </p>
-            <ChartContainer config={trendConfig} className="h-[250px] w-full">
-              <AreaChart data={trendSeries}>
-                <defs>
-                  <linearGradient id="trendFillMain" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-value)" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="var(--color-value)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={6}
-                  minTickGap={28}
-                  tickFormatter={(value) =>
-                    new Date(value).toLocaleDateString("id-ID", { day: "numeric" })
-                  }
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      indicator="dot"
-                      labelFormatter={(value) =>
-                        new Date(value).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                        })
-                      }
-                    />
-                  }
-                />
-                <Area
-                  dataKey="value"
-                  type="monotone"
-                  fill="url(#trendFillMain)"
-                  stroke="var(--color-value)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </AreaChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
-          <CardHeader className="border-b px-6 py-5">
-            <CardTitle className="text-lg">Branch Performance Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="px-6">Branch</TableHead>
-                  <TableHead className="px-6 text-center">Total Point</TableHead>
-                  <TableHead className="px-6 text-center">Total Transaksi</TableHead>
-                  <TableHead className="px-6 text-right">Merchant Produktif</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="px-6 font-medium">Surabaya</TableCell>
-                  <TableCell className="px-6 text-center">284.560</TableCell>
-                  <TableCell className="px-6 text-center">48.210</TableCell>
-                  <TableCell className="px-6 text-right font-semibold text-primary">620</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="px-6 font-medium">Sidoarjo</TableCell>
-                  <TableCell className="px-6 text-center">156.230</TableCell>
-                  <TableCell className="px-6 text-center">32.140</TableCell>
-                  <TableCell className="px-6 text-right font-semibold text-primary">450</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="px-6 font-medium">Malang</TableCell>
-                  <TableCell className="px-6 text-center">210.890</TableCell>
-                  <TableCell className="px-6 text-center">41.500</TableCell>
-                  <TableCell className="px-6 text-right font-semibold text-primary">580</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div> */}
     </div>
   );
 }

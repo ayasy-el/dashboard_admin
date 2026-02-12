@@ -218,9 +218,9 @@ export function OverviewTransactions({
                 </AreaChart>
               </ChartContainer>
             </TabsContent>
-            <p className="mt-3 text-xs text-muted-foreground">
+            {/* <p className="mt-3 text-xs text-muted-foreground">
               Dibanding {previousMonthLabel}
-            </p>
+            </p> */}
           </CardContent>
         </Tabs>
       </Card>

@@ -28,7 +28,7 @@ export type StatCard = {
   unit: string
   currentTotal: number
   previousTotal: number
-  series: { date: string; value: number }[]
+  series?: { date: string; value: number }[]
 }
 
 type SectionCardsProps = {
@@ -55,6 +55,7 @@ export function SectionCards({
         const delta = stat.previousTotal
           ? ((stat.currentTotal - stat.previousTotal) / stat.previousTotal) * 100
           : 0
+        const hasSeries = Boolean(stat.series?.length)
         const isPositive = delta >= 0
         const TrendIcon = isPositive ? IconTrendingUp : IconTrendingDown
         const chartConfig: ChartConfig = {
@@ -74,9 +75,11 @@ export function SectionCards({
           >
             <CardHeader className="pb-2">
               <CardDescription>{stat.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                {formatNumber(stat.currentTotal)}
-              </CardTitle>
+              {hasSeries ? (
+                <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                  {formatNumber(stat.currentTotal)}
+                </CardTitle>
+              ) : null}
               <CardAction>
                 <Badge className="border-green-100 bg-green-50 text-green-700" variant="outline">
                   <TrendIcon />
@@ -86,54 +89,60 @@ export function SectionCards({
               </CardAction>
             </CardHeader>
             <CardContent className="px-6 pt-0">
-              <ChartContainer config={chartConfig} className="h-[64px] w-full">
-                <AreaChart data={stat.series}>
-                  <defs>
-                    <linearGradient
-                      id={`fill-${stat.id}`}
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="10%"
-                        stopColor="var(--color-value)"
-                        stopOpacity={0.9}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="var(--color-value)"
-                        stopOpacity={0.1}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" hide />
-                  <ChartTooltip
-                    cursor={false}
-                    content={
-                      <ChartTooltipContent
-                        labelFormatter={(value) =>
-                          new Date(value).toLocaleDateString("id-ID", {
-                            month: "short",
-                            day: "numeric",
-                          })
-                        }
-                        indicator="dot"
-                      />
-                    }
-                  />
-                  <Area
-                    dataKey="value"
-                    type="monotone"
-                    fill={`url(#fill-${stat.id})`}
-                    stroke="var(--color-value)"
-                    strokeWidth={1.25}
-                    dot={false}
-                    activeDot={false}
-                  />
-                </AreaChart>
-              </ChartContainer>
+              {hasSeries ? (
+                <ChartContainer config={chartConfig} className="h-[64px] w-full">
+                  <AreaChart data={stat.series}>
+                    <defs>
+                      <linearGradient
+                        id={`fill-${stat.id}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="10%"
+                          stopColor="var(--color-value)"
+                          stopOpacity={0.9}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="var(--color-value)"
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" hide />
+                    <ChartTooltip
+                      cursor={false}
+                      content={
+                        <ChartTooltipContent
+                          labelFormatter={(value) =>
+                            new Date(value).toLocaleDateString("id-ID", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          }
+                          indicator="dot"
+                        />
+                      }
+                    />
+                    <Area
+                      dataKey="value"
+                      type="monotone"
+                      fill={`url(#fill-${stat.id})`}
+                      stroke="var(--color-value)"
+                      strokeWidth={1.25}
+                      dot={false}
+                      activeDot={false}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              ) : (
+                <div className="flex h-[64px] items-center justify-center text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                  {formatNumber(stat.currentTotal)}
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex-col items-start gap-1 text-xs">
               <div className="flex w-full items-center justify-between gap-2 font-medium text-foreground/90">

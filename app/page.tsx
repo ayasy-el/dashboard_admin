@@ -1,32 +1,26 @@
-import { AppSidebar } from "@/components/app-sidebar";
-import { OverviewContent } from "@/components/overview-content";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
+import { getMonthOptions } from "@/features/shared/get-month-options";
+import { getOverviewDashboard } from "@/features/overview/get-overview-dashboard";
+import { OverviewContent } from "@/features/overview/components/overview-content";
+import { OverviewRepositoryDrizzle } from "@/features/overview/overview.repository.drizzle";
 
-export default function Page() {
+type PageProps = {
+  searchParams?: Promise<{ month?: string }>;
+};
+
+export default async function Page({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const monthQuery = params.month ?? null;
+
+  const monthOptions = await getMonthOptions();
+  const effectiveMonth = monthQuery ?? monthOptions[0]?.value ?? null;
+
+  const repo = new OverviewRepositoryDrizzle();
+  const data = await getOverviewDashboard(repo, effectiveMonth);
+
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "16rem",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col bg-background">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <OverviewContent />
-              <p className="pb-2 text-center text-xs text-muted-foreground">
-                © 2026 Telkomsel Internal Analytics. All rights reserved.
-              </p>
-            </div>
-          </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <DashboardPageShell sidebarWidth="16rem">
+      <OverviewContent data={data} monthOptions={monthOptions} selectedMonth={data.month} />
+    </DashboardPageShell>
   );
 }

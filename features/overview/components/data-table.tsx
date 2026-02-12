@@ -13,7 +13,7 @@ import {
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { TableCard } from "@/components/table-card";
+import { TableCard } from "@/features/shared/components/table-card";
 import {
   Table,
   TableBody,
@@ -57,7 +57,9 @@ type DataTableProps = {
 
 const formatNumber = (value: number) => new Intl.NumberFormat("id-ID").format(value);
 
-const sumField = (rows: MetricRow[], key: keyof MetricRow) =>
+type NumericMetricKey = Exclude<keyof MetricRow, "id" | "name">;
+
+const sumField = (rows: MetricRow[], key: NumericMetricKey) =>
   rows.reduce((total, row) => total + row[key], 0);
 
 const buildParentTotals = (row: ClusterRow): MetricRow => {
