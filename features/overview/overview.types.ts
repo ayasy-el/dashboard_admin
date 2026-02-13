@@ -71,4 +71,9 @@ export type OverviewResponse = {
     redeem: number;
     uniqueRedeem: number;
   }[];
+  expiredMerchants: {
+    branch: string;
+    merchant: string;
+    keyword: string;
+  }[];
 };

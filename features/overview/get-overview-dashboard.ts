@@ -152,6 +152,12 @@ export async function getOverviewDashboard(
     uniqueRedeem: row.uniqueRedeem,
   }));
 
+  const expiredMerchants = raw.expiredMerchantRaw.map((row) => ({
+    branch: row.branch,
+    merchant: row.merchant,
+    keyword: row.keyword,
+  }));
+
   return {
     month,
     monthLabel: monthLabel(month),
@@ -180,6 +186,7 @@ export async function getOverviewDashboard(
     categoryTable,
     notActiveMerchants,
     merchantPerMonth,
+    expiredMerchants,
   };
 }
 const formatDisplayDate = (value: string) => {

@@ -53,16 +53,51 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
   }));
 
   const branches = data.branchTable.branches;
-  const branchesByPoint = [...branches].sort((a, b) => b.totalPoint - a.totalPoint);
-  const totalRegionMerchant = branches.reduce((sum, branch) => sum + branch.totalMerchant, 0);
+  const branchTotals = new Map(branches.map((branch) => [branch.name, branch]));
+
+  const merchantKeyByBranch = new Map<string, Set<string>>();
+  const activeMerchantKeyByBranch = new Map<string, Set<string>>();
+  for (const merchant of data.merchantPerMonth) {
+    const merchantKey = `${merchant.branch}||${merchant.keyword}`;
+    if (!merchantKeyByBranch.has(merchant.branch)) {
+      merchantKeyByBranch.set(merchant.branch, new Set<string>());
+    }
+    merchantKeyByBranch.get(merchant.branch)?.add(merchantKey);
+
+    if (merchant.redeem > 0) {
+      if (!activeMerchantKeyByBranch.has(merchant.branch)) {
+        activeMerchantKeyByBranch.set(merchant.branch, new Set<string>());
+      }
+      activeMerchantKeyByBranch.get(merchant.branch)?.add(merchantKey);
+    }
+  }
+
+  const keywordByBranch = Object.fromEntries(
+    Array.from(merchantKeyByBranch.entries()).map(([branch, merchants]) => [branch, merchants.size]),
+  ) as Record<string, number>;
+
+  const oaByBranch = Object.fromEntries(
+    Array.from(activeMerchantKeyByBranch.entries()).map(([branch, merchants]) => [branch, merchants.size]),
+  ) as Record<string, number>;
+
+  const branchNames = Array.from(
+    new Set<string>([...Object.keys(keywordByBranch), ...Array.from(branchTotals.keys())]),
+  );
+
+  const branchesByStatusRedeem = branchNames
+    .map((branchName) => ({
+      name: branchName,
+      keyword: keywordByBranch[branchName] ?? 0,
+      totalTransaksi: branchTotals.get(branchName)?.totalTransaksi ?? 0,
+      uniqueRedeemer: branchTotals.get(branchName)?.uniqueRedeemer ?? 0,
+    }))
+    .sort((a, b) => b.totalTransaksi - a.totalTransaksi);
+
+  const totalRegionMerchant = Object.values(keywordByBranch).reduce((sum, value) => sum + value, 0);
   const totalRegionTransaksi = branches.reduce((sum, branch) => sum + branch.totalTransaksi, 0);
   const totalRegionUniqueRedeemer = branches.reduce((sum, branch) => sum + branch.uniqueRedeemer, 0);
-  const maxTransaksi = Math.max(totalRegionTransaksi, ...branchesByPoint.map((item) => item.totalTransaksi), 1);
-  const maxUniqueRedeemer = Math.max(
-    totalRegionUniqueRedeemer,
-    ...branchesByPoint.map((item) => item.uniqueRedeemer),
-    1,
-  );
+  const maxTransaksi = Math.max(totalRegionTransaksi, ...branchesByStatusRedeem.map((item) => item.totalTransaksi), 1);
+  const maxUniqueRedeemer = Math.max(totalRegionUniqueRedeemer, ...branchesByStatusRedeem.map((item) => item.uniqueRedeemer), 1);
 
   const regionRows: ComparisonProgressRow[] = [
     {
@@ -79,10 +114,10 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
         width: clampProgressWidth(totalRegionUniqueRedeemer, maxUniqueRedeemer),
       },
     },
-    ...branchesByPoint.map((branch) => ({
-      id: String(branch.id),
+    ...branchesByStatusRedeem.map((branch) => ({
+      id: branch.name,
       label: branch.name,
-      metric: formatNumber(branch.totalMerchant),
+      metric: formatNumber(branch.keyword),
       left: {
         value: formatNumber(branch.totalTransaksi),
         width: clampProgressWidth(branch.totalTransaksi, maxTransaksi),
@@ -94,13 +129,14 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     })),
   ];
 
-  const activeRows: RankedRow[] = [...branches]
-    .sort((a, b) => b.merchantAktif - a.merchantAktif)
-    .map((branch) => [
-      branch.name,
-      formatNumber(branch.merchantAktif),
-      formatNumber(branch.totalTransaksi),
-      formatNumber(branch.uniqueRedeemer),
+  const activeRows: RankedRow[] = branchNames
+    .map((branchName) => [branchName, oaByBranch[branchName] ?? 0] as const)
+    .sort(([, leftCount], [, rightCount]) => rightCount - leftCount)
+    .map(([branchName, oa]) => [
+      branchName,
+      formatNumber(oa),
+      formatNumber(branchTotals.get(branchName)?.totalTransaksi ?? 0),
+      formatNumber(branchTotals.get(branchName)?.uniqueRedeemer ?? 0),
     ]);
 
   const productiveRows: RankedRow[] = [...branches]
@@ -112,7 +148,42 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
       formatNumber(branch.uniqueRedeemer),
     ]);
 
-  const inactiveRows: RankedRow[] = data.notActiveMerchants.map((merchant) => [
+  const inactiveCountByBranch = data.notActiveMerchants.reduce<Record<string, number>>(
+    (accumulator, merchant) => {
+      accumulator[merchant.branch] = (accumulator[merchant.branch] ?? 0) + 1;
+      return accumulator;
+    },
+    {},
+  );
+
+  const expiredCountByBranch = data.expiredMerchants.reduce<Record<string, number>>(
+    (accumulator, merchant) => {
+      accumulator[merchant.branch] = (accumulator[merchant.branch] ?? 0) + 1;
+      return accumulator;
+    },
+    {},
+  );
+
+  const alertBranches = Array.from(
+    new Set([...Object.keys(inactiveCountByBranch), ...Object.keys(expiredCountByBranch)]),
+  );
+
+  const inactiveRows: RankedRow[] = alertBranches
+    .map((branch) => ({
+      branch,
+      notActive: inactiveCountByBranch[branch] ?? 0,
+      expired: expiredCountByBranch[branch] ?? 0,
+    }))
+    .sort((left, right) => right.notActive + right.expired - (left.notActive + left.expired))
+    .map((row) => [row.branch, formatNumber(row.notActive), formatNumber(row.expired)]);
+
+  const inactiveDetailRows: RankedRow[] = data.notActiveMerchants.map((merchant) => [
+    merchant.branch,
+    merchant.merchant,
+    merchant.keyword,
+  ]);
+
+  const expiredRows: RankedRow[] = data.expiredMerchants.map((merchant) => [
     merchant.branch,
     merchant.merchant,
     merchant.keyword,
@@ -140,6 +211,9 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     activeRows,
     productiveRows,
     inactiveRows,
+    inactiveDetailRows,
+    expiredRows,
+    totalExpiredMerchants: data.expiredMerchants.length,
     merchantPerMonthRows,
   };
 }

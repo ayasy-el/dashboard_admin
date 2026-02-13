@@ -65,6 +65,11 @@ export type OverviewRawData = {
     redeem: number;
     uniqueRedeem: number;
   }[];
+  expiredMerchantRaw: {
+    branch: string;
+    merchant: string;
+    keyword: string;
+  }[];
   clusterPointCurrent: number;
   clusterPointPrevious: number;
 };

@@ -3,10 +3,12 @@
 import * as React from "react";
 
 import {
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
+  IconChevronUp,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,12 +41,44 @@ type ComparisonProgressTableCardProps = {
   rightBarClassName?: string;
   darkHeader?: boolean;
   splitLabel?: string;
+  sortableColumns?: boolean[];
   pagination?: {
     enabled?: boolean;
     pageSize?: number;
     keepFirstRow?: boolean;
   };
 };
+
+type SortDirection = "asc" | "desc";
+
+const toTextValue = (value: React.ReactNode): string => {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map((item) => toTextValue(item)).join(" ");
+  if (React.isValidElement(value)) return toTextValue((value.props as { children?: React.ReactNode }).children);
+  return String(value);
+};
+
+const toNumericValue = (value: React.ReactNode): number | null => {
+  const text = toTextValue(value).trim();
+  if (!text) return null;
+  const normalized = text.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+  return Number(normalized);
+};
+
+function SortIndicator({ active, direction, dark }: { active: boolean; direction?: SortDirection; dark?: boolean }) {
+  if (!active) {
+    return (
+      <span className={cn("inline-flex flex-col", dark ? "text-white/70" : "text-muted-foreground/50")}>
+        <IconChevronUp className="-mb-1 size-3" />
+        <IconChevronDown className="-mt-1 size-3" />
+      </span>
+    );
+  }
+
+  return direction === "asc" ? <IconChevronUp className="size-3.5" /> : <IconChevronDown className="size-3.5" />;
+}
 
 function ProgressBar({ width, className }: { width: string; className: string }) {
   return (
@@ -64,6 +98,7 @@ export function ComparisonProgressTableCard({
   rightBarClassName = "bg-secondary",
   darkHeader = false,
   splitLabel,
+  sortableColumns,
   pagination,
 }: ComparisonProgressTableCardProps) {
   const totalCols = headers.length;
@@ -71,10 +106,43 @@ export function ComparisonProgressTableCard({
   const pageSize = pagination?.pageSize ?? 5;
   const keepFirstRow = Boolean(pagination?.keepFirstRow);
   const pinnedRow = keepFirstRow ? rows[0] : undefined;
-  const pagedRows = keepFirstRow ? rows.slice(1) : rows;
+  const baseRows = keepFirstRow ? rows.slice(1) : rows;
+  const [sortState, setSortState] = React.useState<{ column: number; direction: SortDirection } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageInput, setPageInput] = React.useState("1");
-  const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(pagedRows.length / pageSize)) : 1;
+  const sortedRows = React.useMemo(() => {
+    if (!sortState) return baseRows;
+
+    const next = [...baseRows];
+    next.sort((leftRow, rightRow) => {
+      if (sortState.column === 0) {
+        const leftText = toTextValue(leftRow.label).toLowerCase();
+        const rightText = toTextValue(rightRow.label).toLowerCase();
+        const compared = leftText.localeCompare(rightText, "id", { numeric: true, sensitivity: "base" });
+        return sortState.direction === "asc" ? compared : -compared;
+      }
+
+      if (sortState.column === 1) {
+        const left = toNumericValue(leftRow.metric);
+        const right = toNumericValue(rightRow.metric);
+        if (left != null && right != null) {
+          return sortState.direction === "asc" ? left - right : right - left;
+        }
+      }
+
+      if (sortState.column === 2 || sortState.column === 3) {
+        const left = toNumericValue(sortState.column === 2 ? leftRow.left.value : leftRow.right.value);
+        const right = toNumericValue(sortState.column === 2 ? rightRow.left.value : rightRow.right.value);
+        if (left != null && right != null) {
+          return sortState.direction === "asc" ? left - right : right - left;
+        }
+      }
+
+      return 0;
+    });
+    return next;
+  }, [baseRows, sortState]);
+  const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
 
   React.useEffect(() => {
     if (!isPaginationEnabled) return;
@@ -86,8 +154,8 @@ export function ComparisonProgressTableCard({
   }, [currentPage]);
 
   const start = isPaginationEnabled ? (currentPage - 1) * pageSize : 0;
-  const end = isPaginationEnabled ? start + pageSize : pagedRows.length;
-  const visibleRows = isPaginationEnabled ? pagedRows.slice(start, end) : pagedRows;
+  const end = isPaginationEnabled ? start + pageSize : sortedRows.length;
+  const visibleRows = isPaginationEnabled ? sortedRows.slice(start, end) : sortedRows;
 
   const commitPageInput = () => {
     const parsed = Number.parseInt(pageInput, 10);
@@ -97,6 +165,18 @@ export function ComparisonProgressTableCard({
     }
     const nextPage = Math.min(totalPages, Math.max(1, parsed));
     setCurrentPage(nextPage);
+  };
+
+  const isColumnSortable = (column: number) => sortableColumns?.[column] ?? true;
+
+  const toggleSort = (column: number) => {
+    if (!isColumnSortable(column)) return;
+    setCurrentPage(1);
+    setSortState((current) => {
+      if (!current || current.column !== column) return { column, direction: "asc" };
+      if (current.direction === "asc") return { column, direction: "desc" };
+      return null;
+    });
   };
 
   return (
@@ -111,11 +191,63 @@ export function ComparisonProgressTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>{headers[0]}</TableHead>
-                <TableHead className={cn("px-4 text-center", darkHeader ? "text-white" : undefined)}>{headers[1]}</TableHead>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>{headers[2]}</TableHead>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>{headers[3]}</TableHead>
+                <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
+                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                  {isColumnSortable(0) ? (
+                    <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(0)}>
+                      <span>{headers[0]}</span>
+                      <SortIndicator
+                        active={sortState?.column === 0}
+                        direction={sortState?.column === 0 ? sortState.direction : undefined}
+                        dark={darkHeader}
+                      />
+                    </button>
+                  ) : (
+                    <span>{headers[0]}</span>
+                  )}
+                </TableHead>
+                <TableHead className={cn("px-4 text-center", darkHeader ? "text-white" : undefined)}>
+                  {isColumnSortable(1) ? (
+                    <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(1)}>
+                      <span>{headers[1]}</span>
+                      <SortIndicator
+                        active={sortState?.column === 1}
+                        direction={sortState?.column === 1 ? sortState.direction : undefined}
+                        dark={darkHeader}
+                      />
+                    </button>
+                  ) : (
+                    <span>{headers[1]}</span>
+                  )}
+                </TableHead>
+                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                  {isColumnSortable(2) ? (
+                    <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(2)}>
+                      <span>{headers[2]}</span>
+                      <SortIndicator
+                        active={sortState?.column === 2}
+                        direction={sortState?.column === 2 ? sortState.direction : undefined}
+                        dark={darkHeader}
+                      />
+                    </button>
+                  ) : (
+                    <span>{headers[2]}</span>
+                  )}
+                </TableHead>
+                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                  {isColumnSortable(3) ? (
+                    <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(3)}>
+                      <span>{headers[3]}</span>
+                      <SortIndicator
+                        active={sortState?.column === 3}
+                        direction={sortState?.column === 3 ? sortState.direction : undefined}
+                        dark={darkHeader}
+                      />
+                    </button>
+                  ) : (
+                    <span>{headers[3]}</span>
+                  )}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -274,7 +274,19 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
       left join tx on tx.merchant_key = dm.merchant_key
       order by redeem desc, unique_redeem desc, dm.merchant_name
-      limit 200
+    `);
+
+    const expiredMerchantRaw = await db.execute(sql`
+      select
+        dc.branch as branch,
+        dm.merchant_name as merchant,
+        dm.keyword_code as keyword
+      from dim_rule dr
+      join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+      join dim_cluster dc on dc.cluster_id = dm.cluster_id
+      where dr.end_period >= ${startDate}
+        and dr.end_period < ${endDate}
+      order by dr.end_period, dc.branch, dm.merchant_name
     `);
 
     const [clusterPointCurrent] = await db
@@ -365,6 +377,11 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         point: toNumber(row.point),
         redeem: toNumber(row.redeem),
         uniqueRedeem: toNumber(row.unique_redeem),
+      })),
+      expiredMerchantRaw: (expiredMerchantRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
+        merchant: String(row.merchant ?? ""),
+        keyword: String(row.keyword ?? ""),
       })),
       clusterPointCurrent: toNumber(clusterPointCurrent?.total),
       clusterPointPrevious: toNumber(clusterPointPrevious?.total),

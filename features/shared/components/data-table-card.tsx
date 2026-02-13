@@ -3,10 +3,12 @@
 import * as React from "react";
 
 import {
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
+  IconChevronUp,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,12 +31,48 @@ type DataTableCardProps = {
   headerCellClassName?: string;
   rowKey?: (row: React.ReactNode[], index: number) => React.Key;
   columnClassNames?: string[];
+  sortableColumns?: boolean[];
   pagination?: {
     enabled?: boolean;
     pageSize?: number;
     pageSizeOptions?: number[];
   };
 };
+
+type SortDirection = "asc" | "desc";
+
+const toTextValue = (value: React.ReactNode): string => {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map((item) => toTextValue(item)).join(" ");
+  if (React.isValidElement(value)) return toTextValue((value.props as { children?: React.ReactNode }).children);
+  return String(value);
+};
+
+const toComparableValue = (value: React.ReactNode): string | number => {
+  const text = toTextValue(value).trim();
+  if (!text) return "";
+
+  const numericCandidate = text.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  if (/^-?\d+(\.\d+)?$/.test(numericCandidate)) {
+    return Number(numericCandidate);
+  }
+
+  return text.toLowerCase();
+};
+
+function SortIndicator({ active, direction }: { active: boolean; direction?: SortDirection }) {
+  if (!active) {
+    return (
+      <span className="inline-flex flex-col text-muted-foreground/50">
+        <IconChevronUp className="-mb-1 size-3" />
+        <IconChevronDown className="-mt-1 size-3" />
+      </span>
+    );
+  }
+
+  return direction === "asc" ? <IconChevronUp className="size-3.5" /> : <IconChevronDown className="size-3.5" />;
+}
 
 export function DataTableCard({
   title,
@@ -45,14 +83,35 @@ export function DataTableCard({
   headerCellClassName,
   rowKey,
   columnClassNames,
+  sortableColumns,
   pagination,
 }: DataTableCardProps) {
   const isPaginationEnabled = Boolean(pagination?.enabled);
+  const [sortState, setSortState] = React.useState<{ column: number; direction: SortDirection } | null>(null);
   const [rowsPerPage, setRowsPerPage] = React.useState(pagination?.pageSize ?? 6);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageInput, setPageInput] = React.useState("1");
+  const sortedRows = React.useMemo(() => {
+    if (!sortState) return rows;
 
-  const totalRows = rows.length;
+    const next = [...rows];
+    next.sort((leftRow, rightRow) => {
+      const left = toComparableValue(leftRow[sortState.column]);
+      const right = toComparableValue(rightRow[sortState.column]);
+
+      if (typeof left === "number" && typeof right === "number") {
+        return sortState.direction === "asc" ? left - right : right - left;
+      }
+
+      const leftText = String(left);
+      const rightText = String(right);
+      const compared = leftText.localeCompare(rightText, "id", { numeric: true, sensitivity: "base" });
+      return sortState.direction === "asc" ? compared : -compared;
+    });
+    return next;
+  }, [rows, sortState]);
+
+  const totalRows = sortedRows.length;
   const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(totalRows / rowsPerPage)) : 1;
 
   React.useEffect(() => {
@@ -68,10 +127,22 @@ export function DataTableCard({
 
   const startIndex = isPaginationEnabled ? (currentPage - 1) * rowsPerPage : 0;
   const endIndex = isPaginationEnabled ? Math.min(startIndex + rowsPerPage, totalRows) : totalRows;
-  const visibleRows = isPaginationEnabled ? rows.slice(startIndex, endIndex) : rows;
+  const visibleRows = isPaginationEnabled ? sortedRows.slice(startIndex, endIndex) : sortedRows;
   const pageSizeOptions = pagination?.pageSizeOptions?.length
     ? pagination.pageSizeOptions
     : [6, 10, 20, 50];
+
+  const isColumnSortable = (column: number) => sortableColumns?.[column] ?? true;
+
+  const toggleSort = (column: number) => {
+    if (!isColumnSortable(column)) return;
+    setCurrentPage(1);
+    setSortState((current) => {
+      if (!current || current.column !== column) return { column, direction: "asc" };
+      if (current.direction === "asc") return { column, direction: "desc" };
+      return null;
+    });
+  };
 
   const commitPageInput = () => {
     const parsed = Number.parseInt(pageInput, 10);
@@ -92,13 +163,27 @@ export function DataTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className={cn("bg-muted/40 hover:bg-muted/40", headerRowClassName)}>
+                <TableRow className={cn("bg-muted/40 hover:bg-muted/40", headerRowClassName)}>
                 {headers.map((header, index) => (
                   <TableHead
                     key={`header-${index}`}
                     className={cn("px-4", headerCellClassName, columnClassNames?.[index])}
                   >
-                    {header}
+                    {isColumnSortable(index) ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 font-inherit"
+                        onClick={() => toggleSort(index)}
+                      >
+                        <span>{header}</span>
+                        <SortIndicator
+                          active={sortState?.column === index}
+                          direction={sortState?.column === index ? sortState.direction : undefined}
+                        />
+                      </button>
+                    ) : (
+                      <span>{header}</span>
+                    )}
                   </TableHead>
                 ))}
               </TableRow>

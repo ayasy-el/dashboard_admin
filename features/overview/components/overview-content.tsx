@@ -2,13 +2,19 @@ import { MonthSelect } from "@/features/shared/components/month-select";
 import { SectionCards } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { OverviewTransactions } from "@/features/overview/components/overview-transactions";
-import {
-  ComparisonProgressTableCard,
-} from "@/features/shared/components/comparison-progress-table-card";
+import { ComparisonProgressTableCard } from "@/features/shared/components/comparison-progress-table-card";
 import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { DistributionPieCard } from "@/features/shared/components/distribution-pie-card";
 import { RankedMetricsTableCard } from "@/features/shared/components/ranked-metrics-table-card";
-import { IconCircleCheck, IconCircleOff, IconSun, IconTrophy, IconWand } from "@tabler/icons-react";
+import {
+  IconCircleCheck,
+  IconCircleOff,
+  IconTargetArrow,
+  IconTrophy,
+  IconChartPie,
+  IconMessage2Exclamation,
+  IconTimeDurationOff,
+} from "@tabler/icons-react";
 import { buildOverviewContentViewModel } from "@/features/overview/overview-content.viewmodel";
 import type { OverviewResponse } from "@/features/overview/overview.types";
 
@@ -26,6 +32,9 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     activeRows,
     productiveRows,
     inactiveRows,
+    inactiveDetailRows,
+    expiredRows,
+    totalExpiredMerchants,
     merchantPerMonthRows,
   } = buildOverviewContentViewModel(data);
 
@@ -54,20 +63,21 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
           <DistributionPieCard
             className="xl:col-span-4"
             title="Merchant Categories"
-            icon={<IconWand className="size-4 text-secondary" />}
+            icon={<IconChartPie className="size-4 text-secondary" />}
             data={categoryData}
             minLabelPercent={10}
           />
           <ComparisonProgressTableCard
             className="xl:col-span-8"
             title="POIN Redeem Region Jatim"
-            icon={<IconSun className="size-4 text-secondary" />}
+            icon={<IconTargetArrow className="size-4 text-secondary" />}
             headers={["REGION", "KEYWORD", "STATUS REDEEM", "UNIQUE REEDEEM"]}
             rows={regionRows}
             darkHeader
             splitLabel="Branch"
             leftBarClassName="bg-red-400"
             rightBarClassName="bg-yellow-500"
+            sortableColumns={[false, false, true, true]}
             pagination={{ enabled: true, pageSize: 6, keepFirstRow: true }}
           />
         </div>
@@ -77,6 +87,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             tone="green"
             icon={<IconCircleCheck className="size-4 text-green-500" />}
             headerCols={["BRANCH", "OA", "TRX", "UNIQ REDEEMER"]}
+            sortableColumns={[false, true, true, true]}
             rows={activeRows}
             pagination={{ enabled: true, pageSize: 6 }}
           />
@@ -86,20 +97,42 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             icon={<IconTrophy className="size-4 text-yellow-500" />}
             headerCols={["BRANCH", "OP", "TRX", "UNIQ REDEEMER"]}
             rows={productiveRows}
+            sortableColumns={[false, true, true, true]}
             pagination={{ enabled: true, pageSize: 6 }}
           />
           <RankedMetricsTableCard
-            title="Merchant Not Active"
+            title="Merchant Alert"
+            tone="red"
+            icon={<IconMessage2Exclamation className="size-4 text-primary" />}
+            headerCols={["BRANCH", "NOT ACTIVE", "EXPIRED"]}
+            rows={inactiveRows}
+            pagination={{ enabled: true, pageSize: 6 }}
+            sortableColumns={[false, true, true]}
+            paginationInfo={`Not Active: ${inactiveDetailRows.length} • Expired: ${totalExpiredMerchants}`}
+          />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <RankedMetricsTableCard
+            title="Merchant Not Active Detail"
             tone="red"
             icon={<IconCircleOff className="size-4 text-primary" />}
             headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
-            rows={inactiveRows}
+            rows={inactiveDetailRows}
             pagination={{ enabled: true, pageSize: 6 }}
-            paginationInfo={`Total: ${inactiveRows.length}`}
+            paginationInfo={`Total: ${inactiveDetailRows.length}`}
+          />
+          <RankedMetricsTableCard
+            title="Merchant Expired Detail"
+            tone="yellow"
+            icon={<IconTimeDurationOff className="size-4 text-yellow-500" />}
+            headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
+            rows={expiredRows}
+            pagination={{ enabled: true, pageSize: 6 }}
+            paginationInfo={`Total: ${expiredRows.length}`}
           />
         </div>
         <DataTableCard
-          title="Detail List Merchant 🏷️"
+          title="Detail List Merchant"
           headers={[
             "#",
             "MERCHANT CATEGORY",
@@ -113,6 +146,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             "UNIQE REDEEM",
           ]}
           rows={merchantPerMonthRows}
+          sortableColumns={[false, true, true, true, true, true, true, true, true, true]}
           pagination={{ enabled: true, pageSize: 10 }}
           columnClassNames={[
             "",
