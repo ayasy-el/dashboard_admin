@@ -168,17 +168,17 @@ export function DistributionPieCard({
   };
 
   return (
-    <Card className={cn("gap-0 border border-border/80 py-0 shadow-sm", className)}>
+    <Card className={cn("min-w-0 gap-0 border border-border/80 py-0 shadow-sm", className)}>
       <CardHeader className="px-6 pb-2 pt-6">
         <CardTitle className="flex items-center gap-1 text-lg">
           {title}
           {icon}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6 pt-1 h-full content-center">
-        <div className="flex justify-center">
-          <div className="flex w-fit items-center gap-6">
-            <ChartContainer config={chartConfig} className="h-[230px] w-[230px] shrink-0">
+      <CardContent className="h-full px-4 pb-5 pt-1 sm:px-6 sm:pb-6">
+        <div className="flex h-full items-center justify-center">
+          <div className="flex w-full max-w-[30rem] flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:justify-center">
+            <ChartContainer config={chartConfig} className="h-[190px] w-[190px] shrink-0 sm:h-[220px] sm:w-[220px]">
               <PieChart>
                 <ChartTooltip
                   cursor={false}
@@ -234,7 +234,7 @@ export function DistributionPieCard({
               </PieChart>
             </ChartContainer>
 
-            <div className="grid w-[130px] gap-1.5 text-sm text-muted-foreground">
+            <div className="grid w-full max-w-[220px] gap-1.5 text-sm text-muted-foreground md:w-[150px] md:max-w-none">
               {chartData.map((item, index) => (
                 <div
                   key={item.name}
@@ -246,7 +246,7 @@ export function DistributionPieCard({
                   onMouseLeave={() => setActiveIndex(-1)}
                 >
                   <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span>{item.name}</span>
+                  <span className="truncate">{item.name}</span>
                 </div>
               ))}
             </div>

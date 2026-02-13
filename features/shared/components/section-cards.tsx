@@ -68,7 +68,7 @@ export function SectionCards({
         return (
           <Card
             className={cn(
-              "@container/card border-t-4",
+              "@container/card min-w-0 border-t-4",
               index % 2 === 0 ? "border-t-primary" : "border-t-secondary"
             )}
             key={stat.id}
@@ -80,7 +80,7 @@ export function SectionCards({
                   {formatNumber(stat.currentTotal)}
                 </CardTitle>
               ) : null}
-              <CardAction>
+              <CardAction className="shrink-0">
                 <Badge className="border-green-100 bg-green-50 text-green-700" variant="outline">
                   <TrendIcon />
                   {isPositive ? "+" : ""}

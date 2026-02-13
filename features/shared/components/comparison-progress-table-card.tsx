@@ -180,7 +180,7 @@ export function ComparisonProgressTableCard({
   };
 
   return (
-    <Card className={cn("gap-0 border border-border/80 py-0 shadow-sm", className)}>
+    <Card className={cn("min-w-0 gap-0 border border-border/80 py-0 shadow-sm", className)}>
       <CardHeader className="px-6 py-5">
         <CardTitle className="flex items-center gap-1 text-lg">
           {title}
@@ -307,7 +307,7 @@ export function ComparisonProgressTableCard({
           </Table>
         </div>
         {isPaginationEnabled && totalPages > 1 ? (
-          <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-3 py-3 sm:px-4">
             <Button
               type="button"
               variant="ghost"

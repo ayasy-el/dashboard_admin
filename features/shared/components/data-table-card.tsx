@@ -155,7 +155,7 @@ export function DataTableCard({
   };
 
   return (
-    <Card className={cn("gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
+    <Card className={cn("min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
       <CardHeader className="border-b px-6 py-5">
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
@@ -207,7 +207,7 @@ export function DataTableCard({
           </Table>
         </div>
         {isPaginationEnabled && totalPages > 1 ? (
-          <div className="flex items-center justify-between border-t px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-3 sm:px-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>
                 {totalRows === 0 ? 0 : startIndex + 1} - {endIndex} of {totalRows}

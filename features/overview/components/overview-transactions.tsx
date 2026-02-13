@@ -81,10 +81,10 @@ export function OverviewTransactions({
 
   return (
     <div className="grid gap-4 px-4 lg:px-6 xl:grid-cols-12">
-      <Card className="gap-0 border border-border/80 py-0 shadow-sm xl:col-span-5">
+      <Card className="min-w-0 gap-0 border border-border/80 py-0 shadow-sm xl:col-span-5">
         <Tabs defaultValue="monthly">
           <CardHeader className="border-b px-6 py-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start sm:gap-4">
               <div className="space-y-1">
                 <CardTitle className="flex items-center gap-1">
                   Merchant Analytics
@@ -92,7 +92,7 @@ export function OverviewTransactions({
                 </CardTitle>
                 <CardDescription>{monthLabel}</CardDescription>
               </div>
-              <CardAction>
+              <CardAction className="w-full sm:w-auto">
                 <TabsList className="h-auto rounded-lg bg-muted p-1">
                   <TabsTrigger value="monthly" className="rounded-md px-3 py-1 text-xs">
                     Monthly
@@ -105,7 +105,7 @@ export function OverviewTransactions({
             </div>
           </CardHeader>
           <CardContent className="px-6 py-5">
-            <div className="mb-4 flex gap-8 text-sm">
+            <div className="mb-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
               <div>
                 <p className="text-xs tracking-wide text-muted-foreground uppercase">Redeem</p>
                 <p className="text-2xl font-bold">{formatNumber(totalMonthly)}</p>
@@ -225,7 +225,7 @@ export function OverviewTransactions({
         </Tabs>
       </Card>
 
-      <Card className="gap-0 border border-border/80 py-0 shadow-sm xl:col-span-7">
+      <Card className="min-w-0 gap-0 border border-border/80 py-0 shadow-sm xl:col-span-7">
         <CardHeader className="border-b px-6 py-5">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-1">

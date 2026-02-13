@@ -149,7 +149,7 @@ export function RankedMetricsTableCard({
   };
 
   return (
-    <Card className={cn("gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
+    <Card className={cn("min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
       <CardHeader className={cn("border-b px-4 py-4", toneClass)}>
         <CardTitle className="flex items-center gap-1 text-base">
           {title}
@@ -208,7 +208,7 @@ export function RankedMetricsTableCard({
         </Table>
         </div>
         {isPaginationEnabled && totalPages > 1 ? (
-          <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2">
             <span className="text-xs text-muted-foreground">{paginationInfo}</span>
             <div className="flex items-center gap-2">
               <Button

@@ -61,14 +61,14 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
       <div className="space-y-6 px-4 lg:px-6">
         <div className="grid gap-6 xl:grid-cols-12">
           <DistributionPieCard
-            className="xl:col-span-4"
+            className="min-w-0 xl:col-span-4"
             title="Merchant Categories"
             icon={<IconChartPie className="size-4 text-secondary" />}
             data={categoryData}
             minLabelPercent={10}
           />
           <ComparisonProgressTableCard
-            className="xl:col-span-8"
+            className="min-w-0 xl:col-span-8"
             title="POIN Redeem Region Jatim"
             icon={<IconTargetArrow className="size-4 text-secondary" />}
             headers={["REGION", "KEYWORD", "STATUS REDEEM", "UNIQUE REEDEEM"]}
@@ -81,8 +81,9 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             pagination={{ enabled: true, pageSize: 6, keepFirstRow: true }}
           />
         </div>
-        <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
           <RankedMetricsTableCard
+            className="min-w-0"
             title="Merchant Active"
             tone="green"
             icon={<IconCircleCheck className="size-4 text-green-500" />}
@@ -92,6 +93,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             pagination={{ enabled: true, pageSize: 6 }}
           />
           <RankedMetricsTableCard
+            className="min-w-0"
             title="Merchant Productive"
             tone="yellow"
             icon={<IconTrophy className="size-4 text-yellow-500" />}
@@ -101,6 +103,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             pagination={{ enabled: true, pageSize: 6 }}
           />
           <RankedMetricsTableCard
+            className="min-w-0 lg:col-span-2 2xl:col-span-1"
             title="Merchant Alert"
             tone="red"
             icon={<IconMessage2Exclamation className="size-4 text-primary" />}
@@ -111,8 +114,9 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             paginationInfo={`Not Active: ${inactiveDetailRows.length} • Expired: ${totalExpiredMerchants}`}
           />
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           <RankedMetricsTableCard
+            className="min-w-0"
             title="Merchant Not Active Detail"
             tone="red"
             icon={<IconCircleOff className="size-4 text-primary" />}
@@ -122,6 +126,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             paginationInfo={`Total: ${inactiveDetailRows.length}`}
           />
           <RankedMetricsTableCard
+            className="min-w-0"
             title="Merchant Expired Detail"
             tone="yellow"
             icon={<IconTimeDurationOff className="size-4 text-yellow-500" />}
@@ -132,6 +137,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
           />
         </div>
         <DataTableCard
+          className="min-w-0"
           title="Detail List Merchant"
           headers={[
             "#",
