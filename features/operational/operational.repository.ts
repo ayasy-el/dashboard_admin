@@ -29,14 +29,15 @@ export type OperationalRawData = {
   failedPrevious: number;
   dailySuccess: { date: string; value: number }[];
   dailyFailed: { date: string; value: number }[];
-  topMerchants: {
+  merchantStatusRows: {
+    branch: string;
     merchant: string;
     keyword: string;
-    totalTransactions: number;
-    uniqMerchant: string;
+    transactionCount: number;
     uniqRedeemer: number;
   }[];
   expiredRules: {
+    branch: string;
     merchant: string;
     keyword: string;
     startPeriod: string;

@@ -101,6 +101,35 @@ export async function getOperationalDashboard(
     };
   });
 
+  const activeMerchants = raw.merchantStatusRows
+    .filter((row) => row.transactionCount >= 1)
+    .map((row) => ({
+      branch: row.branch,
+      merchant: row.merchant,
+      keyword: row.keyword,
+      transactionCount: row.transactionCount,
+      uniqRedeemer: row.uniqRedeemer,
+    }));
+
+  const productiveMerchants = raw.merchantStatusRows
+    .filter((row) => row.transactionCount >= 5)
+    .map((row) => ({
+      branch: row.branch,
+      merchant: row.merchant,
+      keyword: row.keyword,
+      transactionCount: row.transactionCount,
+      uniqRedeemer: row.uniqRedeemer,
+    }));
+
+  const notActiveMerchants = raw.merchantStatusRows
+    .filter((row) => row.transactionCount === 0)
+    .map((row) => ({
+      branch: row.branch,
+      merchant: row.merchant,
+      keyword: row.keyword,
+      transactionCount: row.transactionCount,
+    }));
+
   return {
     month,
     filters: {
@@ -124,7 +153,9 @@ export async function getOperationalDashboard(
         series: raw.dailyFailed,
       },
     },
-    topMerchants: raw.topMerchants,
+    activeMerchants,
+    productiveMerchants,
+    notActiveMerchants,
     expiredRules: raw.expiredRules,
     categoryMetrics: raw.categoryMetrics,
     clusterMetrics,

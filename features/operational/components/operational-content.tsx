@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import { MultiFilterDropdown, SingleFilterDropdown } from "@/features/shared/components/filter-dropdown";
 import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
@@ -5,6 +8,7 @@ import type { MonthOption } from "@/features/shared/get-month-options";
 import { CollapsibleClusterTableCard } from "@/features/operational/components/collapsible-cluster-table-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNumber } from "@/lib/dashboard-metrics";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type OperationalResponse = {
   month: string;
@@ -38,14 +42,28 @@ export type OperationalResponse = {
       series: { date: string; value: number }[];
     };
   };
-  topMerchants: {
+  activeMerchants: {
+    branch: string;
     merchant: string;
     keyword: string;
-    totalTransactions: number;
-    uniqMerchant: string;
+    transactionCount: number;
     uniqRedeemer: number;
   }[];
+  productiveMerchants: {
+    branch: string;
+    merchant: string;
+    keyword: string;
+    transactionCount: number;
+    uniqRedeemer: number;
+  }[];
+  notActiveMerchants: {
+    branch: string;
+    merchant: string;
+    keyword: string;
+    transactionCount: number;
+  }[];
   expiredRules: {
+    branch: string;
     merchant: string;
     keyword: string;
     startPeriod: string;
@@ -89,7 +107,10 @@ type OperationalContentProps = {
   selectedMonth: string;
 };
 
+type MerchantStatusTab = "active" | "productive" | "not-active" | "expired";
+
 export function OperationalContent({ data, monthOptions, selectedMonth }: OperationalContentProps) {
+  const [merchantStatusTab, setMerchantStatusTab] = React.useState<MerchantStatusTab>("active");
   const stats: StatCard[] = [
     {
       id: "transaction-success",
@@ -108,14 +129,28 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       series: data.cards.failed.series,
     },
   ];
-  const topMerchantRows = data.topMerchants.map((row) => [
+  const activeMerchantRows = data.activeMerchants.map((row) => [
+    row.branch,
     row.merchant,
-    row.uniqMerchant,
     row.keyword,
-    row.totalTransactions.toLocaleString("id-ID"),
+    row.transactionCount.toLocaleString("id-ID"),
     row.uniqRedeemer.toLocaleString("id-ID"),
   ]);
+  const productiveMerchantRows = data.productiveMerchants.map((row) => [
+    row.branch,
+    row.merchant,
+    row.keyword,
+    row.transactionCount.toLocaleString("id-ID"),
+    row.uniqRedeemer.toLocaleString("id-ID"),
+  ]);
+  const notActiveMerchantRows = data.notActiveMerchants.map((row) => [
+    row.branch,
+    row.merchant,
+    row.keyword,
+    row.transactionCount.toLocaleString("id-ID"),
+  ]);
   const expiredRuleRows = data.expiredRules.map((row) => [
+    row.branch,
     row.merchant,
     row.keyword,
     row.startPeriod,
@@ -131,6 +166,50 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     row.merchantAktif.toLocaleString("id-ID"),
     row.merchantProduktif.toLocaleString("id-ID"),
   ]);
+  const merchantStatusTable = React.useMemo(() => {
+    if (merchantStatusTab === "active") {
+      return {
+        headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi", "Uniq Redeem"],
+        rows: activeMerchantRows,
+        sortableColumns: [true, true, true, true, true],
+        columnClassNames: ["", "font-medium", "", "text-right tabular-nums", "text-right tabular-nums"],
+      };
+    }
+    if (merchantStatusTab === "productive") {
+      return {
+        headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi", "Uniq Redeem"],
+        rows: productiveMerchantRows,
+        sortableColumns: [true, true, true, true, true],
+        columnClassNames: ["", "font-medium", "", "text-right tabular-nums", "text-right tabular-nums"],
+      };
+    }
+    if (merchantStatusTab === "not-active") {
+      return {
+        headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi"],
+        rows: notActiveMerchantRows,
+        sortableColumns: [true, true, true, true],
+        columnClassNames: ["", "font-medium", "", "text-right tabular-nums"],
+      };
+    }
+    return {
+      headers: ["Branch", "Nama Merchant", "Keyword", "Mulai", "Berakhir"],
+      rows: expiredRuleRows,
+      sortableColumns: [true, true, true, true, true],
+      columnClassNames: ["", "font-medium", "", "tabular-nums", "tabular-nums"],
+    };
+  }, [
+    merchantStatusTab,
+    activeMerchantRows,
+    productiveMerchantRows,
+    notActiveMerchantRows,
+    expiredRuleRows,
+  ]);
+  const merchantStatusTitleMap: Record<MerchantStatusTab, string> = {
+    active: "Merchant Active Bulan Ini",
+    productive: "Merchant Productive Bulan Ini",
+    "not-active": "Merchant Not Active Bulan Ini",
+    expired: "Merchant Expired Bulan Ini",
+  };
   const compactStatItems = [
     {
       id: "total-merchant",
@@ -224,34 +303,28 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       <div className="grid gap-6 px-4 lg:px-6">
         <DataTableCard
           className="min-w-0"
-          title="Top Merchant"
-          headers={[
-            "Nama Merchant",
-            "Uniq Merchant",
-            "Keyword",
-            "Jumlah Transaksi",
-            "Uniq Redeemer",
-          ]}
-          rows={topMerchantRows}
-          sortableColumns={[true, true, true, true, true]}
-          pagination={{ enabled: true, pageSize: 5, pageSizeOptions: [5, 10, 20] }}
-          columnClassNames={[
-            "font-medium",
-            "",
-            "",
-            "text-right tabular-nums",
-            "text-right tabular-nums",
-          ]}
-        />
-
-        <DataTableCard
-          className="min-w-0"
-          title="Rule Expired Bulan Ini"
-          headers={["Nama Merchant", "Keyword", "Mulai", "Berakhir"]}
-          rows={expiredRuleRows}
-          sortableColumns={[true, true, true, true]}
+          title={
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
+              <span>{merchantStatusTitleMap[merchantStatusTab]}</span>
+              <Tabs
+                value={merchantStatusTab}
+                onValueChange={(next) => setMerchantStatusTab(next as MerchantStatusTab)}
+                className="gap-0"
+              >
+                <TabsList>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="productive">Productive</TabsTrigger>
+                  <TabsTrigger value="not-active">Not Active</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          }
+          headers={merchantStatusTable.headers}
+          rows={merchantStatusTable.rows}
+          sortableColumns={merchantStatusTable.sortableColumns}
           pagination={{ enabled: true, pageSize: 8, pageSizeOptions: [8, 16, 24] }}
-          columnClassNames={["font-medium", "", "tabular-nums", "tabular-nums"]}
+          columnClassNames={merchantStatusTable.columnClassNames}
         />
 
         <DataTableCard

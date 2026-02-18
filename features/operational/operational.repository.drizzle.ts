@@ -124,7 +124,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       merchant_tx as (
         select
           ft.merchant_key as merchant_key,
-          count(*)::int as tx_count
+          count(*)::int as tx_count,
+          count(distinct ft.msisdn)::int as uniq_redeemer
         from fact_transaction ft
         join active_merchants am on am.merchant_key = ft.merchant_key
         where ft.transaction_at >= ${startTs}
@@ -174,29 +175,56 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       .groupBy(sql`date(${factTransaction.transactionAt})`)
       .orderBy(sql`date(${factTransaction.transactionAt})`);
 
-    const topMerchants = await db.execute(sql`
+    const merchantStatusRows = await db.execute(sql`
+      with active_rules as (
+        select
+          dr.rule_merchant as merchant_key,
+          dr.start_period as start_period,
+          dr.end_period as end_period
+        from dim_rule dr
+        join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+        join dim_category dcat on dcat.category_id = dm.category_id
+        where dr.start_period < ${endDate}
+          and dr.end_period >= ${startDate}
+          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
+      ),
+      active_merchants as (
+        select
+          ar.merchant_key as merchant_key,
+          min(ar.start_period)::date as start_period,
+          max(ar.end_period)::date as end_period
+        from active_rules ar
+        group by ar.merchant_key
+      ),
+      merchant_tx as (
+        select
+          ft.merchant_key as merchant_key,
+          count(*)::int as tx_count,
+          count(distinct ft.msisdn)::int as uniq_redeemer
+        from fact_transaction ft
+        join active_merchants am on am.merchant_key = ft.merchant_key
+        where ft.transaction_at >= ${startTs}
+          and ft.transaction_at < ${endTs}
+        group by ft.merchant_key
+      )
       select
+        dcl.branch as branch,
         dm.merchant_name as merchant,
         dm.keyword_code as keyword,
-        count(*)::int as total_transactions,
-        dm.uniq_merchant as uniq_merchant,
-        count(distinct ft.msisdn)::int as uniq_redeemer
-      from fact_transaction ft
-      join dim_merchant dm on dm.merchant_key = ft.merchant_key
+        coalesce(mt.tx_count, 0)::int as tx_count,
+        coalesce(mt.uniq_redeemer, 0)::int as uniq_redeemer
+      from active_merchants am
+      join dim_merchant dm on dm.merchant_key = am.merchant_key
       join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      join dim_category dcat on dcat.category_id = dm.category_id
-      where ft.status = 'success'
-        and ft.transaction_at >= ${startTs}
-        and ft.transaction_at < ${endTs}
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      group by dm.merchant_name, dm.keyword_code, dm.uniq_merchant
-      order by total_transactions desc
-      limit 5
+      left join merchant_tx mt on mt.merchant_key = am.merchant_key
+      order by dcl.branch, dm.merchant_name
     `);
 
     const expiredRules = await db.execute(sql`
       select
+        dcl.branch as branch,
         dm.merchant_name as merchant,
         dm.keyword_code as keyword,
         dr.start_period as start_period,
@@ -210,7 +238,6 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
         ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
       order by dr.end_period desc
-      limit 8
     `);
 
     const categoryMetrics = await db.execute(sql`
@@ -342,14 +369,15 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         date: row.date,
         value: toNumber(row.value),
       })),
-      topMerchants: (topMerchants.rows as Array<Record<string, unknown>>).map((row) => ({
+      merchantStatusRows: (merchantStatusRows.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
         merchant: String(row.merchant ?? ""),
         keyword: String(row.keyword ?? ""),
-        totalTransactions: toNumber(row.total_transactions),
-        uniqMerchant: String(row.uniq_merchant ?? ""),
+        transactionCount: toNumber(row.tx_count),
         uniqRedeemer: toNumber(row.uniq_redeemer),
       })),
       expiredRules: (expiredRules.rows as Array<Record<string, unknown>>).map((row) => ({
+        branch: String(row.branch ?? ""),
         merchant: String(row.merchant ?? ""),
         keyword: String(row.keyword ?? ""),
         startPeriod: formatDisplayDate(row.start_period),
