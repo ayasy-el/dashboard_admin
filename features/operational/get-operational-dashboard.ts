@@ -111,6 +111,7 @@ export async function getOperationalDashboard(
     monthLabel: monthLabel(month),
     previousMonth,
     previousMonthLabel: monthLabel(previousMonth),
+    compactStats: raw.compactStats,
     cards: {
       success: {
         current: raw.successCurrent,

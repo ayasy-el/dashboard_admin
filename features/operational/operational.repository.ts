@@ -16,6 +16,13 @@ export type OperationalFilterOptions = {
 };
 
 export type OperationalRawData = {
+  compactStats: {
+    totalMerchant: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+    merchantNotActive: number;
+    merchantExpired: number;
+  };
   successCurrent: number;
   failedCurrent: number;
   successPrevious: number;

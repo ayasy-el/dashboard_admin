@@ -3,6 +3,8 @@ import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { CollapsibleClusterTableCard } from "@/features/operational/components/collapsible-cluster-table-card";
+import { Card, CardContent } from "@/components/ui/card";
+import { formatNumber } from "@/lib/dashboard-metrics";
 
 export type OperationalResponse = {
   month: string;
@@ -17,6 +19,13 @@ export type OperationalResponse = {
   monthLabel: string;
   previousMonth: string;
   previousMonthLabel: string;
+  compactStats: {
+    totalMerchant: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+    merchantNotActive: number;
+    merchantExpired: number;
+  };
   cards: {
     success: {
       current: number;
@@ -122,6 +131,38 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     row.merchantAktif.toLocaleString("id-ID"),
     row.merchantProduktif.toLocaleString("id-ID"),
   ]);
+  const compactStatItems = [
+    {
+      id: "total-merchant",
+      label: "Jumlah Merchant",
+      value: data.compactStats.totalMerchant,
+      helper: "dalam Periode Berjalan Bulan Ini",
+    },
+    {
+      id: "merchant-aktif",
+      label: "Merchant Aktif",
+      value: data.compactStats.merchantAktif,
+      helper: "Minimal 1 transaksi",
+    },
+    {
+      id: "merchant-produktif",
+      label: "Merchant Produktif",
+      value: data.compactStats.merchantProduktif,
+      helper: "Minimal 5 transaksi",
+    },
+    {
+      id: "merchant-not-active",
+      label: "Merchant Not Active",
+      value: data.compactStats.merchantNotActive,
+      helper: "Tanpa transaksi",
+    },
+    {
+      id: "merchant-expired",
+      label: "Merchant Expired",
+      value: data.compactStats.merchantExpired,
+      helper: "Expired di bulan ini",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -166,6 +207,19 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
         stats={stats}
         className="mx-auto w-full max-w-4xl px-0 sm:grid-cols-2 @xl/main:grid-cols-2 @5xl/main:grid-cols-2"
       />
+      <div className="grid grid-cols-1 gap-3 px-4 sm:grid-cols-2 lg:px-6 xl:grid-cols-5">
+        {compactStatItems.map((item) => (
+          <Card key={item.id} className="gap-0 border-border/80 py-0 shadow-sm">
+            <CardContent className="space-y-1 px-4 py-4">
+              <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {item.label}
+              </div>
+              <div className="text-2xl font-semibold tabular-nums">{formatNumber(item.value)}</div>
+              <div className="text-xs text-muted-foreground">{item.helper}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <div className="grid gap-6 px-4 lg:px-6">
         <DataTableCard

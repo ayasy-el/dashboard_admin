@@ -109,6 +109,51 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       .from(factTransaction)
       .where(prevFailedWhere);
 
+    const compactSummaryResult = await db.execute(sql`
+      with active_merchants as (
+        select distinct dr.rule_merchant as merchant_key
+        from dim_rule dr
+        join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+        join dim_category dcat on dcat.category_id = dm.category_id
+        where dr.start_period < ${endDate}
+          and dr.end_period >= ${startDate}
+          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
+      ),
+      merchant_tx as (
+        select
+          ft.merchant_key as merchant_key,
+          count(*)::int as tx_count
+        from fact_transaction ft
+        join active_merchants am on am.merchant_key = ft.merchant_key
+        where ft.transaction_at >= ${startTs}
+          and ft.transaction_at < ${endTs}
+        group by ft.merchant_key
+      ),
+      expired_merchants as (
+        select distinct dr.rule_merchant as merchant_key
+        from dim_rule dr
+        join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+        join dim_category dcat on dcat.category_id = dm.category_id
+        where dr.end_period >= ${startDate}
+          and dr.end_period < ${endDate}
+          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
+      )
+      select
+        (select count(*)::int from active_merchants) as total_merchant,
+        (select count(*)::int from merchant_tx where tx_count >= 1) as merchant_aktif,
+        (select count(*)::int from merchant_tx where tx_count >= ${PRODUCTIVE_THRESHOLD}) as merchant_productif,
+        (
+          (select count(*)::int from active_merchants) -
+          (select count(*)::int from merchant_tx where tx_count >= 1)
+        ) as merchant_not_active,
+        (select count(*)::int from expired_merchants) as merchant_expired
+    `);
+    const compactSummary = (compactSummaryResult.rows as Array<Record<string, unknown>>)[0];
+
     const dailySuccess = await db
       .select({
         date: sql<string>`date(${factTransaction.transactionAt})`,
@@ -278,6 +323,13 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
     `);
 
     return {
+      compactStats: {
+        totalMerchant: toNumber(compactSummary?.total_merchant),
+        merchantAktif: toNumber(compactSummary?.merchant_aktif),
+        merchantProduktif: toNumber(compactSummary?.merchant_productif),
+        merchantNotActive: toNumber(compactSummary?.merchant_not_active),
+        merchantExpired: toNumber(compactSummary?.merchant_expired),
+      },
       successCurrent: toNumber(successSummary?.total),
       failedCurrent: toNumber(failedSummary?.total),
       successPrevious: toNumber(prevSuccessSummary?.total),
