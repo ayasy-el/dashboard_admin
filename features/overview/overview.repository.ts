@@ -5,6 +5,16 @@ export type MonthRange = {
   previousEnd: Date;
 };
 
+export type OverviewFilters = {
+  categories: string[];
+  branches: string[];
+};
+
+export type OverviewFilterOptions = {
+  categories: string[];
+  branches: string[];
+};
+
 export type OverviewRawData = {
   summary: {
     totalTransaksi: number;
@@ -75,5 +85,6 @@ export type OverviewRawData = {
 };
 
 export type OverviewRepository = {
-  getOverviewRawData(params: MonthRange): Promise<OverviewRawData>;
+  getOverviewRawData(params: MonthRange & OverviewFilters): Promise<OverviewRawData>;
+  getOverviewFilterOptions(): Promise<OverviewFilterOptions>;
 };

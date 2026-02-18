@@ -25,6 +25,66 @@ export async function getOperationalDashboard(
     previousEnd,
   });
 
+  const branchMap = new Map<
+    string,
+    {
+      name: string;
+      children: {
+        name: string;
+        totalMerchant: number;
+        uniqueMerchant: number;
+        totalPoint: number;
+        totalTransaksi: number;
+        uniqueRedeemer: number;
+        merchantAktif: number;
+        merchantProduktif: number;
+      }[];
+    }
+  >();
+
+  for (const row of raw.branchClusterMetrics) {
+    if (!branchMap.has(row.branch)) {
+      branchMap.set(row.branch, { name: row.branch, children: [] });
+    }
+    branchMap.get(row.branch)?.children.push({
+      name: row.cluster,
+      totalMerchant: row.totalMerchant,
+      uniqueMerchant: row.uniqueMerchant,
+      totalPoint: row.totalPoint,
+      totalTransaksi: row.totalTransaksi,
+      uniqueRedeemer: row.uniqueRedeemer,
+      merchantAktif: row.merchantAktif,
+      merchantProduktif: row.merchantProduktif,
+    });
+  }
+
+  const clusterMetrics = Array.from(branchMap.values()).map((branch) => {
+    const sum = (
+      selector: (row: {
+        name: string;
+        totalMerchant: number;
+        uniqueMerchant: number;
+        totalPoint: number;
+        totalTransaksi: number;
+        uniqueRedeemer: number;
+        merchantAktif: number;
+        merchantProduktif: number;
+      }) => number,
+    ) => branch.children.reduce((total, row) => total + selector(row), 0);
+
+    return {
+      name: branch.name,
+      totalMerchant: sum((row) => row.totalMerchant),
+      uniqueMerchant: sum((row) => row.uniqueMerchant),
+      totalPoint: sum((row) => row.totalPoint),
+      totalTransaksi: sum((row) => row.totalTransaksi),
+      uniqueRedeemer: sum((row) => row.uniqueRedeemer),
+      merchantAktif: sum((row) => row.merchantAktif),
+      merchantProduktif: sum((row) => row.merchantProduktif),
+      children: branch.children,
+    };
+  });
+
   return {
     month,
     monthLabel: monthLabel(month),
@@ -44,5 +104,7 @@ export async function getOperationalDashboard(
     },
     topMerchants: raw.topMerchants,
     expiredRules: raw.expiredRules,
+    categoryMetrics: raw.categoryMetrics,
+    clusterMetrics,
   };
 }

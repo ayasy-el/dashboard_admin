@@ -27,6 +27,7 @@ type DataTableCardProps = {
   headers: React.ReactNode[];
   rows: React.ReactNode[][];
   className?: string;
+  darkHeader?: boolean;
   headerRowClassName?: string;
   headerCellClassName?: string;
   rowKey?: (row: React.ReactNode[], index: number) => React.Key;
@@ -45,7 +46,8 @@ const toTextValue = (value: React.ReactNode): string => {
   if (value == null) return "";
   if (typeof value === "string" || typeof value === "number") return String(value);
   if (Array.isArray(value)) return value.map((item) => toTextValue(item)).join(" ");
-  if (React.isValidElement(value)) return toTextValue((value.props as { children?: React.ReactNode }).children);
+  if (React.isValidElement(value))
+    return toTextValue((value.props as { children?: React.ReactNode }).children);
   return String(value);
 };
 
@@ -61,17 +63,31 @@ const toComparableValue = (value: React.ReactNode): string | number => {
   return text.toLowerCase();
 };
 
-function SortIndicator({ active, direction }: { active: boolean; direction?: SortDirection }) {
+function SortIndicator({
+  active,
+  direction,
+  dark,
+}: {
+  active: boolean;
+  direction?: SortDirection;
+  dark?: boolean;
+}) {
   if (!active) {
     return (
-      <span className="inline-flex flex-col text-muted-foreground/50">
+      <span
+        className={cn("inline-flex flex-col", dark ? "text-white/70" : "text-muted-foreground/50")}
+      >
         <IconChevronUp className="-mb-1 size-3" />
         <IconChevronDown className="-mt-1 size-3" />
       </span>
     );
   }
 
-  return direction === "asc" ? <IconChevronUp className="size-3.5" /> : <IconChevronDown className="size-3.5" />;
+  return direction === "asc" ? (
+    <IconChevronUp className="size-3.5" />
+  ) : (
+    <IconChevronDown className="size-3.5" />
+  );
 }
 
 export function DataTableCard({
@@ -79,6 +95,7 @@ export function DataTableCard({
   headers,
   rows,
   className,
+  darkHeader = true,
   headerRowClassName,
   headerCellClassName,
   rowKey,
@@ -87,7 +104,10 @@ export function DataTableCard({
   pagination,
 }: DataTableCardProps) {
   const isPaginationEnabled = Boolean(pagination?.enabled);
-  const [sortState, setSortState] = React.useState<{ column: number; direction: SortDirection } | null>(null);
+  const [sortState, setSortState] = React.useState<{
+    column: number;
+    direction: SortDirection;
+  } | null>(null);
   const [rowsPerPage, setRowsPerPage] = React.useState(pagination?.pageSize ?? 6);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageInput, setPageInput] = React.useState("1");
@@ -105,7 +125,10 @@ export function DataTableCard({
 
       const leftText = String(left);
       const rightText = String(right);
-      const compared = leftText.localeCompare(rightText, "id", { numeric: true, sensitivity: "base" });
+      const compared = leftText.localeCompare(rightText, "id", {
+        numeric: true,
+        sensitivity: "base",
+      });
       return sortState.direction === "asc" ? compared : -compared;
     });
     return next;
@@ -155,7 +178,12 @@ export function DataTableCard({
   };
 
   return (
-    <Card className={cn("min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm", className)}>
+    <Card
+      className={cn(
+        "min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm",
+        className,
+      )}
+    >
       <CardHeader className="border-b px-6 py-5">
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
@@ -163,11 +191,21 @@ export function DataTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
-                <TableRow className={cn("bg-muted/40 hover:bg-muted/40", headerRowClassName)}>
+              <TableRow
+                className={cn(
+                  darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40",
+                  headerRowClassName,
+                )}
+              >
                 {headers.map((header, index) => (
                   <TableHead
                     key={`header-${index}`}
-                    className={cn("px-4", headerCellClassName, columnClassNames?.[index])}
+                    className={cn(
+                      "px-4",
+                      darkHeader ? "text-white" : undefined,
+                      headerCellClassName,
+                      // columnClassNames?.[index],
+                    )}
                   >
                     {isColumnSortable(index) ? (
                       <button
@@ -179,6 +217,7 @@ export function DataTableCard({
                         <SortIndicator
                           active={sortState?.column === index}
                           direction={sortState?.column === index ? sortState.direction : undefined}
+                          dark={darkHeader}
                         />
                       </button>
                     ) : (
@@ -192,17 +231,18 @@ export function DataTableCard({
               {visibleRows.map((row, rowIndex) => {
                 const absoluteIndex = startIndex + rowIndex;
                 return (
-                <TableRow key={rowKey ? rowKey(row, absoluteIndex) : absoluteIndex}>
-                  {row.map((cell, cellIndex) => (
-                    <TableCell
-                      key={`${absoluteIndex}-${cellIndex}`}
-                      className={cn("px-4", columnClassNames?.[cellIndex])}
-                    >
-                      {cell}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              )})}
+                  <TableRow key={rowKey ? rowKey(row, absoluteIndex) : absoluteIndex}>
+                    {row.map((cell, cellIndex) => (
+                      <TableCell
+                        key={`${absoluteIndex}-${cellIndex}`}
+                        className={cn("px-4", columnClassNames?.[cellIndex])}
+                      >
+                        {cell}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

@@ -29,7 +29,11 @@ type BranchAggregate = {
 
 export async function getOverviewDashboard(
   repo: OverviewRepository,
-  monthQuery: string | null
+  monthQuery: string | null,
+  filters: {
+    categories: string[];
+    branches: string[];
+  }
 ) {
   const month = parseMonth(monthQuery);
   const start = monthToDateUtc(month);
@@ -38,11 +42,23 @@ export async function getOverviewDashboard(
   const previousEnd = start;
   const previousMonth = formatMonthUtc(previousStart);
 
+  const filterOptions = await repo.getOverviewFilterOptions();
+  const appliedCategories = filters.categories.filter((category) =>
+    filterOptions.categories.includes(category),
+  );
+  const appliedBranches = filters.branches.filter((branch) =>
+    filterOptions.branches.includes(branch),
+  );
+  const selectedCategories = appliedCategories.length > 0 ? appliedCategories : filterOptions.categories;
+  const selectedBranches = appliedBranches.length > 0 ? appliedBranches : filterOptions.branches;
+
   const raw = await repo.getOverviewRawData({
     start,
     end,
     previousStart,
     previousEnd,
+    categories: appliedCategories,
+    branches: appliedBranches,
   });
 
   const rangeStart = addMonthsUtc(start, -(MONTHLY_WINDOW - 1));
@@ -160,6 +176,11 @@ export async function getOverviewDashboard(
 
   return {
     month,
+    filters: {
+      categories: selectedCategories,
+      branches: selectedBranches,
+    },
+    filterOptions,
     monthLabel: monthLabel(month),
     previousMonth,
     previousMonthLabel: monthLabel(previousMonth),

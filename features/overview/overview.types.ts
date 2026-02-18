@@ -1,5 +1,13 @@
 export type OverviewResponse = {
   month: string;
+  filters: {
+    categories: string[];
+    branches: string[];
+  };
+  filterOptions: {
+    categories: string[];
+    branches: string[];
+  };
   monthLabel: string;
   previousMonth: string;
   previousMonthLabel: string;

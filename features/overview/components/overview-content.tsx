@@ -1,4 +1,4 @@
-import { MonthSelect } from "@/features/shared/components/month-select";
+import { MultiFilterDropdown, SingleFilterDropdown } from "@/features/shared/components/filter-dropdown";
 import { SectionCards } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { OverviewTransactions } from "@/features/overview/components/overview-transactions";
@@ -13,7 +13,7 @@ import {
   IconTrophy,
   IconChartPie,
   IconMessage2Exclamation,
-  IconTimeDurationOff,
+  IconHourglassOff,
 } from "@tabler/icons-react";
 import { buildOverviewContentViewModel } from "@/features/overview/overview-content.viewmodel";
 import type { OverviewResponse } from "@/features/overview/overview.types";
@@ -42,7 +42,38 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 lg:px-6">
         <div className="text-sm font-medium text-muted-foreground">Ringkasan bulan</div>
-        <MonthSelect value={selectedMonth} options={monthOptions} />
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <SingleFilterDropdown
+            title="MONTH"
+            paramKey="month"
+            selectedValue={selectedMonth}
+            options={monthOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            className="w-[220px]"
+          />
+          <MultiFilterDropdown
+            title="CATEGORY"
+            paramKey="category"
+            selectedValues={data.filters.categories}
+            options={data.filterOptions.categories.map((category) => ({
+              value: category,
+              label: category,
+            }))}
+            className="w-[200px]"
+          />
+          <MultiFilterDropdown
+            title="BRANCH"
+            options={data.filterOptions.branches.map((branch) => ({
+              value: branch,
+              label: branch,
+            }))}
+            paramKey="branch"
+            selectedValues={data.filters.branches}
+            className="w-[200px]"
+          />
+        </div>
       </div>
       <SectionCards
         monthLabel={data.monthLabel}
@@ -129,7 +160,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             className="min-w-0"
             title="Merchant Expired Detail"
             tone="yellow"
-            icon={<IconTimeDurationOff className="size-4 text-yellow-500" />}
+            icon={<IconHourglassOff className="size-4 text-yellow-500" />}
             headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
             rows={expiredRows}
             pagination={{ enabled: true, pageSize: 6 }}
@@ -139,6 +170,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         <DataTableCard
           className="min-w-0"
           title="Detail List Merchant"
+          darkHeader={true}
           headers={[
             "#",
             "MERCHANT CATEGORY",

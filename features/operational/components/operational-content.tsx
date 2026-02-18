@@ -1,8 +1,8 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MonthSelect } from "@/features/shared/components/month-select";
+import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
-import { TableCard } from "@/features/shared/components/table-card";
 import type { MonthOption } from "@/features/shared/get-month-options";
+import { CollapsibleClusterTableCard } from "@/features/operational/components/collapsible-cluster-table-card";
 
 export type OperationalResponse = {
   month: string;
@@ -34,10 +34,37 @@ export type OperationalResponse = {
     startPeriod: string;
     endPeriod: string;
   }[];
+  categoryMetrics: {
+    name: string;
+    totalMerchant: number;
+    uniqueMerchant: number;
+    totalPoint: number;
+    totalTransaksi: number;
+    uniqueRedeemer: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+  }[];
+  clusterMetrics: {
+    name: string;
+    totalMerchant: number;
+    uniqueMerchant: number;
+    totalPoint: number;
+    totalTransaksi: number;
+    uniqueRedeemer: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+    children: {
+      name: string;
+      totalMerchant: number;
+      uniqueMerchant: number;
+      totalPoint: number;
+      totalTransaksi: number;
+      uniqueRedeemer: number;
+      merchantAktif: number;
+      merchantProduktif: number;
+    }[];
+  }[];
 };
-
-const tableClassName =
-  "[&_th]:px-5 [&_td]:px-5 [&_td]:py-3 [&_th]:h-14 [&_th:first-child]:pl-12 [&_td:first-child]:pl-12 [&_th:last-child]:pr-12 [&_td:last-child]:pr-12";
 
 type OperationalContentProps = {
   data: OperationalResponse;
@@ -64,6 +91,29 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       series: data.cards.failed.series,
     },
   ];
+  const topMerchantRows = data.topMerchants.map((row) => [
+    row.merchant,
+    row.uniqMerchant,
+    row.keyword,
+    row.totalTransactions.toLocaleString("id-ID"),
+    row.uniqRedeemer.toLocaleString("id-ID"),
+  ]);
+  const expiredRuleRows = data.expiredRules.map((row) => [
+    row.merchant,
+    row.keyword,
+    row.startPeriod,
+    row.endPeriod,
+  ]);
+  const categoryMetricRows = data.categoryMetrics.map((row) => [
+    row.name,
+    row.totalMerchant.toLocaleString("id-ID"),
+    row.uniqueMerchant.toLocaleString("id-ID"),
+    row.totalPoint.toLocaleString("id-ID"),
+    row.totalTransaksi.toLocaleString("id-ID"),
+    row.uniqueRedeemer.toLocaleString("id-ID"),
+    row.merchantAktif.toLocaleString("id-ID"),
+    row.merchantProduktif.toLocaleString("id-ID"),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,53 +129,72 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       />
 
       <div className="grid gap-6 px-4 lg:px-6">
-        <TableCard title="Top Merchant">
-          <Table className={tableClassName}>
-            <TableHeader className="bg-muted/60 text-muted-foreground">
-              <TableRow>
-                <TableHead>Nama Merchant</TableHead>
-                <TableHead>Uniq Merchant</TableHead>
-                <TableHead>Keyword</TableHead>
-                <TableHead>Jumlah Transaksi</TableHead>
-                <TableHead>Uniq Redeemer</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.topMerchants.map((row) => (
-                <TableRow key={`${row.merchant}-${row.keyword}`}>
-                  <TableCell className="font-medium">{row.merchant}</TableCell>
-                  <TableCell>{row.uniqMerchant}</TableCell>
-                  <TableCell>{row.keyword}</TableCell>
-                  <TableCell>{row.totalTransactions}</TableCell>
-                  <TableCell>{row.uniqRedeemer}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableCard>
+        <DataTableCard
+          className="min-w-0"
+          title="Top Merchant"
+          headers={[
+            "Nama Merchant",
+            "Uniq Merchant",
+            "Keyword",
+            "Jumlah Transaksi",
+            "Uniq Redeemer",
+          ]}
+          rows={topMerchantRows}
+          sortableColumns={[true, true, true, true, true]}
+          pagination={{ enabled: true, pageSize: 5, pageSizeOptions: [5, 10, 20] }}
+          columnClassNames={[
+            "font-medium",
+            "",
+            "",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+          ]}
+        />
 
-        <TableCard title="Rule Expired Bulan Ini">
-          <Table className={tableClassName}>
-            <TableHeader className="bg-muted/60 text-muted-foreground">
-              <TableRow>
-                <TableHead>Nama Merchant</TableHead>
-                <TableHead>Keyword</TableHead>
-                <TableHead>Mulai</TableHead>
-                <TableHead>Berakhir</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.expiredRules.map((row) => (
-                <TableRow key={`${row.merchant}-${row.keyword}-${row.endPeriod}`}>
-                  <TableCell className="font-medium">{row.merchant}</TableCell>
-                  <TableCell>{row.keyword}</TableCell>
-                  <TableCell>{row.startPeriod}</TableCell>
-                  <TableCell>{row.endPeriod}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableCard>
+        <DataTableCard
+          className="min-w-0"
+          title="Rule Expired Bulan Ini"
+          headers={["Nama Merchant", "Keyword", "Mulai", "Berakhir"]}
+          rows={expiredRuleRows}
+          sortableColumns={[true, true, true, true]}
+          pagination={{ enabled: true, pageSize: 8, pageSizeOptions: [8, 16, 24] }}
+          columnClassNames={["font-medium", "", "tabular-nums", "tabular-nums"]}
+        />
+
+        <DataTableCard
+          className="min-w-0"
+          title="Category Metrics"
+          headers={[
+            "Category",
+            "Jumlah Merchant",
+            "Unique Merchant",
+            "Burning Point",
+            "Total Transaksi",
+            "Unique Redeemer",
+            "Merchant Aktif",
+            "Merchant Produktif",
+          ]}
+          rows={categoryMetricRows}
+          sortableColumns={[true, true, true, true, true, true, true, true]}
+          pagination={{ enabled: true, pageSize: 8, pageSizeOptions: [8, 16, 24] }}
+          columnClassNames={[
+            "font-medium",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+            "text-right tabular-nums",
+          ]}
+        />
+
+        <CollapsibleClusterTableCard
+          className="min-w-0"
+          darkHeader={true}
+          title="Cluster Metrics"
+          rows={data.clusterMetrics}
+        />
       </div>
     </div>
   );

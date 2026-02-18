@@ -25,6 +25,27 @@ export type OperationalRawData = {
     startPeriod: string;
     endPeriod: string;
   }[];
+  categoryMetrics: {
+    name: string;
+    totalMerchant: number;
+    uniqueMerchant: number;
+    totalPoint: number;
+    totalTransaksi: number;
+    uniqueRedeemer: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+  }[];
+  branchClusterMetrics: {
+    branch: string;
+    cluster: string;
+    totalMerchant: number;
+    uniqueMerchant: number;
+    totalPoint: number;
+    totalTransaksi: number;
+    uniqueRedeemer: number;
+    merchantAktif: number;
+    merchantProduktif: number;
+  }[];
 };
 
 export type OperationalRepository = {

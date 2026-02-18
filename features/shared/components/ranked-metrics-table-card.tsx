@@ -29,6 +29,7 @@ type RankedMetricsTableCardProps = {
   headerCols: React.ReactNode[];
   rows: React.ReactNode[][];
   className?: string;
+  darkHeader?: boolean;
   rankHeader?: React.ReactNode;
   sortableColumns?: boolean[];
   pagination?: {
@@ -60,10 +61,18 @@ const toComparableValue = (value: React.ReactNode): string | number => {
   return text.toLowerCase();
 };
 
-function SortIndicator({ active, direction }: { active: boolean; direction?: SortDirection }) {
+function SortIndicator({
+  active,
+  direction,
+  dark,
+}: {
+  active: boolean;
+  direction?: SortDirection;
+  dark?: boolean;
+}) {
   if (!active) {
     return (
-      <span className="inline-flex flex-col text-muted-foreground/50">
+      <span className={cn("inline-flex flex-col", dark ? "text-white/70" : "text-muted-foreground/50")}>
         <IconChevronUp className="-mb-1 size-3" />
         <IconChevronDown className="-mt-1 size-3" />
       </span>
@@ -80,6 +89,7 @@ export function RankedMetricsTableCard({
   headerCols,
   rows,
   className,
+  darkHeader = true,
   rankHeader = "#",
   sortableColumns,
   pagination,
@@ -160,12 +170,12 @@ export function RankedMetricsTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
           <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="w-10 px-3 text-center">{rankHeader}</TableHead>
+            <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
+              <TableHead className={cn("w-10 px-3 text-center", darkHeader ? "text-white" : undefined)}>{rankHeader}</TableHead>
               {headerCols.map((header, index) => (
                 <TableHead
                   key={`header-${index}`}
-                  className={cn("px-3", index === 0 ? undefined : "text-right")}
+                  className={cn("px-3", index === 0 ? undefined : "text-right", darkHeader ? "text-white" : undefined)}
                 >
                   {isColumnSortable(index) ? (
                     <button
@@ -177,6 +187,7 @@ export function RankedMetricsTableCard({
                       <SortIndicator
                         active={sortState?.column === index}
                         direction={sortState?.column === index ? sortState.direction : undefined}
+                        dark={darkHeader}
                       />
                     </button>
                   ) : (

@@ -6,7 +6,10 @@ import { OverviewRepositoryDrizzle } from "@/features/overview/overview.reposito
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const repo = new OverviewRepositoryDrizzle();
-  const payload = await getOverviewDashboard(repo, searchParams.get("month"));
+  const payload = await getOverviewDashboard(repo, searchParams.get("month"), {
+    categories: searchParams.getAll("category"),
+    branches: searchParams.getAll("branch"),
+  });
 
   return NextResponse.json(payload);
 }
