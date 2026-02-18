@@ -210,7 +210,6 @@ export function DataTableCard({
                       "px-4",
                       darkHeader ? "text-white" : undefined,
                       headerCellClassName,
-                      columnClassNames?.[index],
                     )}
                   >
                     {isColumnSortable(index) ? (
