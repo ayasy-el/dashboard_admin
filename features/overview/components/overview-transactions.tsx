@@ -216,7 +216,6 @@ export function OverviewTransactions({
                 </AreaChart>
               </ChartContainer>
             </TabsContent>
-            <p className="mt-3 text-xs text-muted-foreground">Dibanding {previousMonthLabel}</p>
           </CardContent>
         </Tabs>
       </Card>

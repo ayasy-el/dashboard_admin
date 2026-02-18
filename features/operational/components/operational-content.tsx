@@ -269,7 +269,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
           ]}
           rows={categoryMetricRows}
           sortableColumns={[true, true, true, true, true, true, true, true]}
-          pagination={{ enabled: true, pageSize: 8, pageSizeOptions: [8, 16, 24] }}
+          pagination={{ enabled: true, pageSize: 10, pageSizeOptions: [10, 16, 24] }}
           columnClassNames={[
             "font-medium",
             "text-right tabular-nums",

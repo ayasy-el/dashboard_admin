@@ -93,10 +93,11 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
       <div className="space-y-6 px-4 lg:px-6">
         <div className="grid gap-6 xl:grid-cols-12">
           <DistributionPieCard
-            className="min-w-0 xl:col-span-4"
+            className="min-w-[20rem] min-w-0 xl:col-span-4"
             title="Merchant Categories"
             icon={<IconChartPie className="size-4 text-secondary" />}
             data={categoryData}
+            description="Berdasarkan jumlah transaksi"
             minLabelPercent={10}
           />
           <ComparisonProgressTableCard

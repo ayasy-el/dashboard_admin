@@ -41,6 +41,7 @@ type DistributionPieCardProps = {
   minLabelPercent?: number;
   valueLabel?: string;
   percentLabel?: string;
+  description?: string;
 };
 
 const hexToRgb = (hex: string) => {
@@ -123,6 +124,7 @@ export function DistributionPieCard({
   minLabelPercent = 10,
   valueLabel = "Jumlah",
   percentLabel = "Persentase",
+  description,
 }: DistributionPieCardProps) {
   const [activeIndex, setActiveIndex] = React.useState<number>(-1);
 
@@ -168,7 +170,12 @@ export function DistributionPieCard({
   };
 
   return (
-    <Card className={cn("min-w-0 gap-0 border border-border/80 py-0 shadow-sm", className)}>
+    <Card
+      className={cn(
+        "gap-0 overflow-hidden border border-border/80 py-0 shadow-sm",
+        className,
+      )}
+    >
       <CardHeader className="px-6 pb-2 pt-6">
         <CardTitle className="flex items-center gap-1 text-lg">
           {title}
@@ -177,8 +184,11 @@ export function DistributionPieCard({
       </CardHeader>
       <CardContent className="h-full px-4 pb-5 pt-1 sm:px-6 sm:pb-6">
         <div className="flex h-full items-center justify-center">
-          <div className="flex w-full max-w-[30rem] flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:justify-center">
-            <ChartContainer config={chartConfig} className="h-[190px] w-[190px] shrink-0 sm:h-[220px] sm:w-[220px]">
+          <div className="flex w-full max-w-[26rem] flex-col items-center gap-4 sm:gap-6 2xl:flex-row 2xl:items-center 2xl:justify-center">
+            <ChartContainer
+              config={chartConfig}
+              className="h-[190px] w-[190px] shrink-0 sm:h-[220px] sm:w-[220px]"
+            >
               <PieChart>
                 <ChartTooltip
                   cursor={false}
@@ -234,7 +244,7 @@ export function DistributionPieCard({
               </PieChart>
             </ChartContainer>
 
-            <div className="grid w-full max-w-[220px] gap-1.5 text-sm text-muted-foreground md:w-[150px] md:max-w-none">
+            <div className="grid w-full min-w-0 max-w-[240px] gap-1.5 text-sm text-muted-foreground 2xl:w-[150px] 2xl:max-w-none">
               {chartData.map((item, index) => (
                 <div
                   key={item.name}
@@ -252,6 +262,7 @@ export function DistributionPieCard({
             </div>
           </div>
         </div>
+        {description ? <p className="mb-3 text-xs text-muted-foreground">{description}</p> : null}
       </CardContent>
     </Card>
   );
