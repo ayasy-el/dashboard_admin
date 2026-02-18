@@ -168,6 +168,26 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       .groupBy(dimCategory.categoryId, dimCategory.category)
       .orderBy(sql`count(*) desc`);
 
+    const topMerchantsRaw = await db.execute(sql`
+      select
+        dm.merchant_name as merchant,
+        dcat.category as category,
+        dcl.branch as branch,
+        count(*)::int as redeem
+      from fact_transaction ft
+      join dim_merchant dm on dm.merchant_key = ft.merchant_key
+      join dim_category dcat on dcat.category_id = dm.category_id
+      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+      where ft.status = 'success'
+        and ft.transaction_at >= ${startTs}
+        and ft.transaction_at < ${endTs}
+        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
+      group by dm.merchant_name, dcat.category, dcl.branch
+      order by redeem desc, dm.merchant_name
+      limit 6
+    `);
+
     const branchClusterRows = await db.execute(sql`
       select
         dcl.branch as branch,
@@ -403,6 +423,12 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       categoryRaw: categoryRaw.map((row) => ({
         name: row.name,
         value: toNumber(row.value),
+      })),
+      topMerchantsRaw: (topMerchantsRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        merchant: String(row.merchant ?? ""),
+        category: String(row.category ?? ""),
+        branch: String(row.branch ?? ""),
+        redeem: toNumber(row.redeem),
       })),
       branchClusterRows: (branchClusterRows.rows as Array<Record<string, unknown>>).map((row) => ({
         branch: String(row.branch ?? ""),

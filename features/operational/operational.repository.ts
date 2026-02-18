@@ -5,6 +5,16 @@ export type MonthRange = {
   previousEnd: Date;
 };
 
+export type OperationalFilters = {
+  categories: string[];
+  branches: string[];
+};
+
+export type OperationalFilterOptions = {
+  categories: string[];
+  branches: string[];
+};
+
 export type OperationalRawData = {
   successCurrent: number;
   failedCurrent: number;
@@ -49,5 +59,6 @@ export type OperationalRawData = {
 };
 
 export type OperationalRepository = {
-  getOperationalRawData(params: MonthRange): Promise<OperationalRawData>;
+  getOperationalRawData(params: MonthRange & OperationalFilters): Promise<OperationalRawData>;
+  getOperationalFilterOptions(): Promise<OperationalFilterOptions>;
 };

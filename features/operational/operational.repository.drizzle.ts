@@ -1,8 +1,10 @@
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { factTransaction } from "@/lib/db/schema";
+import { dimCategory, dimCluster, dimMerchant, factTransaction } from "@/lib/db/schema";
 import type {
+  OperationalFilterOptions,
+  OperationalFilters,
   MonthRange,
   OperationalRawData,
   OperationalRepository,
@@ -11,6 +13,20 @@ import { toSqlDate, toSqlTimestamp } from "@/features/shared/month";
 
 const toNumber = (value: unknown) => Number(value ?? 0);
 const PRODUCTIVE_THRESHOLD = 5;
+const formatDisplayDate = (value: unknown) => {
+  const normalized = String(value ?? "");
+  if (!normalized) return "";
+  return new Date(normalized).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+const toUniqueFilters = (values: string[] | undefined) => {
+  const normalized = (values ?? []).map((item) => item.trim()).filter(Boolean);
+  return Array.from(new Set(normalized));
+};
+const inClause = (values: string[]) => sql.join(values.map((value) => sql`${value}`), sql`, `);
 
 export class OperationalRepositoryDrizzle implements OperationalRepository {
   async getOperationalRawData({
@@ -18,36 +34,59 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
     end,
     previousStart,
     previousEnd,
-  }: MonthRange): Promise<OperationalRawData> {
+    categories,
+    branches,
+  }: MonthRange & OperationalFilters): Promise<OperationalRawData> {
     const startTs = toSqlTimestamp(start);
     const endTs = toSqlTimestamp(end);
     const startDate = toSqlDate(start);
     const endDate = toSqlDate(end);
     const previousStartTs = toSqlTimestamp(previousStart);
     const previousEndTs = toSqlTimestamp(previousEnd);
+    const selectedCategories = toUniqueFilters(categories);
+    const selectedBranches = toUniqueFilters(branches);
+    const hasCategoryFilter = selectedCategories.length > 0;
+    const hasBranchFilter = selectedBranches.length > 0;
+    const hasMerchantScopeFilter = hasCategoryFilter || hasBranchFilter;
+
+    const merchantScopeWhere = and(
+      hasCategoryFilter ? inArray(dimCategory.category, selectedCategories) : undefined,
+      hasBranchFilter ? inArray(dimCluster.branch, selectedBranches) : undefined,
+    );
+
+    const merchantScopeSubquery = db
+      .select({ merchantKey: dimMerchant.merchantKey })
+      .from(dimMerchant)
+      .innerJoin(dimCategory, eq(dimCategory.categoryId, dimMerchant.categoryId))
+      .innerJoin(dimCluster, eq(dimCluster.clusterId, dimMerchant.clusterId))
+      .where(merchantScopeWhere);
 
     const successWhere = and(
       eq(factTransaction.status, "success"),
       gte(factTransaction.transactionAt, startTs),
-      lt(factTransaction.transactionAt, endTs)
+      lt(factTransaction.transactionAt, endTs),
+      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
     );
 
     const failedWhere = and(
       eq(factTransaction.status, "failed"),
       gte(factTransaction.transactionAt, startTs),
-      lt(factTransaction.transactionAt, endTs)
+      lt(factTransaction.transactionAt, endTs),
+      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
     );
 
     const prevSuccessWhere = and(
       eq(factTransaction.status, "success"),
       gte(factTransaction.transactionAt, previousStartTs),
-      lt(factTransaction.transactionAt, previousEndTs)
+      lt(factTransaction.transactionAt, previousEndTs),
+      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
     );
 
     const prevFailedWhere = and(
       eq(factTransaction.status, "failed"),
       gte(factTransaction.transactionAt, previousStartTs),
-      lt(factTransaction.transactionAt, previousEndTs)
+      lt(factTransaction.transactionAt, previousEndTs),
+      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
     );
 
     const [successSummary] = await db
@@ -99,9 +138,13 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         count(distinct ft.msisdn)::int as uniq_redeemer
       from fact_transaction ft
       join dim_merchant dm on dm.merchant_key = ft.merchant_key
+      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+      join dim_category dcat on dcat.category_id = dm.category_id
       where ft.status = 'success'
         and ft.transaction_at >= ${startTs}
         and ft.transaction_at < ${endTs}
+        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
       group by dm.merchant_name, dm.keyword_code, dm.uniq_merchant
       order by total_transactions desc
       limit 5
@@ -115,8 +158,12 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         dr.end_period as end_period
       from dim_rule dr
       join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+      join dim_category dcat on dcat.category_id = dm.category_id
       where dr.end_period >= ${startTs}
         and dr.end_period < ${endTs}
+        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
       order by dr.end_period desc
       limit 8
     `);
@@ -125,8 +172,13 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       with active_merchants as (
         select distinct dr.rule_merchant as merchant_key
         from dim_rule dr
+        join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+        join dim_category dcat on dcat.category_id = dm.category_id
         where dr.start_period < ${endDate}
           and dr.end_period >= ${startDate}
+          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
       ),
       tx_success as (
         select
@@ -173,8 +225,13 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       with active_merchants as (
         select distinct dr.rule_merchant as merchant_key
         from dim_rule dr
+        join dim_merchant dm on dm.merchant_key = dr.rule_merchant
+        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+        join dim_category dcat on dcat.category_id = dm.category_id
         where dr.start_period < ${endDate}
           and dr.end_period >= ${startDate}
+          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
       ),
       tx_success as (
         select
@@ -233,26 +290,18 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         date: row.date,
         value: toNumber(row.value),
       })),
-      topMerchants: (topMerchants.rows as any[]).map((row) => ({
-        merchant: row.merchant,
-        keyword: row.keyword,
+      topMerchants: (topMerchants.rows as Array<Record<string, unknown>>).map((row) => ({
+        merchant: String(row.merchant ?? ""),
+        keyword: String(row.keyword ?? ""),
         totalTransactions: toNumber(row.total_transactions),
-        uniqMerchant: row.uniq_merchant,
+        uniqMerchant: String(row.uniq_merchant ?? ""),
         uniqRedeemer: toNumber(row.uniq_redeemer),
       })),
-      expiredRules: (expiredRules.rows as any[]).map((row) => ({
-        merchant: row.merchant,
-        keyword: row.keyword,
-        startPeriod: new Date(row.start_period).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        endPeriod: new Date(row.end_period).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
+      expiredRules: (expiredRules.rows as Array<Record<string, unknown>>).map((row) => ({
+        merchant: String(row.merchant ?? ""),
+        keyword: String(row.keyword ?? ""),
+        startPeriod: formatDisplayDate(row.start_period),
+        endPeriod: formatDisplayDate(row.end_period),
       })),
       categoryMetrics: (categoryMetrics.rows as Array<Record<string, unknown>>).map((row) => ({
         name: String(row.name ?? ""),
@@ -279,6 +328,24 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
           merchantProduktif: toNumber(row.merchant_productif),
         };
       }),
+    };
+  }
+
+  async getOperationalFilterOptions(): Promise<OperationalFilterOptions> {
+    const [categoryRows, branchRows] = await Promise.all([
+      db
+        .selectDistinct({ value: dimCategory.category })
+        .from(dimCategory)
+        .orderBy(dimCategory.category),
+      db
+        .selectDistinct({ value: dimCluster.branch })
+        .from(dimCluster)
+        .orderBy(dimCluster.branch),
+    ]);
+
+    return {
+      categories: categoryRows.map((row) => row.value),
+      branches: branchRows.map((row) => row.value),
     };
   }
 }

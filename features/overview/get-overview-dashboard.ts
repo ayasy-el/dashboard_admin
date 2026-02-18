@@ -78,6 +78,12 @@ export async function getOverviewDashboard(
     value: row.value,
     percent: totalCategory ? (row.value / totalCategory) * 100 : 0,
   }));
+  const topMerchants = raw.topMerchantsRaw.map((row) => ({
+    merchant: row.merchant,
+    category: row.category,
+    branch: row.branch,
+    redeem: row.redeem,
+  }));
 
   const produktifMap = new Map<string, number>();
   for (const row of raw.produktifRows) {
@@ -200,6 +206,7 @@ export async function getOverviewDashboard(
     dailyTransactions: raw.dailyTransactions,
     dailyRedeemer: raw.dailyRedeemer,
     monthlyTransactions,
+    topMerchants,
     categoryBreakdown,
     branchTable: {
       branches,

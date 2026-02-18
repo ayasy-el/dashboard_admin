@@ -1,4 +1,4 @@
-import { MonthSelect } from "@/features/shared/components/month-select";
+import { MultiFilterDropdown, SingleFilterDropdown } from "@/features/shared/components/filter-dropdown";
 import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
@@ -6,6 +6,14 @@ import { CollapsibleClusterTableCard } from "@/features/operational/components/c
 
 export type OperationalResponse = {
   month: string;
+  filters: {
+    categories: string[];
+    branches: string[];
+  };
+  filterOptions: {
+    categories: string[];
+    branches: string[];
+  };
   monthLabel: string;
   previousMonth: string;
   previousMonthLabel: string;
@@ -119,7 +127,38 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 lg:px-6">
         <div className="text-sm font-medium text-muted-foreground">Ringkasan bulan</div>
-        <MonthSelect value={selectedMonth} options={monthOptions} />
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <SingleFilterDropdown
+            title="MONTH"
+            paramKey="month"
+            selectedValue={selectedMonth}
+            options={monthOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            className="w-[220px]"
+          />
+          <MultiFilterDropdown
+            title="CATEGORY"
+            paramKey="category"
+            selectedValues={data.filters.categories}
+            options={data.filterOptions.categories.map((category) => ({
+              value: category,
+              label: category,
+            }))}
+            className="w-[200px]"
+          />
+          <MultiFilterDropdown
+            title="BRANCH"
+            paramKey="branch"
+            selectedValues={data.filters.branches}
+            options={data.filterOptions.branches.map((branch) => ({
+              value: branch,
+              label: branch,
+            }))}
+            className="w-[200px]"
+          />
+        </div>
       </div>
       <SectionCards
         monthLabel={data.monthLabel}

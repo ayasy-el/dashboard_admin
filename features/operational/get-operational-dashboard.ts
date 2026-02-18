@@ -9,7 +9,11 @@ import {
 
 export async function getOperationalDashboard(
   repo: OperationalRepository,
-  monthQuery: string | null
+  monthQuery: string | null,
+  filters: {
+    categories: string[];
+    branches: string[];
+  },
 ) {
   const month = parseMonth(monthQuery);
   const start = monthToDateUtc(month);
@@ -18,11 +22,23 @@ export async function getOperationalDashboard(
   const previousEnd = start;
   const previousMonth = formatMonthUtc(previousStart);
 
+  const filterOptions = await repo.getOperationalFilterOptions();
+  const appliedCategories = filters.categories.filter((category) =>
+    filterOptions.categories.includes(category),
+  );
+  const appliedBranches = filters.branches.filter((branch) =>
+    filterOptions.branches.includes(branch),
+  );
+  const selectedCategories = appliedCategories.length > 0 ? appliedCategories : filterOptions.categories;
+  const selectedBranches = appliedBranches.length > 0 ? appliedBranches : filterOptions.branches;
+
   const raw = await repo.getOperationalRawData({
     start,
     end,
     previousStart,
     previousEnd,
+    categories: appliedCategories,
+    branches: appliedBranches,
   });
 
   const branchMap = new Map<
@@ -87,6 +103,11 @@ export async function getOperationalDashboard(
 
   return {
     month,
+    filters: {
+      categories: selectedCategories,
+      branches: selectedBranches,
+    },
+    filterOptions,
     monthLabel: monthLabel(month),
     previousMonth,
     previousMonthLabel: monthLabel(previousMonth),

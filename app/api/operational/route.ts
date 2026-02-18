@@ -6,7 +6,10 @@ import { OperationalRepositoryDrizzle } from "@/features/operational/operational
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const repo = new OperationalRepositoryDrizzle();
-  const payload = await getOperationalDashboard(repo, searchParams.get("month"));
+  const payload = await getOperationalDashboard(repo, searchParams.get("month"), {
+    categories: searchParams.getAll("category"),
+    branches: searchParams.getAll("branch"),
+  });
 
   return NextResponse.json(payload);
 }

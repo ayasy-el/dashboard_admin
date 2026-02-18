@@ -36,21 +36,18 @@ type OverviewTransactionsProps = {
   monthlySeries: { month: string; value: number }[];
   totalDaily: number;
   totalMonthly: number;
+  topMerchants: {
+    merchant: string;
+    category: string;
+    branch: string;
+    redeem: number;
+  }[];
 };
 
 const trendConfig = {
   value: { label: "Redeem", color: "var(--chart-1)" },
   unique: { label: "Unique Redeem", color: "var(--chart-2)" },
 } satisfies ChartConfig;
-
-const topMerchants = [
-  { rank: "1", merchant: "Atlas Surabaya", category: "Sport & Education", branch: "Surabaya", redeem: "13.681" },
-  { rank: "2", merchant: "Tanah Datar", category: "Food", branch: "Lamongan", redeem: "10.328" },
-  { rank: "3", merchant: "iLuFA168 Trenggalek", category: "Shop", branch: "Madiun", redeem: "3.249" },
-  { rank: "4", merchant: "Prodia Darmo Permai", category: "Health & Beauty", branch: "Surabaya", redeem: "3.141" },
-  { rank: "5", merchant: "AIOLA EATERY SBY", category: "Program", branch: "Surabaya", redeem: "2.978" },
-  { rank: "6", merchant: "iLuFA168 Ngawi", category: "Shop", branch: "Madiun", redeem: "2.591" },
-];
 
 export function OverviewTransactions({
   monthLabel,
@@ -59,6 +56,7 @@ export function OverviewTransactions({
   monthlySeries,
   totalDaily,
   totalMonthly,
+  topMerchants,
 }: OverviewTransactionsProps) {
   const monthlyStackedSeries = React.useMemo(
     () =>
@@ -218,9 +216,7 @@ export function OverviewTransactions({
                 </AreaChart>
               </ChartContainer>
             </TabsContent>
-            {/* <p className="mt-3 text-xs text-muted-foreground">
-              Dibanding {previousMonthLabel}
-            </p> */}
+            <p className="mt-3 text-xs text-muted-foreground">Dibanding {previousMonthLabel}</p>
           </CardContent>
         </Tabs>
       </Card>
@@ -252,20 +248,20 @@ export function OverviewTransactions({
               </TableHeader>
               <TableBody>
                 {topMerchants.map((item, index) => (
-                  <TableRow key={item.rank} className="hover:bg-red-50/40">
+                  <TableRow key={`${item.merchant}-${item.branch}-${index}`} className="hover:bg-red-50/40">
                     <TableCell className="px-3 text-muted-foreground">
                       {index < 3 ? (
                         <IconTrophy
                           className={`size-4 ${index === 0 ? "text-yellow-500" : index === 1 ? "text-gray-400" : "text-orange-400"}`}
                         />
                       ) : (
-                        item.rank
+                        String(index + 1)
                       )}
                     </TableCell>
                     <TableCell className="px-3 font-medium">{item.merchant}</TableCell>
                     <TableCell className="px-3">{item.category}</TableCell>
                     <TableCell className="px-3">{item.branch}</TableCell>
-                    <TableCell className="px-3 text-right font-semibold">{item.redeem}</TableCell>
+                    <TableCell className="px-3 text-right font-semibold">{formatNumber(item.redeem)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

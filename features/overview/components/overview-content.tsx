@@ -88,6 +88,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         monthlySeries={data.monthlyTransactions}
         totalDaily={data.cards.totalTransaksi}
         totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
+        topMerchants={data.topMerchants}
       />
       <div className="space-y-6 px-4 lg:px-6">
         <div className="grid gap-6 xl:grid-cols-12">
