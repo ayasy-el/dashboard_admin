@@ -85,9 +85,11 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         monthLabel={data.monthLabel}
         previousMonthLabel={data.previousMonthLabel}
         dailySeries={data.dailyTransactions}
+        dailyUniqueSeries={data.dailyRedeemer}
         monthlySeries={data.monthlyTransactions}
-        totalDaily={data.cards.totalTransaksi}
-        totalMonthly={data.monthlyTransactions.at(-1)?.value ?? 0}
+        monthlyUniqueSeries={data.monthlyRedeemers}
+        totalRedeem={data.cards.totalTransaksi}
+        totalUniqueRedeem={data.cards.totalRedeemer}
         topMerchants={data.topMerchants}
       />
       <div className="space-y-6 px-4 lg:px-6">

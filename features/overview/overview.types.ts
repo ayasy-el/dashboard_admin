@@ -27,6 +27,7 @@ export type OverviewResponse = {
   dailyTransactions: { date: string; value: number }[];
   dailyRedeemer: { date: string; value: number }[];
   monthlyTransactions: { month: string; value: number }[];
+  monthlyRedeemers: { month: string; value: number }[];
   topMerchants: {
     merchant: string;
     category: string;

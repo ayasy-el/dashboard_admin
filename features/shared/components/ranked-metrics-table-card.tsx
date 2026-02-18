@@ -60,6 +60,12 @@ const toComparableValue = (value: React.ReactNode): string | number => {
 
   return text.toLowerCase();
 };
+const splitValueAndPercent = (value: React.ReactNode) => {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/^(.+?)\s+\(([-+]?[0-9.,]+%)\)$/);
+  if (!match) return null;
+  return { raw: match[1], percent: `(${match[2]})` };
+};
 
 function SortIndicator({
   active,
@@ -210,7 +216,16 @@ export function RankedMetricsTableCard({
                     key={`row-${absoluteIndex}-cell-${cellIndex}`}
                     className={cn("px-3", cellIndex === 0 ? "font-medium" : "text-right")}
                   >
-                    {cell}
+                    {(() => {
+                      const parsed = splitValueAndPercent(cell);
+                      if (!parsed || cellIndex === 0) return cell;
+                      return (
+                        <span className="inline-grid grid-cols-[5ch_5ch] items-baseline justify-end gap-x-1.5 tabular-nums whitespace-nowrap">
+                          <span className="text-right">{parsed.raw}</span>
+                          <span className="text-left text-muted-foreground">{parsed.percent}</span>
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                 ))}
               </TableRow>

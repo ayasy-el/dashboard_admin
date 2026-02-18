@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { MultiFilterDropdown, SingleFilterDropdown } from "@/features/shared/components/filter-dropdown";
+import {
+  MultiFilterDropdown,
+  SingleFilterDropdown,
+} from "@/features/shared/components/filter-dropdown";
 import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
@@ -108,6 +111,11 @@ type OperationalContentProps = {
 };
 
 type MerchantStatusTab = "active" | "productive" | "not-active" | "expired";
+const formatShare = (value: number, total: number) => {
+  if (total <= 0) return `${value.toLocaleString("id-ID")} (0%)`;
+  const percent = (value / total) * 100;
+  return `${value.toLocaleString("id-ID")} (${percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%)`;
+};
 
 export function OperationalContent({ data, monthOptions, selectedMonth }: OperationalContentProps) {
   const [merchantStatusTab, setMerchantStatusTab] = React.useState<MerchantStatusTab>("active");
@@ -163,8 +171,8 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     row.totalPoint.toLocaleString("id-ID"),
     row.totalTransaksi.toLocaleString("id-ID"),
     row.uniqueRedeemer.toLocaleString("id-ID"),
-    row.merchantAktif.toLocaleString("id-ID"),
-    row.merchantProduktif.toLocaleString("id-ID"),
+    formatShare(row.merchantAktif, row.totalMerchant),
+    formatShare(row.merchantProduktif, row.totalMerchant),
   ]);
   const merchantStatusTable = React.useMemo(() => {
     if (merchantStatusTab === "active") {
@@ -172,7 +180,13 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
         headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi", "Uniq Redeem"],
         rows: activeMerchantRows,
         sortableColumns: [true, true, true, true, true],
-        columnClassNames: ["", "font-medium", "", "text-right tabular-nums", "text-right tabular-nums"],
+        columnClassNames: [
+          "",
+          "font-medium",
+          "",
+          "w-[88px] text-right tabular-nums",
+          "w-[88px] text-right tabular-nums",
+        ],
       };
     }
     if (merchantStatusTab === "productive") {
@@ -180,7 +194,13 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
         headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi", "Uniq Redeem"],
         rows: productiveMerchantRows,
         sortableColumns: [true, true, true, true, true],
-        columnClassNames: ["", "font-medium", "", "text-right tabular-nums", "text-right tabular-nums"],
+        columnClassNames: [
+          "",
+          "font-medium",
+          "",
+          "w-[88px] text-right tabular-nums",
+          "w-[88px] text-right tabular-nums",
+        ],
       };
     }
     if (merchantStatusTab === "not-active") {
@@ -188,7 +208,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
         headers: ["Branch", "Nama Merchant", "Keyword", "Jumlah Transaksi"],
         rows: notActiveMerchantRows,
         sortableColumns: [true, true, true, true],
-        columnClassNames: ["", "font-medium", "", "text-right tabular-nums"],
+        columnClassNames: ["", "font-medium", "", "w-[88px] text-right tabular-nums"],
       };
     }
     return {
@@ -284,7 +304,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
         monthLabel={data.monthLabel}
         previousMonthLabel={data.previousMonthLabel}
         stats={stats}
-        className="mx-auto w-full max-w-4xl px-0 sm:grid-cols-2 @xl/main:grid-cols-2 @5xl/main:grid-cols-2"
+        className="mx-auto w-full max-w-4xl px-4 lg:px-6 sm:grid-cols-2 @xl/main:grid-cols-2 @5xl/main:grid-cols-2"
       />
       <div className="grid grid-cols-1 gap-3 px-4 sm:grid-cols-2 lg:px-6 xl:grid-cols-5">
         {compactStatItems.map((item) => (

@@ -294,7 +294,16 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
     `);
 
     const branchClusterBase = await db.execute(sql`
-      with active_merchants as (
+      with cluster_scope as (
+        select
+          dcl.cluster_id as cluster_id,
+          dcl.branch as branch,
+          dcl.cluster as cluster
+        from dim_cluster dcl
+        where 1 = 1
+          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
+      ),
+      active_merchants as (
         select distinct dr.rule_merchant as merchant_key
         from dim_rule dr
         join dim_merchant dm on dm.merchant_key = dr.rule_merchant
@@ -318,35 +327,32 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       ),
       productive as (
         select
-          dcl.branch as branch,
-          dcl.cluster as cluster,
+          dm.cluster_id as cluster_id,
           tx.merchant_key as merchant_key
         from tx_success tx
         join dim_merchant dm on dm.merchant_key = tx.merchant_key
-        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-        group by dcl.branch, dcl.cluster, tx.merchant_key
+        group by dm.cluster_id, tx.merchant_key
         having count(*) >= ${PRODUCTIVE_THRESHOLD}
       )
       select
-        dcl.branch as branch,
-        dcl.cluster as cluster,
+        cs.branch as branch,
+        cs.cluster as cluster,
         count(distinct am.merchant_key)::int as total_merchant,
-        count(distinct dm.uniq_merchant)::int as unique_merchant,
+        count(distinct case when am.merchant_key is not null then dm.uniq_merchant end)::int as unique_merchant,
         coalesce(sum(tx.point_value), 0)::int as total_point,
         count(tx.merchant_key)::int as total_transaksi,
         count(distinct tx.msisdn)::int as unique_redeemer,
         count(distinct tx.merchant_key)::int as merchant_aktif,
         count(distinct productive.merchant_key)::int as merchant_productif
-      from active_merchants am
-      join dim_merchant dm on dm.merchant_key = am.merchant_key
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
+      from cluster_scope cs
+      left join dim_merchant dm on dm.cluster_id = cs.cluster_id
+      left join active_merchants am on am.merchant_key = dm.merchant_key
       left join tx_success tx on tx.merchant_key = am.merchant_key
       left join productive
-        on productive.branch = dcl.branch
-        and productive.cluster = dcl.cluster
+        on productive.cluster_id = cs.cluster_id
         and productive.merchant_key = am.merchant_key
-      group by dcl.branch, dcl.cluster
-      order by dcl.branch, dcl.cluster
+      group by cs.branch, cs.cluster
+      order by cs.branch, cs.cluster
     `);
 
     return {

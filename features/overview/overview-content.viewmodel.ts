@@ -11,6 +11,11 @@ const clampProgressWidth = (value: number, max: number) => {
   if (max <= 0) return "8%";
   return `${Math.max(8, Math.round((value / max) * 100))}%`;
 };
+const formatShare = (value: number, total: number) => {
+  if (total <= 0) return `${formatNumber(value)} (0%)`;
+  const percent = (value / total) * 100;
+  return `${formatNumber(value)} (${percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%)`;
+};
 
 export function buildOverviewContentViewModel(data: OverviewResponse) {
   const stats: StatCard[] = [
@@ -134,7 +139,7 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     .sort(([, leftCount], [, rightCount]) => rightCount - leftCount)
     .map(([branchName, oa]) => [
       branchName,
-      formatNumber(oa),
+      formatShare(oa, keywordByBranch[branchName] ?? 0),
       formatNumber(branchTotals.get(branchName)?.totalTransaksi ?? 0),
       formatNumber(branchTotals.get(branchName)?.uniqueRedeemer ?? 0),
     ]);
@@ -143,7 +148,7 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     .sort((a, b) => b.merchantProduktif - a.merchantProduktif)
     .map((branch) => [
       branch.name,
-      formatNumber(branch.merchantProduktif),
+      formatShare(branch.merchantProduktif, keywordByBranch[branch.name] ?? 0),
       formatNumber(branch.totalTransaksi),
       formatNumber(branch.uniqueRedeemer),
     ]);

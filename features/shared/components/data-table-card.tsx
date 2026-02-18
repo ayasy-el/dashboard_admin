@@ -62,6 +62,12 @@ const toComparableValue = (value: React.ReactNode): string | number => {
 
   return text.toLowerCase();
 };
+const splitValueAndPercent = (value: React.ReactNode) => {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/^(.+?)\s+\(([-+]?[0-9.,]+%)\)$/);
+  if (!match) return null;
+  return { raw: match[1], percent: `(${match[2]})` };
+};
 
 function SortIndicator({
   active,
@@ -204,7 +210,7 @@ export function DataTableCard({
                       "px-4",
                       darkHeader ? "text-white" : undefined,
                       headerCellClassName,
-                      // columnClassNames?.[index],
+                      columnClassNames?.[index],
                     )}
                   >
                     {isColumnSortable(index) ? (
@@ -237,7 +243,16 @@ export function DataTableCard({
                         key={`${absoluteIndex}-${cellIndex}`}
                         className={cn("px-4", columnClassNames?.[cellIndex])}
                       >
-                        {cell}
+                        {(() => {
+                          const parsed = splitValueAndPercent(cell);
+                          if (!parsed) return cell;
+                          return (
+                            <span className="inline-grid grid-cols-[6ch_9ch] items-baseline justify-end gap-x-1.5 tabular-nums whitespace-nowrap">
+                              <span className="text-right">{parsed.raw}</span>
+                              <span className="text-left text-muted-foreground">{parsed.percent}</span>
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                     ))}
                   </TableRow>

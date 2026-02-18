@@ -28,6 +28,16 @@ type CollapsibleClusterTableCardProps = {
 };
 
 const formatNumber = (value: number) => value.toLocaleString("id-ID");
+const formatShare = (value: number, total: number) => {
+  if (total <= 0) return `${formatNumber(value)} (0%)`;
+  const percent = (value / total) * 100;
+  return `${formatNumber(value)} (${percent.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%)`;
+};
+const splitValueAndPercent = (value: string) => {
+  const match = value.trim().match(/^(.+?)\s+\(([-+]?[0-9.,]+%)\)$/);
+  if (!match) return null;
+  return { raw: match[1], percent: `(${match[2]})` };
+};
 type SortDirection = "asc" | "desc";
 type SortColumn = "name" | keyof Omit<ClusterMetricRow, "name" | "children">;
 
@@ -241,7 +251,19 @@ export function CollapsibleClusterTableCard({
                         </TableCell>
                         {numericColumns.map((column) => (
                           <TableCell key={`${row.name}-${column}`} className="px-4 text-right tabular-nums">
-                            {formatNumber(row[column])}
+                            {(() => {
+                              if (column !== "merchantAktif" && column !== "merchantProduktif") {
+                                return formatNumber(row[column]);
+                              }
+                              const parsed = splitValueAndPercent(formatShare(row[column], row.totalMerchant));
+                              if (!parsed) return formatShare(row[column], row.totalMerchant);
+                              return (
+                                <span className="inline-grid grid-cols-[7ch_9ch] items-baseline justify-end gap-x-1.5 tabular-nums whitespace-nowrap">
+                                  <span className="text-right">{parsed.raw}</span>
+                                  <span className="text-left text-muted-foreground">{parsed.percent}</span>
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -255,7 +277,21 @@ export function CollapsibleClusterTableCard({
                               key={`${row.name}-${child.name}-${column}`}
                               className="px-4 text-right tabular-nums"
                             >
-                              {formatNumber(child[column])}
+                              {(() => {
+                                if (column !== "merchantAktif" && column !== "merchantProduktif") {
+                                  return formatNumber(child[column]);
+                                }
+                                const parsed = splitValueAndPercent(
+                                  formatShare(child[column], child.totalMerchant),
+                                );
+                                if (!parsed) return formatShare(child[column], child.totalMerchant);
+                                return (
+                                  <span className="inline-grid grid-cols-[7ch_9ch] items-baseline justify-end gap-x-1.5 tabular-nums whitespace-nowrap">
+                                    <span className="text-right">{parsed.raw}</span>
+                                    <span className="text-left text-muted-foreground">{parsed.percent}</span>
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                           ))}
                         </TableRow>

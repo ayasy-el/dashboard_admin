@@ -33,9 +33,11 @@ type OverviewTransactionsProps = {
   monthLabel: string;
   previousMonthLabel: string;
   dailySeries: { date: string; value: number }[];
+  dailyUniqueSeries: { date: string; value: number }[];
   monthlySeries: { month: string; value: number }[];
-  totalDaily: number;
-  totalMonthly: number;
+  monthlyUniqueSeries: { month: string; value: number }[];
+  totalRedeem: number;
+  totalUniqueRedeem: number;
   topMerchants: {
     merchant: string;
     category: string;
@@ -49,32 +51,55 @@ const trendConfig = {
   unique: { label: "Unique Redeem", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
+const getPreviousMonth = (month: string) => {
+  const [year, monthIndex] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthIndex - 1, 1));
+  date.setUTCMonth(date.getUTCMonth() - 1);
+  const nextYear = date.getUTCFullYear();
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${nextYear}-${nextMonth}`;
+};
+
 export function OverviewTransactions({
   monthLabel,
-  previousMonthLabel,
   dailySeries,
+  dailyUniqueSeries,
   monthlySeries,
-  totalDaily,
-  totalMonthly,
+  monthlyUniqueSeries,
+  totalRedeem,
+  totalUniqueRedeem,
   topMerchants,
 }: OverviewTransactionsProps) {
+  const monthlyUniqueMap = React.useMemo(
+    () => new Map(monthlyUniqueSeries.map((item) => [item.month, item.value])),
+    [monthlyUniqueSeries],
+  );
+  const dailyUniqueMap = React.useMemo(
+    () => new Map(dailyUniqueSeries.map((item) => [item.date, item.value])),
+    [dailyUniqueSeries],
+  );
+
   const monthlyStackedSeries = React.useMemo(
     () =>
       monthlySeries.map((item) => ({
         month: item.month,
         redeem: item.value,
-        uniqueRedeem: Math.round(item.value * 0.86),
+        uniqueRedeem: monthlyUniqueMap.get(item.month) ?? 0,
       })),
-    [monthlySeries],
+    [monthlySeries, monthlyUniqueMap],
+  );
+  const monthlySeriesByMonth = React.useMemo(
+    () => new Map(monthlyStackedSeries.map((item) => [item.month, item])),
+    [monthlyStackedSeries],
   );
   const dailyDualSeries = React.useMemo(
     () =>
       dailySeries.map((item) => ({
         date: item.date,
         redeem: item.value,
-        uniqueRedeem: Math.round(item.value * 0.84),
+        uniqueRedeem: dailyUniqueMap.get(item.date) ?? 0,
       })),
-    [dailySeries],
+    [dailySeries, dailyUniqueMap],
   );
 
   return (
@@ -106,11 +131,11 @@ export function OverviewTransactions({
             <div className="mb-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
               <div>
                 <p className="text-xs tracking-wide text-muted-foreground uppercase">Redeem</p>
-                <p className="text-2xl font-bold">{formatNumber(totalMonthly)}</p>
+                <p className="text-2xl font-bold">{formatNumber(totalRedeem)}</p>
               </div>
               <div>
                 <p className="text-xs tracking-wide text-muted-foreground uppercase">Unique Redeem</p>
-                <p className="text-2xl font-bold">{formatNumber(totalDaily)}</p>
+                <p className="text-2xl font-bold">{formatNumber(totalUniqueRedeem)}</p>
               </div>
             </div>
             <div className="mb-4 flex items-center gap-4 text-xs">
@@ -152,6 +177,41 @@ export function OverviewTransactions({
                             year: "numeric",
                           })
                         }
+                        formatter={(value, name, item) => {
+                          const month = String(item.payload?.month ?? "");
+                          const currentValue = Number(value ?? 0);
+                          const previousMonth = getPreviousMonth(month);
+                          const previousValue = Number(
+                            name === "redeem"
+                              ? monthlySeriesByMonth.get(previousMonth)?.redeem ?? 0
+                              : monthlySeriesByMonth.get(previousMonth)?.uniqueRedeem ?? 0,
+                          );
+                          const momPercent =
+                            previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : null;
+
+                          return (
+                            <div className="grid min-w-[10rem] gap-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">
+                                  {name === "redeem" ? "Redeem" : "Unique Redeem"}
+                                </span>
+                                <span className="font-mono font-medium tabular-nums text-foreground">
+                                  {formatNumber(currentValue)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">MoM</span>
+                                <span className="font-mono font-medium tabular-nums text-foreground">
+                                  {momPercent == null
+                                    ? "-"
+                                    : `${momPercent >= 0 ? "+" : ""}${momPercent.toLocaleString("id-ID", {
+                                        maximumFractionDigits: 1,
+                                      })}%`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }}
                       />
                     }
                   />

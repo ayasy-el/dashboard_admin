@@ -30,6 +30,7 @@ export type OverviewRawData = {
   dailyTransactions: { date: string; value: number }[];
   dailyRedeemer: { date: string; value: number }[];
   monthlyTransactionsRaw: { month: string; value: number }[];
+  monthlyRedeemerRaw: { month: string; value: number }[];
   categoryRaw: { name: string; value: number }[];
   topMerchantsRaw: {
     merchant: string;

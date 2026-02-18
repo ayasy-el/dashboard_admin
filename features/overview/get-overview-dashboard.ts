@@ -63,12 +63,21 @@ export async function getOverviewDashboard(
 
   const rangeStart = addMonthsUtc(start, -(MONTHLY_WINDOW - 1));
   const monthlyMap = new Map(raw.monthlyTransactionsRaw.map((row) => [row.month, row.value]));
+  const monthlyRedeemerMap = new Map(raw.monthlyRedeemerRaw.map((row) => [row.month, row.value]));
   const monthlyTransactions = Array.from({ length: MONTHLY_WINDOW }, (_, index) => {
     const date = addMonthsUtc(rangeStart, index);
     const monthKey = formatMonthUtc(date);
     return {
       month: monthKey,
       value: monthlyMap.get(monthKey) ?? 0,
+    };
+  });
+  const monthlyRedeemers = Array.from({ length: MONTHLY_WINDOW }, (_, index) => {
+    const date = addMonthsUtc(rangeStart, index);
+    const monthKey = formatMonthUtc(date);
+    return {
+      month: monthKey,
+      value: monthlyRedeemerMap.get(monthKey) ?? 0,
     };
   });
 
@@ -206,6 +215,7 @@ export async function getOverviewDashboard(
     dailyTransactions: raw.dailyTransactions,
     dailyRedeemer: raw.dailyRedeemer,
     monthlyTransactions,
+    monthlyRedeemers,
     topMerchants,
     categoryBreakdown,
     branchTable: {

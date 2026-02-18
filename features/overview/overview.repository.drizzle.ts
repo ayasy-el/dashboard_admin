@@ -155,6 +155,23 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
       .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt})`);
 
+    const monthlyRedeemerRaw = await db
+      .select({
+        month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
+        value: sql<number>`count(distinct ${factTransaction.msisdn})`,
+      })
+      .from(factTransaction)
+      .where(
+        and(
+          eq(factTransaction.status, "success"),
+          gte(factTransaction.transactionAt, toSqlTimestamp(rangeStart)),
+          lt(factTransaction.transactionAt, endTs),
+          hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
+        ),
+      )
+      .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
+      .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt})`);
+
     const categoryRaw = await db
       .select({
         name: dimCategory.category,
@@ -417,6 +434,10 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         value: toNumber(row.value),
       })),
       monthlyTransactionsRaw: monthlyTransactionsRaw.map((row) => ({
+        month: row.month,
+        value: toNumber(row.value),
+      })),
+      monthlyRedeemerRaw: monthlyRedeemerRaw.map((row) => ({
         month: row.month,
         value: toNumber(row.value),
       })),
