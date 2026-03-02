@@ -11,10 +11,16 @@ import {
   date,
   timestamp,
   pgEnum,
+  customType,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const transactionStatus = pgEnum("transaction_status", ["success", "failed"]);
+const dateRange = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return "daterange";
+  },
+});
 
 export const dimCategory = pgTable("dim_category", {
   categoryId: integer("category_id").primaryKey().notNull(),
@@ -61,27 +67,17 @@ export const dimRule = pgTable(
     ruleKey: uuid("rule_key").primaryKey().notNull(),
     ruleMerchant: uuid("rule_merchant").notNull(),
     pointRedeem: integer("point_redeem").notNull(),
-    startPeriod: date("start_period").notNull(),
-    endPeriod: date("end_period").notNull(),
+    period: dateRange("period").notNull(),
     createdAt: timestamp("created_at", { mode: "string" }).notNull(),
   },
   (table) => [
-    index("dim_rule_idx_dim_rule_end_period").using(
-      "btree",
-      table.endPeriod.asc().nullsLast().op("date_ops"),
-    ),
-    index("dim_rule_index_3").using(
-      "btree",
-      table.ruleMerchant.asc().nullsLast().op("date_ops"),
-      table.startPeriod.asc().nullsLast().op("date_ops"),
-      table.endPeriod.asc().nullsLast().op("uuid_ops"),
-    ),
+    index("dim_rule_idx_dim_rule_merchant").using("btree", table.ruleMerchant.asc().nullsLast().op("uuid_ops")),
     foreignKey({
       columns: [table.ruleMerchant],
       foreignColumns: [dimMerchant.merchantKey],
       name: "fk_dim_rule_rule_merchant_dim_merchant_merchant_key",
     }),
-    check("ck_dim_rule_period_valid", sql`start_period <= end_period`),
+    check("ck_dim_rule_period_valid", sql`not isempty(period)`),
     check("ck_dim_rule_point_positive", sql`point_redeem >= 0`),
   ],
 );

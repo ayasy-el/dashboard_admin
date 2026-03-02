@@ -235,31 +235,26 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       id: "total-merchant",
       label: "Jumlah Merchant",
       value: data.compactStats.totalMerchant,
-      helper: "dalam Periode Berjalan Bulan Ini",
     },
     {
       id: "merchant-aktif",
       label: "Merchant Aktif",
       value: data.compactStats.merchantAktif,
-      helper: "Minimal 1 transaksi",
     },
     {
       id: "merchant-produktif",
       label: "Merchant Produktif",
       value: data.compactStats.merchantProduktif,
-      helper: "Minimal 5 transaksi",
     },
     {
       id: "merchant-not-active",
       label: "Merchant Not Active",
       value: data.compactStats.merchantNotActive,
-      helper: "Tanpa transaksi",
     },
     {
       id: "merchant-expired",
       label: "Merchant Expired",
       value: data.compactStats.merchantExpired,
-      helper: "Expired di bulan ini",
     },
   ];
 
@@ -314,7 +309,6 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
                 {item.label}
               </div>
               <div className="text-2xl font-semibold tabular-nums">{formatNumber(item.value)}</div>
-              <div className="text-xs text-muted-foreground">{item.helper}</div>
             </CardContent>
           </Card>
         ))}

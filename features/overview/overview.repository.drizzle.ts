@@ -1,13 +1,7 @@
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import {
-  dimCategory,
-  dimCluster,
-  dimMerchant,
-  factClusterPoint,
-  factTransaction,
-} from "@/lib/db/schema";
+import { dimCategory, dimCluster, factClusterPoint, vwOverviewTransaction } from "@/lib/db/schema";
 import type {
   MonthRange,
   OverviewFilterOptions,
@@ -33,7 +27,11 @@ const toUniqueFilters = (values: string[] | undefined) => {
   return Array.from(new Set(normalized));
 };
 
-const inClause = (values: string[]) => sql.join(values.map((value) => sql`${value}`), sql`, `);
+const inClause = (values: string[]) =>
+  sql.join(
+    values.map((value) => sql`${value}`),
+    sql`, `,
+  );
 
 export class OverviewRepositoryDrizzle implements OverviewRepository {
   async getOverviewRawData({
@@ -56,196 +54,157 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
     const selectedBranches = toUniqueFilters(branches);
     const hasCategoryFilter = selectedCategories.length > 0;
     const hasBranchFilter = selectedBranches.length > 0;
-    const hasMerchantScopeFilter = hasCategoryFilter || hasBranchFilter;
 
-    const merchantScopeWhere = and(
-      hasCategoryFilter ? inArray(dimCategory.category, selectedCategories) : undefined,
-      hasBranchFilter ? inArray(dimCluster.branch, selectedBranches) : undefined,
-    );
-
-    const merchantScopeSubquery = db
-      .select({ merchantKey: dimMerchant.merchantKey })
-      .from(dimMerchant)
-      .innerJoin(dimCategory, eq(dimCategory.categoryId, dimMerchant.categoryId))
-      .innerJoin(dimCluster, eq(dimCluster.clusterId, dimMerchant.clusterId))
-      .where(merchantScopeWhere);
+    const buildSuccessWhere = (from: string, to: string) =>
+      and(
+        eq(vwOverviewTransaction.status, "success"),
+        gte(vwOverviewTransaction.transactionAt, from),
+        lt(vwOverviewTransaction.transactionAt, to),
+        hasCategoryFilter ? inArray(vwOverviewTransaction.category, selectedCategories) : undefined,
+        hasBranchFilter ? inArray(vwOverviewTransaction.branch, selectedBranches) : undefined,
+      );
 
     const clusterScopeSubquery = db
-      .select({ clusterId: dimCluster.clusterId })
+      .selectDistinct({ clusterId: dimCluster.clusterId })
       .from(dimCluster)
       .where(hasBranchFilter ? inArray(dimCluster.branch, selectedBranches) : undefined);
 
-    const baseWhere = and(
-      eq(factTransaction.status, "success"),
-      gte(factTransaction.transactionAt, startTs),
-      lt(factTransaction.transactionAt, endTs),
-      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
-    );
-
-    const previousWhere = and(
-      eq(factTransaction.status, "success"),
-      gte(factTransaction.transactionAt, previousStartTs),
-      lt(factTransaction.transactionAt, previousEndTs),
-      hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
-    );
+    const baseWhere = buildSuccessWhere(startTs, endTs);
+    const previousWhere = buildSuccessWhere(previousStartTs, previousEndTs);
 
     const [summary] = await db
       .select({
         totalTransaksi: sql<number>`count(*)`,
-        totalPoint: sql<number>`coalesce(sum(${factTransaction.qty} * ${factTransaction.pointRedeem}), 0)`,
-        totalRedeemer: sql<number>`count(distinct ${factTransaction.msisdn})`,
+        totalPoint: sql<number>`coalesce(sum(${vwOverviewTransaction.totalPoint}), 0)`,
+        totalRedeemer: sql<number>`count(distinct ${vwOverviewTransaction.msisdn})`,
       })
-      .from(factTransaction)
+      .from(vwOverviewTransaction)
       .where(baseWhere);
 
     const [previousSummary] = await db
       .select({
         totalTransaksi: sql<number>`count(*)`,
-        totalPoint: sql<number>`coalesce(sum(${factTransaction.qty} * ${factTransaction.pointRedeem}), 0)`,
-        totalRedeemer: sql<number>`count(distinct ${factTransaction.msisdn})`,
+        totalPoint: sql<number>`coalesce(sum(${vwOverviewTransaction.totalPoint}), 0)`,
+        totalRedeemer: sql<number>`count(distinct ${vwOverviewTransaction.msisdn})`,
       })
-      .from(factTransaction)
+      .from(vwOverviewTransaction)
       .where(previousWhere);
 
     const dailyPoints = await db
       .select({
-        date: sql<string>`date(${factTransaction.transactionAt})`,
-        value: sql<number>`coalesce(sum(${factTransaction.qty} * ${factTransaction.pointRedeem}), 0)`,
+        date: sql<string>`date(${vwOverviewTransaction.transactionAt})`,
+        value: sql<number>`coalesce(sum(${vwOverviewTransaction.totalPoint}), 0)`,
       })
-      .from(factTransaction)
+      .from(vwOverviewTransaction)
       .where(baseWhere)
-      .groupBy(sql`date(${factTransaction.transactionAt})`)
-      .orderBy(sql`date(${factTransaction.transactionAt})`);
+      .groupBy(sql`date(${vwOverviewTransaction.transactionAt})`)
+      .orderBy(sql`date(${vwOverviewTransaction.transactionAt})`);
 
     const dailyTransactions = await db
       .select({
-        date: sql<string>`date(${factTransaction.transactionAt})`,
+        date: sql<string>`date(${vwOverviewTransaction.transactionAt})`,
         value: sql<number>`count(*)`,
       })
-      .from(factTransaction)
+      .from(vwOverviewTransaction)
       .where(baseWhere)
-      .groupBy(sql`date(${factTransaction.transactionAt})`)
-      .orderBy(sql`date(${factTransaction.transactionAt})`);
+      .groupBy(sql`date(${vwOverviewTransaction.transactionAt})`)
+      .orderBy(sql`date(${vwOverviewTransaction.transactionAt})`);
 
     const dailyRedeemer = await db
       .select({
-        date: sql<string>`date(${factTransaction.transactionAt})`,
-        value: sql<number>`count(distinct ${factTransaction.msisdn})`,
+        date: sql<string>`date(${vwOverviewTransaction.transactionAt})`,
+        value: sql<number>`count(distinct ${vwOverviewTransaction.msisdn})`,
       })
-      .from(factTransaction)
+      .from(vwOverviewTransaction)
       .where(baseWhere)
-      .groupBy(sql`date(${factTransaction.transactionAt})`)
-      .orderBy(sql`date(${factTransaction.transactionAt})`);
+      .groupBy(sql`date(${vwOverviewTransaction.transactionAt})`)
+      .orderBy(sql`date(${vwOverviewTransaction.transactionAt})`);
 
     const rangeStart = addMonths(start, -(MONTHLY_WINDOW - 1));
+    const monthlyWhere = buildSuccessWhere(toSqlTimestamp(rangeStart), endTs);
+
     const monthlyTransactionsRaw = await db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
+        month: sql<string>`to_char(date_trunc('month', ${vwOverviewTransaction.transactionAt}), 'YYYY-MM')`,
         value: sql<number>`count(*)`,
       })
-      .from(factTransaction)
-      .where(
-        and(
-          eq(factTransaction.status, "success"),
-          gte(factTransaction.transactionAt, toSqlTimestamp(rangeStart)),
-          lt(factTransaction.transactionAt, endTs),
-          hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
-        ),
-      )
-      .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
-      .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt})`);
+      .from(vwOverviewTransaction)
+      .where(monthlyWhere)
+      .groupBy(sql`date_trunc('month', ${vwOverviewTransaction.transactionAt})`)
+      .orderBy(sql`date_trunc('month', ${vwOverviewTransaction.transactionAt})`);
 
     const monthlyRedeemerRaw = await db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${factTransaction.transactionAt}), 'YYYY-MM')`,
-        value: sql<number>`count(distinct ${factTransaction.msisdn})`,
+        month: sql<string>`to_char(date_trunc('month', ${vwOverviewTransaction.transactionAt}), 'YYYY-MM')`,
+        value: sql<number>`count(distinct ${vwOverviewTransaction.msisdn})`,
       })
-      .from(factTransaction)
-      .where(
-        and(
-          eq(factTransaction.status, "success"),
-          gte(factTransaction.transactionAt, toSqlTimestamp(rangeStart)),
-          lt(factTransaction.transactionAt, endTs),
-          hasMerchantScopeFilter ? inArray(factTransaction.merchantKey, merchantScopeSubquery) : undefined,
-        ),
-      )
-      .groupBy(sql`date_trunc('month', ${factTransaction.transactionAt})`)
-      .orderBy(sql`date_trunc('month', ${factTransaction.transactionAt})`);
+      .from(vwOverviewTransaction)
+      .where(monthlyWhere)
+      .groupBy(sql`date_trunc('month', ${vwOverviewTransaction.transactionAt})`)
+      .orderBy(sql`date_trunc('month', ${vwOverviewTransaction.transactionAt})`);
 
     const categoryRaw = await db
       .select({
-        name: dimCategory.category,
+        name: vwOverviewTransaction.category,
         value: sql<number>`count(*)`,
       })
-      .from(factTransaction)
-      .innerJoin(dimMerchant, eq(dimMerchant.merchantKey, factTransaction.merchantKey))
-      .innerJoin(dimCategory, eq(dimCategory.categoryId, dimMerchant.categoryId))
-      .innerJoin(dimCluster, eq(dimCluster.clusterId, dimMerchant.clusterId))
+      .from(vwOverviewTransaction)
       .where(baseWhere)
-      .groupBy(dimCategory.categoryId, dimCategory.category)
+      .groupBy(vwOverviewTransaction.category)
       .orderBy(sql`count(*) desc`);
 
     const topMerchantsRaw = await db.execute(sql`
       select
-        dm.merchant_name as merchant,
-        dcat.category as category,
-        dcl.branch as branch,
+        vt.merchant_name as merchant,
+        vt.category as category,
+        vt.branch as branch,
         count(*)::int as redeem
-      from fact_transaction ft
-      join dim_merchant dm on dm.merchant_key = ft.merchant_key
-      join dim_category dcat on dcat.category_id = dm.category_id
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      where ft.status = 'success'
-        and ft.transaction_at >= ${startTs}
-        and ft.transaction_at < ${endTs}
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      group by dm.merchant_name, dcat.category, dcl.branch
-      order by redeem desc, dm.merchant_name
-      limit 6
+      from vw_overview_transaction vt
+      where vt.status = 'success'
+        and vt.transaction_at >= ${startTs}
+        and vt.transaction_at < ${endTs}
+        ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
+      group by vt.merchant_name, vt.category, vt.branch
+      order by redeem desc, vt.merchant_name
+      limit 10
     `);
 
     const branchClusterRows = await db.execute(sql`
       select
-        dcl.branch as branch,
-        dcl.cluster as cluster,
-        count(distinct ft.merchant_key)::int as total_merchant,
-        count(distinct dm.uniq_merchant)::int as unique_merchant,
-        coalesce(sum(ft.qty * ft.point_redeem), 0)::int as total_point,
+        vt.branch as branch,
+        vt.cluster as cluster,
+        count(distinct vt.merchant_key)::int as total_merchant,
+        count(distinct vt.uniq_merchant)::int as unique_merchant,
+        coalesce(sum(vt.total_point), 0)::int as total_point,
         count(*)::int as total_transaksi,
-        count(distinct ft.msisdn)::int as unique_redeemer,
-        count(distinct ft.merchant_key)::int as merchant_aktif
-      from fact_transaction ft
-      join dim_merchant dm on dm.merchant_key = ft.merchant_key
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      join dim_category dcat on dcat.category_id = dm.category_id
-      where ft.status = 'success'
-        and ft.transaction_at >= ${startTs}
-        and ft.transaction_at < ${endTs}
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      group by dcl.branch, dcl.cluster
-      order by dcl.branch, dcl.cluster
+        count(distinct vt.msisdn)::int as unique_redeemer,
+        count(distinct vt.merchant_key)::int as merchant_aktif
+      from vw_overview_transaction vt
+      where vt.status = 'success'
+        and vt.transaction_at >= ${startTs}
+        and vt.transaction_at < ${endTs}
+        ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
+      group by vt.branch, vt.cluster
+      order by vt.branch, vt.cluster
     `);
 
     const produktifRows = await db.execute(sql`
       select branch, cluster, count(*)::int as merchant_productif
       from (
         select
-          dcl.branch as branch,
-          dcl.cluster as cluster,
-          ft.merchant_key as merchant_key,
+          vt.branch as branch,
+          vt.cluster as cluster,
+          vt.merchant_key as merchant_key,
           count(*)::int as tx_count
-        from fact_transaction ft
-        join dim_merchant dm on dm.merchant_key = ft.merchant_key
-        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-        join dim_category dcat on dcat.category_id = dm.category_id
-        where ft.status = 'success'
-          and ft.transaction_at >= ${startTs}
-          and ft.transaction_at < ${endTs}
-          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-        group by dcl.branch, dcl.cluster, ft.merchant_key
+        from vw_overview_transaction vt
+        where vt.status = 'success'
+          and vt.transaction_at >= ${startTs}
+          and vt.transaction_at < ${endTs}
+          ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
+        group by vt.branch, vt.cluster, vt.merchant_key
       ) t
       where t.tx_count >= ${PRODUCTIVE_THRESHOLD}
       group by branch, cluster
@@ -253,23 +212,20 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
 
     const categoryTableRaw = await db.execute(sql`
       select
-        dcat.category as name,
-        count(distinct ft.merchant_key)::int as total_merchant,
-        count(distinct dm.uniq_merchant)::int as unique_merchant,
-        coalesce(sum(ft.qty * ft.point_redeem), 0)::int as total_point,
+        vt.category as name,
+        count(distinct vt.merchant_key)::int as total_merchant,
+        count(distinct vt.uniq_merchant)::int as unique_merchant,
+        coalesce(sum(vt.total_point), 0)::int as total_point,
         count(*)::int as total_transaksi,
-        count(distinct ft.msisdn)::int as unique_redeemer,
-        count(distinct ft.merchant_key)::int as merchant_aktif
-      from fact_transaction ft
-      join dim_merchant dm on dm.merchant_key = ft.merchant_key
-      join dim_category dcat on dcat.category_id = dm.category_id
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      where ft.status = 'success'
-        and ft.transaction_at >= ${startTs}
-        and ft.transaction_at < ${endTs}
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      group by dcat.category
+        count(distinct vt.msisdn)::int as unique_redeemer,
+        count(distinct vt.merchant_key)::int as merchant_aktif
+      from vw_overview_transaction vt
+      where vt.status = 'success'
+        and vt.transaction_at >= ${startTs}
+        and vt.transaction_at < ${endTs}
+        ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
+      group by vt.category
       order by total_transaksi desc
     `);
 
@@ -277,19 +233,16 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       select category, count(*)::int as merchant_productif
       from (
         select
-          dcat.category as category,
-          ft.merchant_key as merchant_key,
+          vt.category as category,
+          vt.merchant_key as merchant_key,
           count(*)::int as tx_count
-        from fact_transaction ft
-        join dim_merchant dm on dm.merchant_key = ft.merchant_key
-        join dim_category dcat on dcat.category_id = dm.category_id
-        join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-        where ft.status = 'success'
-          and ft.transaction_at >= ${startTs}
-          and ft.transaction_at < ${endTs}
-          ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-          ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-        group by dcat.category, ft.merchant_key
+        from vw_overview_transaction vt
+        where vt.status = 'success'
+          and vt.transaction_at >= ${startTs}
+          and vt.transaction_at < ${endTs}
+          ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
+        group by vt.category, vt.merchant_key
       ) t
       where t.tx_count >= ${PRODUCTIVE_THRESHOLD}
       group by category
@@ -298,89 +251,81 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
     const notActiveMerchantRaw = await db.execute(sql`
       with tx as (
         select
-          ft.merchant_key as merchant_key,
-          count(*)::int as trx_count
-        from fact_transaction ft
-        where ft.status = 'success'
-          and ft.transaction_at >= ${startTs}
-          and ft.transaction_at < ${endTs}
-        group by ft.merchant_key
+          vm.merchant_key as merchant_key,
+          coalesce(sum(vm.success_tx_count), 0)::int as trx_count
+        from vw_merchant_tx_monthly_agg vm
+        where vm.month_year >= ${startDate}::date
+          and vm.month_year < ${endDate}::date
+        group by vm.merchant_key
       )
       select
-        dcl.branch as branch,
-        dm.merchant_name as merchant,
-        dm.keyword_code as keyword
-      from dim_rule dr
-      join dim_merchant dm on dm.merchant_key = dr.rule_merchant
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      join dim_category dcat on dcat.category_id = dm.category_id
-      left join tx on tx.merchant_key = dm.merchant_key
-      where dr.start_period < ${endDate}
-        and dr.end_period >= ${startDate}
+        vr.branch as branch,
+        vr.merchant_name as merchant,
+        vr.keyword_code as keyword
+      from vw_rule_merchant_dim vr
+      left join tx on tx.merchant_key = vr.merchant_key
+      where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
         and coalesce(tx.trx_count, 0) = 0
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      order by dcl.branch, dm.merchant_name
+        ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
+      order by vr.branch, vr.merchant_name
     `);
 
     const merchantPerMonthRaw = await db.execute(sql`
       with tx as (
         select
-          ft.merchant_key as merchant_key,
+          vt.merchant_key,
           count(*)::int as redeem,
-          count(distinct ft.msisdn)::int as unique_redeem
-        from fact_transaction ft
-        where ft.status = 'success'
-          and ft.transaction_at >= ${startTs}
-          and ft.transaction_at < ${endTs}
-        group by ft.merchant_key
+          count(distinct vt.msisdn)::int as unique_redeem
+        from vw_overview_transaction vt
+        where vt.status = 'success'
+          and vt.transaction_at >= ${startTs}::timestamp
+          and vt.transaction_at <  ${endTs}::timestamp
+        group by vt.merchant_key
       ),
       active_rule as (
         select
-          dr.rule_merchant as merchant_key,
-          min(dr.start_period)::date as start_period,
-          max(dr.end_period)::date as end_period,
-          max(dr.point_redeem)::int as point
-        from dim_rule dr
-        where dr.start_period < ${endDate}
-          and dr.end_period >= ${startDate}
-        group by dr.rule_merchant
+          vr.merchant_key,
+          min(vr.start_period)::date as start_period,
+          max(vr.end_period)::date as end_period,
+          max(vr.point_redeem)::int as point,
+
+          min(vr.category) as category,
+          min(vr.branch) as branch,
+          min(vr.merchant_name) as merchant_name,
+          min(vr.keyword_code) as keyword_code
+        from vw_rule_merchant_dim vr
+        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+          ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
+          ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
+        group by vr.merchant_key
       )
       select
-        dcat.category as category,
-        dcl.branch as branch,
-        dm.merchant_name as merchant,
-        dm.keyword_code as keyword,
+        ar.category as category,
+        ar.branch as branch,
+        ar.merchant_name as merchant,
+        ar.keyword_code as keyword,
         ar.start_period as start_period,
         ar.end_period as end_period,
         ar.point as point,
         coalesce(tx.redeem, 0)::int as redeem,
         coalesce(tx.unique_redeem, 0)::int as unique_redeem
       from active_rule ar
-      join dim_merchant dm on dm.merchant_key = ar.merchant_key
-      join dim_category dcat on dcat.category_id = dm.category_id
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      left join tx on tx.merchant_key = dm.merchant_key
-      where 1 = 1
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      order by redeem desc, unique_redeem desc, dm.merchant_name
+      left join tx on tx.merchant_key = ar.merchant_key
+      order by redeem desc, unique_redeem desc, ar.merchant_name
     `);
 
     const expiredMerchantRaw = await db.execute(sql`
       select
-        dcl.branch as branch,
-        dm.merchant_name as merchant,
-        dm.keyword_code as keyword
-      from dim_rule dr
-      join dim_merchant dm on dm.merchant_key = dr.rule_merchant
-      join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-      join dim_category dcat on dcat.category_id = dm.category_id
-      where dr.end_period >= ${startDate}
-        and dr.end_period < ${endDate}
-        ${hasCategoryFilter ? sql`and dcat.category in (${inClause(selectedCategories)})` : sql``}
-        ${hasBranchFilter ? sql`and dcl.branch in (${inClause(selectedBranches)})` : sql``}
-      order by dr.end_period, dcl.branch, dm.merchant_name
+        vr.branch as branch,
+        vr.merchant_name as merchant,
+        vr.keyword_code as keyword
+      from vw_rule_merchant_dim vr
+      where upper(vr.period) > ${startDate}::date
+        and upper(vr.period) <= ${endDate}::date
+        ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
+        ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
+      order by vr.end_period, vr.branch, vr.merchant_name
     `);
 
     const [clusterPointCurrent] = await db
@@ -442,7 +387,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         value: toNumber(row.value),
       })),
       categoryRaw: categoryRaw.map((row) => ({
-        name: row.name,
+        name: String(row.name ?? ""),
         value: toNumber(row.value),
       })),
       topMerchantsRaw: (topMerchantsRaw.rows as Array<Record<string, unknown>>).map((row) => ({
@@ -475,31 +420,39 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         unique_redeemer: toNumber(row.unique_redeemer),
         merchant_aktif: toNumber(row.merchant_aktif),
       })),
-      categoryProduktifRaw: (categoryProduktifRaw.rows as Array<Record<string, unknown>>).map((row) => ({
-        category: String(row.category ?? ""),
-        merchant_productif: toNumber(row.merchant_productif),
-      })),
-      notActiveMerchantRaw: (notActiveMerchantRaw.rows as Array<Record<string, unknown>>).map((row) => ({
-        branch: String(row.branch ?? ""),
-        merchant: String(row.merchant ?? ""),
-        keyword: String(row.keyword ?? ""),
-      })),
-      merchantPerMonthRaw: (merchantPerMonthRaw.rows as Array<Record<string, unknown>>).map((row) => ({
-        category: String(row.category ?? ""),
-        branch: String(row.branch ?? ""),
-        merchant: String(row.merchant ?? ""),
-        keyword: String(row.keyword ?? ""),
-        startPeriod: String(row.start_period ?? ""),
-        endPeriod: String(row.end_period ?? ""),
-        point: toNumber(row.point),
-        redeem: toNumber(row.redeem),
-        uniqueRedeem: toNumber(row.unique_redeem),
-      })),
-      expiredMerchantRaw: (expiredMerchantRaw.rows as Array<Record<string, unknown>>).map((row) => ({
-        branch: String(row.branch ?? ""),
-        merchant: String(row.merchant ?? ""),
-        keyword: String(row.keyword ?? ""),
-      })),
+      categoryProduktifRaw: (categoryProduktifRaw.rows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          category: String(row.category ?? ""),
+          merchant_productif: toNumber(row.merchant_productif),
+        }),
+      ),
+      notActiveMerchantRaw: (notActiveMerchantRaw.rows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          branch: String(row.branch ?? ""),
+          merchant: String(row.merchant ?? ""),
+          keyword: String(row.keyword ?? ""),
+        }),
+      ),
+      merchantPerMonthRaw: (merchantPerMonthRaw.rows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          category: String(row.category ?? ""),
+          branch: String(row.branch ?? ""),
+          merchant: String(row.merchant ?? ""),
+          keyword: String(row.keyword ?? ""),
+          startPeriod: String(row.start_period ?? ""),
+          endPeriod: String(row.end_period ?? ""),
+          point: toNumber(row.point),
+          redeem: toNumber(row.redeem),
+          uniqueRedeem: toNumber(row.unique_redeem),
+        }),
+      ),
+      expiredMerchantRaw: (expiredMerchantRaw.rows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          branch: String(row.branch ?? ""),
+          merchant: String(row.merchant ?? ""),
+          keyword: String(row.keyword ?? ""),
+        }),
+      ),
       clusterPointCurrent: toNumber(clusterPointCurrent?.total),
       clusterPointPrevious: toNumber(clusterPointPrevious?.total),
     };
@@ -511,10 +464,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         .selectDistinct({ value: dimCategory.category })
         .from(dimCategory)
         .orderBy(dimCategory.category),
-      db
-        .selectDistinct({ value: dimCluster.branch })
-        .from(dimCluster)
-        .orderBy(dimCluster.branch),
+      db.selectDistinct({ value: dimCluster.branch }).from(dimCluster).orderBy(dimCluster.branch),
     ]);
 
     return {

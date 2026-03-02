@@ -1,7 +1,12 @@
-import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const transactionStatus = pgEnum("transaction_status", ['success', 'failed'])
+const dateRange = customType<{ data: string; driverData: string }>({
+	dataType() {
+		return "daterange";
+	},
+});
 
 
 export const dimCategory = pgTable("dim_category", {
@@ -37,18 +42,16 @@ export const dimRule = pgTable("dim_rule", {
 	ruleKey: uuid("rule_key").primaryKey().notNull(),
 	ruleMerchant: uuid("rule_merchant").notNull(),
 	pointRedeem: integer("point_redeem").notNull(),
-	startPeriod: date("start_period").notNull(),
-	endPeriod: date("end_period").notNull(),
+	period: dateRange("period").notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).notNull(),
 }, (table) => [
-	index("dim_rule_idx_dim_rule_end_period").using("btree", table.endPeriod.asc().nullsLast().op("date_ops")),
-	index("dim_rule_index_3").using("btree", table.ruleMerchant.asc().nullsLast().op("date_ops"), table.startPeriod.asc().nullsLast().op("date_ops"), table.endPeriod.asc().nullsLast().op("uuid_ops")),
+	index("dim_rule_idx_dim_rule_merchant").using("btree", table.ruleMerchant.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.ruleMerchant],
 			foreignColumns: [dimMerchant.merchantKey],
 			name: "fk_dim_rule_rule_merchant_dim_merchant_merchant_key"
 		}),
-	check("ck_dim_rule_period_valid", sql`start_period <= end_period`),
+	check("ck_dim_rule_period_valid", sql`not isempty(period)`),
 	check("ck_dim_rule_point_positive", sql`point_redeem >= 0`),
 ]);
 
@@ -104,5 +107,58 @@ export const factClusterPoint = pgTable("fact_cluster_point", {
 			columns: [table.clusterId],
 			foreignColumns: [dimCluster.clusterId],
 			name: "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id"
-		}),
+	}),
 ]);
+
+export const vwOverviewTransaction = pgView("vw_overview_transaction", {
+	transactionKey: uuid("transaction_key"),
+	transactionAt: timestamp("transaction_at", { mode: "string" }),
+	status: transactionStatus("status"),
+	merchantKey: uuid("merchant_key"),
+	qty: integer("qty"),
+	pointRedeem: integer("point_redeem"),
+	totalPoint: bigint("total_point", { mode: "number" }),
+	msisdn: varchar("msisdn", { length: 20 }),
+	keywordCode: varchar("keyword_code", { length: 500 }),
+	merchantName: varchar("merchant_name", { length: 500 }),
+	uniqMerchant: varchar("uniq_merchant", { length: 500 }),
+	categoryId: integer("category_id"),
+	category: varchar("category", { length: 500 }),
+	clusterId: bigint("cluster_id", { mode: "number" }),
+	cluster: varchar("cluster", { length: 500 }),
+	branch: varchar("branch", { length: 500 }),
+	region: varchar("region", { length: 500 }),
+}).existing();
+
+export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {
+	ruleKey: uuid("rule_key"),
+	merchantKey: uuid("merchant_key"),
+	pointRedeem: integer("point_redeem"),
+	period: dateRange("period"),
+	startPeriod: date("start_period"),
+	endPeriod: date("end_period"),
+	merchantName: varchar("merchant_name", { length: 500 }),
+	keywordCode: varchar("keyword_code", { length: 500 }),
+	uniqMerchant: varchar("uniq_merchant", { length: 500 }),
+	clusterId: bigint("cluster_id", { mode: "number" }),
+	categoryId: integer("category_id"),
+	category: varchar("category", { length: 500 }),
+	branch: varchar("branch", { length: 500 }),
+	cluster: varchar("cluster", { length: 500 }),
+	region: varchar("region", { length: 500 }),
+}).existing();
+
+export const vwMerchantTxMonthlyAgg = pgView("vw_merchant_tx_monthly_agg", {
+	monthYear: date("month_year"),
+	merchantKey: uuid("merchant_key"),
+	category: varchar("category", { length: 500 }),
+	branch: varchar("branch", { length: 500 }),
+	cluster: varchar("cluster", { length: 500 }),
+	uniqMerchant: varchar("uniq_merchant", { length: 500 }),
+	txCount: integer("tx_count"),
+	successTxCount: integer("success_tx_count"),
+	failedTxCount: integer("failed_tx_count"),
+	uniqueRedeemer: integer("unique_redeemer"),
+	uniqueRedeemerSuccess: integer("unique_redeemer_success"),
+	totalPointSuccess: bigint("total_point_success", { mode: "number" }),
+}).existing();

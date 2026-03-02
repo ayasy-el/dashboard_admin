@@ -1,0 +1,863 @@
+{
+  "id": "d1efbe94-5208-47bb-8bb8-9fd851448365",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.dim_category": {
+      "name": "dim_category",
+      "schema": "",
+      "columns": {
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dim_cluster": {
+      "name": "dim_cluster",
+      "schema": "",
+      "columns": {
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "cluster": {
+          "name": "cluster",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "branch": {
+          "name": "branch",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dim_merchant": {
+      "name": "dim_merchant",
+      "schema": "",
+      "columns": {
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "keyword_code": {
+          "name": "keyword_code",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "merchant_name": {
+          "name": "merchant_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uniq_merchant": {
+          "name": "uniq_merchant",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "dim_merchant_idx_dim_merchant_category_id": {
+          "name": "dim_merchant_idx_dim_merchant_category_id",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dim_merchant_idx_dim_merchant_cluster_id": {
+          "name": "dim_merchant_idx_dim_merchant_cluster_id",
+          "columns": [
+            {
+              "expression": "cluster_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int8_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_dim_merchant_category_id_dim_category_category_id": {
+          "name": "fk_dim_merchant_category_id_dim_category_category_id",
+          "tableFrom": "dim_merchant",
+          "tableTo": "dim_category",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_dim_merchant_cluster_id_dim_cluster_cluster_id": {
+          "name": "fk_dim_merchant_cluster_id_dim_cluster_cluster_id",
+          "tableFrom": "dim_merchant",
+          "tableTo": "dim_cluster",
+          "columnsFrom": [
+            "cluster_id"
+          ],
+          "columnsTo": [
+            "cluster_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "dim_merchant_keyword_code_key": {
+          "name": "dim_merchant_keyword_code_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "keyword_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dim_rule": {
+      "name": "dim_rule",
+      "schema": "",
+      "columns": {
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rule_merchant": {
+          "name": "rule_merchant",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_period": {
+          "name": "start_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_period": {
+          "name": "end_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "dim_rule_idx_dim_rule_end_period": {
+          "name": "dim_rule_idx_dim_rule_end_period",
+          "columns": [
+            {
+              "expression": "end_period",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dim_rule_index_3": {
+          "name": "dim_rule_index_3",
+          "columns": [
+            {
+              "expression": "rule_merchant",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            },
+            {
+              "expression": "start_period",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            },
+            {
+              "expression": "end_period",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_dim_rule_rule_merchant_dim_merchant_merchant_key": {
+          "name": "fk_dim_rule_rule_merchant_dim_merchant_merchant_key",
+          "tableFrom": "dim_rule",
+          "tableTo": "dim_merchant",
+          "columnsFrom": [
+            "rule_merchant"
+          ],
+          "columnsTo": [
+            "merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_dim_rule_period_valid": {
+          "name": "ck_dim_rule_period_valid",
+          "value": "start_period <= end_period"
+        },
+        "ck_dim_rule_point_positive": {
+          "name": "ck_dim_rule_point_positive",
+          "value": "point_redeem >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fact_cluster_point": {
+      "name": "fact_cluster_point",
+      "schema": "",
+      "columns": {
+        "point_key": {
+          "name": "point_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "month_year": {
+          "name": "month_year",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_point": {
+          "name": "total_point",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "point_owner": {
+          "name": "point_owner",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fact_cluster_point_idx_fcp_month_cluster": {
+          "name": "fact_cluster_point_idx_fcp_month_cluster",
+          "columns": [
+            {
+              "expression": "month_year",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            },
+            {
+              "expression": "cluster_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id": {
+          "name": "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id",
+          "tableFrom": "fact_cluster_point",
+          "tableTo": "dim_cluster",
+          "columnsFrom": [
+            "cluster_id"
+          ],
+          "columnsTo": [
+            "cluster_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fact_transaction": {
+      "name": "fact_transaction",
+      "schema": "",
+      "columns": {
+        "transaction_key": {
+          "name": "transaction_key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "transaction_at": {
+          "name": "transaction_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "transaction_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qty": {
+          "name": "qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "msisdn": {
+          "name": "msisdn",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fact_transaction_idx_ft_merchant_status_time": {
+          "name": "fact_transaction_idx_ft_merchant_status_time",
+          "columns": [
+            {
+              "expression": "merchant_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "timestamp_ops"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "enum_ops"
+            },
+            {
+              "expression": "transaction_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "enum_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_index_6": {
+          "name": "fact_transaction_index_6",
+          "columns": [
+            {
+              "expression": "msisdn",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fact_transaction_rule": {
+          "name": "fact_transaction_rule",
+          "columns": [
+            {
+              "expression": "rule_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_fact_transaction_merchant_key_dim_merchant_merchant_key": {
+          "name": "fk_fact_transaction_merchant_key_dim_merchant_merchant_key",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_merchant",
+          "columnsFrom": [
+            "merchant_key"
+          ],
+          "columnsTo": [
+            "merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_fact_transaction_rule_key_dim_rule_rule_key": {
+          "name": "fk_fact_transaction_rule_key_dim_rule_rule_key",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_rule",
+          "columnsFrom": [
+            "rule_key"
+          ],
+          "columnsTo": [
+            "rule_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_fact_transaction_qty_valid": {
+          "name": "ck_fact_transaction_qty_valid",
+          "value": "qty >= 1"
+        },
+        "ck_fact_transaction_point_positive": {
+          "name": "ck_fact_transaction_point_positive",
+          "value": "point_redeem >= 0"
+        },
+        "ck_fact_transaction_msisdn_digits": {
+          "name": "ck_fact_transaction_msisdn_digits",
+          "value": "(msisdn)::text ~ '^[0-9]{8,20}$'::text"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.transaction_status": {
+      "name": "transaction_status",
+      "schema": "public",
+      "values": [
+        "success",
+        "failed"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {
+    "public.vw_merchant_tx_monthly_agg": {
+      "columns": {
+        "month_year": {
+          "name": "month_year",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch": {
+          "name": "branch",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster": {
+          "name": "cluster",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uniq_merchant": {
+          "name": "uniq_merchant",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_count": {
+          "name": "tx_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "success_tx_count": {
+          "name": "success_tx_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_tx_count": {
+          "name": "failed_tx_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unique_redeemer": {
+          "name": "unique_redeemer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unique_redeemer_success": {
+          "name": "unique_redeemer_success",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_point_success": {
+          "name": "total_point_success",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "vw_merchant_tx_monthly_agg",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.vw_overview_transaction": {
+      "columns": {
+        "transaction_key": {
+          "name": "transaction_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transaction_at": {
+          "name": "transaction_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "transaction_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qty": {
+          "name": "qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_point": {
+          "name": "total_point",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "msisdn": {
+          "name": "msisdn",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "keyword_code": {
+          "name": "keyword_code",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merchant_name": {
+          "name": "merchant_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uniq_merchant": {
+          "name": "uniq_merchant",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster": {
+          "name": "cluster",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch": {
+          "name": "branch",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "vw_overview_transaction",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.vw_rule_merchant_dim": {
+      "columns": {
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merchant_key": {
+          "name": "merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "point_redeem": {
+          "name": "point_redeem",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_period": {
+          "name": "start_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_period": {
+          "name": "end_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merchant_name": {
+          "name": "merchant_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "keyword_code": {
+          "name": "keyword_code",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uniq_merchant": {
+          "name": "uniq_merchant",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch": {
+          "name": "branch",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster": {
+          "name": "cluster",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "vw_rule_merchant_dim",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    }
+  },
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
