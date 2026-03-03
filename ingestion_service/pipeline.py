@@ -654,6 +654,47 @@ def load_data(batch_id: str) -> int:
         elif dataset == "transactions":
             cur.execute(
                 """
+                with joined as (
+                    select
+                        c.transaction_at,
+                        c.keyword,
+                        c.msisdn,
+                        c.qty,
+                        c.status::transaction_status as status
+                    from stg.transactions_clean c
+                    join public.dim_merchant m on m.keyword_code = c.keyword
+                    join public.dim_rule r
+                      on r.rule_merchant = m.merchant_key
+                     and r.period @> c.transaction_at::date
+                    where c.batch_id = %s::uuid
+                )
+                select count(*) as skipped_duplicates
+                from joined j
+                where exists (
+                    select 1
+                    from public.fact_transaction ft
+                    where ft.transaction_at = j.transaction_at
+                      and ft.status = j.status
+                      and ft.qty = j.qty
+                      and ft.msisdn = j.msisdn
+                      and ft.merchant_key in (
+                          select merchant_key from public.dim_merchant where keyword_code = j.keyword
+                      )
+                )
+                """,
+                (batch_id,),
+            )
+            dup_row = cur.fetchone()
+            skipped_duplicates = int(dup_row["skipped_duplicates"] or 0)
+            if skipped_duplicates > 0:
+                logger.warning(
+                    "TRANSACTIONS DEDUP_CROSS_BATCH batch_id=%s skipped_duplicates=%s",
+                    batch_id,
+                    skipped_duplicates,
+                )
+
+            cur.execute(
+                """
                 insert into stg.rejected_rows
                   (batch_id, dataset, row_num, error_type, error_message, raw_payload)
                 select c.batch_id, 'transactions', c.row_num,
@@ -686,6 +727,16 @@ def load_data(batch_id: str) -> int:
                   on r.rule_merchant = m.merchant_key
                  and r.period @> c.transaction_at::date
                 where c.batch_id = %s::uuid
+                  and not exists (
+                    select 1
+                    from public.fact_transaction ft
+                    where ft.transaction_at = c.transaction_at
+                      and ft.rule_key = r.rule_key
+                      and ft.merchant_key = m.merchant_key
+                      and ft.status = c.status::transaction_status
+                      and ft.qty = c.qty
+                      and ft.msisdn = c.msisdn
+                  )
                 on conflict (transaction_key) do update
                 set transaction_at = excluded.transaction_at,
                     rule_key = excluded.rule_key,
