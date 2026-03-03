@@ -357,18 +357,18 @@ export default function IngestionPage() {
 
   return (
     <DashboardPageShell sidebarWidth="16rem">
-      <div className="mx-4 grid gap-4">
-        <Card>
-          <CardHeader>
+      <div className="grid min-w-0 gap-4 px-4 lg:px-6">
+        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+          <CardHeader className="border-b px-6 py-5">
             <CardTitle>CSV Ingestion Admin</CardTitle>
             <CardDescription>
               Upload CSV, monitor status batch, lihat conflict/error/rejected, lalu pilih Ignore atau Solve & Apply.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <CardContent className="grid gap-3 px-6 py-5">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto_auto] lg:items-center">
               <select
-                className="h-9 rounded-md border px-3 text-sm"
+                className="h-10 w-full rounded-md border px-3 text-sm"
                 value={dataset}
                 onChange={(e) => setDataset(e.target.value as Dataset)}
                 disabled={busy}
@@ -379,11 +379,17 @@ export default function IngestionPage() {
                   </option>
                 ))}
               </select>
-              <Input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} />
-              <Button onClick={onUpload} disabled={busy || !file}>
+              <Input
+                type="file"
+                accept=".csv"
+                className="h-10 w-full"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                disabled={busy}
+              />
+              <Button className="h-10 w-full sm:w-auto" onClick={onUpload} disabled={busy || !file}>
                 {busy ? "Processing..." : "Upload & Run"}
               </Button>
-              <Button variant="outline" onClick={() => void refreshAll()} disabled={busy}>
+              <Button className="h-10 w-full sm:w-auto" variant="outline" onClick={() => void refreshAll()} disabled={busy}>
                 Refresh
               </Button>
             </div>
@@ -392,8 +398,8 @@ export default function IngestionPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+          <CardHeader className="border-b px-6 py-5">
             <CardTitle>Batch Monitoring</CardTitle>
           </CardHeader>
           <CardContent>
@@ -428,7 +434,8 @@ export default function IngestionPage() {
                       <td className="p-2">{(Number(batch.reject_rate || 0) * 100).toFixed(2)}%</td>
                       <td className="p-2">
                         <Button
-                          size="xs"
+                          size="sm"
+                          className="h-9 min-w-20"
                           variant="outline"
                           disabled={busy || !RERUN_ALLOWED_STATUSES.has(batch.status)}
                           onClick={(e) => {
@@ -447,8 +454,8 @@ export default function IngestionPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+          <CardHeader className="border-b px-6 py-5">
             <CardTitle>Issue Resolution</CardTitle>
             <CardDescription>
               {batchDetail
@@ -456,16 +463,17 @@ export default function IngestionPage() {
                 : "Pilih batch untuk melihat detail conflict/error/rejected."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="mb-3 grid gap-2 md:grid-cols-3">
+          <CardContent className="px-6 py-5">
+            <div className="mb-3 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <Input
                 placeholder="Cari row/type/error..."
+                className="h-10"
                 value={issueSearch}
                 onChange={(e) => setIssueSearch(e.target.value)}
                 disabled={busy}
               />
               <select
-                className="h-9 rounded-md border px-3 text-sm"
+                className="h-10 w-full rounded-md border px-3 text-sm"
                 value={issueTypeFilter}
                 onChange={(e) => setIssueTypeFilter(e.target.value)}
                 disabled={busy}
@@ -477,7 +485,7 @@ export default function IngestionPage() {
                 ))}
               </select>
               <select
-                className="h-9 rounded-md border px-3 text-sm"
+                className="h-10 w-full rounded-md border px-3 text-sm"
                 value={issueSolveFilter}
                 onChange={(e) => setIssueSolveFilter(e.target.value)}
                 disabled={busy}
@@ -487,11 +495,22 @@ export default function IngestionPage() {
                 <option value="MANUAL">Manual Required</option>
               </select>
             </div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Button size="xs" variant="outline" disabled={busy || selectedRejectedIds.length === 0} onClick={() => void onBulkIgnore()}>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                size="sm"
+                className="h-10 w-full sm:w-auto"
+                variant="outline"
+                disabled={busy || selectedRejectedIds.length === 0}
+                onClick={() => void onBulkIgnore()}
+              >
                 Ignore Selected ({selectedRejectedIds.length})
               </Button>
-              <Button size="xs" disabled={busy || selectedRejectedIds.length === 0} onClick={() => void onBulkSolve()}>
+              <Button
+                size="sm"
+                className="h-10 w-full sm:w-auto"
+                disabled={busy || selectedRejectedIds.length === 0}
+                onClick={() => void onBulkSolve()}
+              >
                 Solve Selected
               </Button>
             </div>
@@ -500,8 +519,8 @@ export default function IngestionPage() {
                 {batchDetail.failed_reason}
               </div>
             ) : null}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="no-scrollbar overflow-x-auto">
+              <table className="min-w-[1120px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
                     <th className="p-2">
@@ -606,12 +625,19 @@ export default function IngestionPage() {
                         </td>
                         <td className="p-2 max-w-[22rem] break-words text-muted-foreground">{resolveSuggestion(row)}</td>
                         <td className="p-2">
-                          <div className="flex gap-2">
-                            <Button size="xs" variant="outline" disabled={busy} onClick={() => void onIgnore(row.id)}>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button
+                              size="sm"
+                              className="h-9 w-full sm:w-auto"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => void onIgnore(row.id)}
+                            >
                               Ignore
                             </Button>
                             <Button
-                              size="xs"
+                              size="sm"
+                              className="h-9 w-full sm:w-auto"
                               disabled={busy || !row.resolution?.can_solve}
                               onClick={() => void onSolve(row.id)}
                               title={row.resolution?.can_solve ? "Apply solve ke database" : row.resolution?.help ?? "Tidak bisa auto-solve"}
