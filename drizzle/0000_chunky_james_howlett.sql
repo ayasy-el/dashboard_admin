@@ -64,8 +64,8 @@ ALTER TABLE "fact_transaction" ADD CONSTRAINT "fk_fact_transaction_rule_key_dim_
 CREATE INDEX "dim_merchant_idx_dim_merchant_category_id" ON "dim_merchant" USING btree ("category_id" int4_ops);--> statement-breakpoint
 CREATE INDEX "dim_merchant_idx_dim_merchant_cluster_id" ON "dim_merchant" USING btree ("cluster_id" int8_ops);--> statement-breakpoint
 CREATE INDEX "dim_rule_idx_dim_rule_end_period" ON "dim_rule" USING btree ("end_period" date_ops);--> statement-breakpoint
-CREATE INDEX "dim_rule_index_3" ON "dim_rule" USING btree ("rule_merchant" date_ops,"start_period" date_ops,"end_period" uuid_ops);--> statement-breakpoint
-CREATE INDEX "fact_cluster_point_idx_fcp_month_cluster" ON "fact_cluster_point" USING btree ("month_year" date_ops,"cluster_id" date_ops);--> statement-breakpoint
-CREATE INDEX "fact_transaction_idx_ft_merchant_status_time" ON "fact_transaction" USING btree ("merchant_key" timestamp_ops,"status" enum_ops,"transaction_at" enum_ops);--> statement-breakpoint
+CREATE INDEX "dim_rule_index_3" ON "dim_rule" USING btree ("rule_merchant" uuid_ops,"start_period" date_ops,"end_period" date_ops);--> statement-breakpoint
+CREATE INDEX "fact_cluster_point_idx_fcp_month_cluster" ON "fact_cluster_point" USING btree ("month_year" date_ops,"cluster_id" int8_ops);--> statement-breakpoint
+CREATE INDEX "fact_transaction_idx_ft_merchant_status_time" ON "fact_transaction" USING btree ("merchant_key" uuid_ops,"status" enum_ops,"transaction_at" timestamp_ops);--> statement-breakpoint
 CREATE INDEX "fact_transaction_index_6" ON "fact_transaction" USING btree ("msisdn" text_ops);--> statement-breakpoint
 CREATE INDEX "fact_transaction_rule" ON "fact_transaction" USING btree ("rule_key" uuid_ops);

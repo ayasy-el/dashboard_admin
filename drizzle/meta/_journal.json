@@ -8,6 +8,34 @@
       "when": 1772078519302,
       "tag": "0000_chunky_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772078519303,
+      "tag": "0001_overview_transaction_view",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772078519304,
+      "tag": "0002_rule_and_monthly_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772078519305,
+      "tag": "0003_dim_rule_daterange",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772078519306,
+      "tag": "0004_ingestion_service",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,7 @@
 begin;
 
+create extension if not exists btree_gist;
+
 drop view if exists vw_merchant_tx_monthly_agg;
 drop view if exists vw_rule_merchant_dim;
 

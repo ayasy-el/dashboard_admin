@@ -1,4 +1,4 @@
-import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType } from "drizzle-orm/pg-core"
+import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType, pgSchema, text, numeric, jsonb, bigserial, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const transactionStatus = pgEnum("transaction_status", ['success', 'failed'])
@@ -66,7 +66,7 @@ export const factTransaction = pgTable("fact_transaction", {
 	msisdn: varchar({ length: 20 }).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).notNull(),
 }, (table) => [
-	index("fact_transaction_idx_ft_merchant_status_time").using("btree", table.merchantKey.asc().nullsLast().op("timestamp_ops"), table.status.asc().nullsLast().op("enum_ops"), table.transactionAt.asc().nullsLast().op("enum_ops")),
+	index("fact_transaction_idx_ft_merchant_status_time").using("btree", table.merchantKey.asc().nullsLast().op("uuid_ops"), table.status.asc().nullsLast().op("enum_ops"), table.transactionAt.asc().nullsLast().op("timestamp_ops")),
 	index("fact_transaction_index_6").using("btree", table.msisdn.asc().nullsLast().op("text_ops")),
 	index("fact_transaction_rule").using("btree", table.ruleKey.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
@@ -102,12 +102,158 @@ export const factClusterPoint = pgTable("fact_cluster_point", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	pointOwner: bigint("point_owner", { mode: "number" }).notNull(),
 }, (table) => [
-	index("fact_cluster_point_idx_fcp_month_cluster").using("btree", table.monthYear.asc().nullsLast().op("date_ops"), table.clusterId.asc().nullsLast().op("date_ops")),
+	index("fact_cluster_point_idx_fcp_month_cluster").using("btree", table.monthYear.asc().nullsLast().op("date_ops"), table.clusterId.asc().nullsLast().op("int8_ops")),
 	foreignKey({
 			columns: [table.clusterId],
 			foreignColumns: [dimCluster.clusterId],
 			name: "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id"
 	}),
+]);
+
+const auditSchema = pgSchema("audit");
+const stgSchema = pgSchema("stg");
+
+export const auditBatches = auditSchema.table("batches", {
+	batchId: uuid("batch_id").defaultRandom().primaryKey().notNull(),
+	dataset: text("dataset").notNull(),
+	status: text("status").notNull(),
+	sourceFile: text("source_file").notNull(),
+	failedStep: text("failed_step"),
+	failedReason: text("failed_reason"),
+	totalRows: integer("total_rows").default(0).notNull(),
+	loadedRows: integer("loaded_rows").default(0).notNull(),
+	rejectedRows: integer("rejected_rows").default(0).notNull(),
+	rejectRate: numeric("reject_rate", { precision: 8, scale: 6 }).default("0").notNull(),
+	runCount: integer("run_count").default(0).notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_batches_dataset_status").on(table.dataset, table.status),
+	index("idx_batches_created_at").on(table.createdAt),
+]);
+
+export const stgRejectedRows = stgSchema.table("rejected_rows", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	dataset: text("dataset").notNull(),
+	rowNum: integer("row_num").notNull(),
+	errorType: text("error_type").notNull(),
+	errorMessage: text("error_message").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_rejected_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgListKotaRaw = stgSchema.table("list_kota_raw", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_list_kota_raw_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgMasterRaw = stgSchema.table("master_raw", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_master_raw_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgTransactionsRaw = stgSchema.table("transactions_raw", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_transactions_raw_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgTotalPointRaw = stgSchema.table("total_point_raw", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_total_point_raw_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgListKotaClean = stgSchema.table("list_kota_clean", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	region: text("region").notNull(),
+	branch: text("branch").notNull(),
+	cluster: text("cluster").notNull(),
+	clusterId: bigint("cluster_id", { mode: "number" }).notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_list_kota_clean_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgMasterClean = stgSchema.table("master_clean", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	uniqMerchant: text("uniq_merchant").notNull(),
+	merchantName: text("merchant_name").notNull(),
+	keyword: text("keyword").notNull(),
+	category: text("category").notNull(),
+	pointRedeem: integer("point_redeem").notNull(),
+	startPeriod: date("start_period").notNull(),
+	endPeriod: date("end_period").notNull(),
+	region: text("region").notNull(),
+	branch: text("branch").notNull(),
+	cluster: text("cluster").notNull(),
+	merchantKey: uuid("merchant_key").notNull(),
+	categoryId: integer("category_id").notNull(),
+	clusterId: bigint("cluster_id", { mode: "number" }).notNull(),
+	ruleKey: uuid("rule_key").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_master_clean_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgTransactionsClean = stgSchema.table("transactions_clean", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	transactionKey: uuid("transaction_key").notNull(),
+	transactionAt: timestamp("transaction_at", { mode: "string" }).notNull(),
+	keyword: text("keyword").notNull(),
+	msisdn: text("msisdn").notNull(),
+	qty: integer("qty").notNull(),
+	status: text("status").notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_transactions_clean_batch").on(table.batchId, table.rowNum),
+]);
+
+export const stgTotalPointClean = stgSchema.table("total_point_clean", {
+	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
+	batchId: uuid("batch_id").notNull(),
+	rowNum: integer("row_num").notNull(),
+	pointKey: uuid("point_key").notNull(),
+	cluster: text("cluster").notNull(),
+	clusterId: bigint("cluster_id", { mode: "number" }).notNull(),
+	monthYear: date("month_year").notNull(),
+	totalPoint: bigint("total_point", { mode: "number" }).notNull(),
+	pointOwner: bigint("point_owner", { mode: "number" }).notNull(),
+	rawPayload: jsonb("raw_payload").notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_total_point_clean_batch").on(table.batchId, table.rowNum),
+	uniqueIndex("total_point_clean_batch_row_month_unique").on(table.batchId, table.rowNum, table.monthYear),
 ]);
 
 export const vwOverviewTransaction = pgView("vw_overview_transaction", {
