@@ -3,9 +3,11 @@ from __future__ import annotations
 import csv
 import logging
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from psycopg import errors
 from psycopg import sql
 from psycopg.types.json import Json
 
@@ -49,6 +51,107 @@ class BatchMetrics:
     total_rows: int
     loaded_rows: int
     rejected_rows: int
+
+
+def _iso_date(value: Any) -> str | None:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value) if value is not None else None
+
+
+def _build_master_load_error(cur, row: dict[str, Any], exc: Exception) -> tuple[str, str, dict[str, Any]]:
+    payload = dict(row.get("raw_payload") or {})
+    payload["__incoming"] = {
+        "merchant_key": str(row.get("merchant_key")),
+        "keyword": str(payload.get("keyword") or ""),
+        "merchant_name": str(payload.get("merchant_name") or ""),
+        "uniq_merchant": str(payload.get("uniq_merchant") or ""),
+        "category": str(payload.get("category") or ""),
+        "cluster": str(payload.get("cluster") or ""),
+        "point_redeem": int(row.get("point_redeem") or 0),
+        "start_period": _iso_date(row.get("start_period")),
+        "end_period": _iso_date(row.get("end_period")),
+    }
+
+    if isinstance(exc, errors.ExclusionViolation):
+        constraint = getattr(getattr(exc, "diag", None), "constraint_name", "")
+        if constraint == "ex_dim_rule_no_overlap":
+            cur.execute(
+                """
+                select
+                    rule_key::text as rule_key,
+                    rule_merchant::text as rule_merchant,
+                    dm.keyword_code as keyword,
+                    dm.merchant_name,
+                    dm.uniq_merchant,
+                    point_redeem,
+                    lower(period)::date as start_period,
+                    (upper(period) - interval '1 day')::date as end_period
+                from public.dim_rule
+                join public.dim_merchant dm on dm.merchant_key = dim_rule.rule_merchant
+                where rule_merchant = %s
+                  and period && daterange(%s::date, (%s::date + 1), '[)')
+                order by lower(period) asc
+                limit 5
+                """,
+                (row["merchant_key"], row["start_period"], row["end_period"]),
+            )
+            conflicts = cur.fetchall()
+            existing = [
+                {
+                    "rule_key": c["rule_key"],
+                    "rule_merchant": c["rule_merchant"],
+                    "keyword": c["keyword"],
+                    "merchant_name": c["merchant_name"],
+                    "uniq_merchant": c["uniq_merchant"],
+                    "point_redeem": int(c["point_redeem"] or 0),
+                    "start_period": _iso_date(c["start_period"]),
+                    "end_period": _iso_date(c["end_period"]),
+                }
+                for c in conflicts
+            ]
+            payload["__conflict"] = {
+                "kind": "RULE_PERIOD_OVERLAP",
+                "constraint": constraint,
+                "incoming": payload["__incoming"],
+                "existing": existing,
+                "can_auto_solve": any(
+                    item["start_period"] == payload["__incoming"]["start_period"]
+                    and item["end_period"] == payload["__incoming"]["end_period"]
+                    for item in existing
+                ),
+            }
+            message = (
+                "Konflik rule period (overlap). "
+                "Bandingkan incoming vs existing, lalu pilih Ignore atau Solve jika period sama persis."
+            )
+            return "CONFLICT_OVERLAP", message, payload
+
+    if isinstance(exc, errors.ForeignKeyViolation):
+        payload["__conflict"] = {
+            "kind": "FK_VIOLATION",
+            "constraint": getattr(getattr(exc, "diag", None), "constraint_name", ""),
+            "incoming": payload["__incoming"],
+            "can_auto_solve": False,
+        }
+        message = (
+            "Referensi foreign key tidak valid. Data dependency belum ada "
+            "(contoh merchant/rule/cluster). Upload data referensi dulu lalu rerun."
+        )
+        return "FK_MISSING", message, payload
+
+    message = str(exc)
+    if "end_period lebih pendek" in message.lower():
+        payload["__conflict"] = {
+            "kind": "RULE_PERIOD_SHORTER",
+            "incoming": payload["__incoming"],
+            "can_auto_solve": False,
+        }
+        return "BUSINESS_RULE", message, payload
+
+    return "LOAD_ERROR", message, payload
 
 
 
@@ -641,58 +744,18 @@ def load_data(batch_id: str) -> int:
                 except Exception as exc:
                     cur.execute(sql.SQL("rollback to savepoint {};").format(sql.Identifier(savepoint)))
                     cur.execute(sql.SQL("release savepoint {};").format(sql.Identifier(savepoint)))
+                    error_type, error_message, error_payload = _build_master_load_error(cur, row, exc)
                     _insert_rejected(
                         cur,
                         batch_id=batch_id,
                         dataset=dataset,
                         row_num=row["row_num"],
-                        error_type="LOAD_ERROR",
-                        error_message=str(exc),
-                        raw_payload=row["raw_payload"],
+                        error_type=error_type,
+                        error_message=error_message,
+                        raw_payload=error_payload,
                     )
 
         elif dataset == "transactions":
-            cur.execute(
-                """
-                with joined as (
-                    select
-                        c.transaction_at,
-                        c.keyword,
-                        c.msisdn,
-                        c.qty,
-                        c.status::transaction_status as status
-                    from stg.transactions_clean c
-                    join public.dim_merchant m on m.keyword_code = c.keyword
-                    join public.dim_rule r
-                      on r.rule_merchant = m.merchant_key
-                     and r.period @> c.transaction_at::date
-                    where c.batch_id = %s::uuid
-                )
-                select count(*) as skipped_duplicates
-                from joined j
-                where exists (
-                    select 1
-                    from public.fact_transaction ft
-                    where ft.transaction_at = j.transaction_at
-                      and ft.status = j.status
-                      and ft.qty = j.qty
-                      and ft.msisdn = j.msisdn
-                      and ft.merchant_key in (
-                          select merchant_key from public.dim_merchant where keyword_code = j.keyword
-                      )
-                )
-                """,
-                (batch_id,),
-            )
-            dup_row = cur.fetchone()
-            skipped_duplicates = int(dup_row["skipped_duplicates"] or 0)
-            if skipped_duplicates > 0:
-                logger.warning(
-                    "TRANSACTIONS DEDUP_CROSS_BATCH batch_id=%s skipped_duplicates=%s",
-                    batch_id,
-                    skipped_duplicates,
-                )
-
             cur.execute(
                 """
                 insert into stg.rejected_rows
@@ -715,6 +778,53 @@ def load_data(batch_id: str) -> int:
                 (batch_id,),
             )
 
+            # Recalculate point_redeem for matching transactions from older batches.
+            cur.execute(
+                """
+                with resolved as (
+                    select
+                        c.transaction_key,
+                        c.transaction_at,
+                        m.merchant_key,
+                        c.status::transaction_status as status,
+                        c.qty,
+                        c.msisdn,
+                        r.rule_key,
+                        r.point_redeem
+                    from stg.transactions_clean c
+                    join public.dim_merchant m on m.keyword_code = c.keyword
+                    join public.dim_rule r
+                      on r.rule_merchant = m.merchant_key
+                     and r.period @> c.transaction_at::date
+                    where c.batch_id = %s::uuid
+                )
+                update public.fact_transaction ft
+                set rule_key = rs.rule_key,
+                    merchant_key = rs.merchant_key,
+                    point_redeem = rs.point_redeem
+                from resolved rs
+                where ft.transaction_at = rs.transaction_at
+                  and ft.merchant_key = rs.merchant_key
+                  and ft.status = rs.status
+                  and ft.qty = rs.qty
+                  and ft.msisdn = rs.msisdn
+                  and ft.transaction_key <> rs.transaction_key
+                  and (
+                    ft.rule_key is distinct from rs.rule_key
+                    or ft.point_redeem is distinct from rs.point_redeem
+                    or ft.merchant_key is distinct from rs.merchant_key
+                  )
+                """,
+                (batch_id,),
+            )
+            refreshed_rows = cur.rowcount
+            if refreshed_rows > 0:
+                logger.info(
+                    "TRANSACTIONS RECALCULATED_CROSS_BATCH batch_id=%s refreshed_rows=%s",
+                    batch_id,
+                    refreshed_rows,
+                )
+
             cur.execute(
                 """
                 insert into public.fact_transaction
@@ -731,7 +841,6 @@ def load_data(batch_id: str) -> int:
                     select 1
                     from public.fact_transaction ft
                     where ft.transaction_at = c.transaction_at
-                      and ft.rule_key = r.rule_key
                       and ft.merchant_key = m.merchant_key
                       and ft.status = c.status::transaction_status
                       and ft.qty = c.qty
@@ -748,7 +857,7 @@ def load_data(batch_id: str) -> int:
                 """,
                 (batch_id,),
             )
-            loaded = cur.rowcount
+            loaded = refreshed_rows + cur.rowcount
 
         elif dataset == "total_point":
             # dim_cluster is managed only by list_kota ingestion.

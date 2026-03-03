@@ -7,8 +7,10 @@ FastAPI service untuk upload CSV, trigger pipeline ingestion, monitoring batch, 
 - `POST /ingest/{dataset}` upload CSV + create batch + trigger Prefect flow
 - `GET /ingest/{batch_id}` status batch dan metrics
 - `GET /ingest` list batch (filter `dataset`, `status`)
-- `POST /ingest/{batch_id}/rerun` rerun batch gagal
+- `POST /ingest/{batch_id}/rerun` buat batch baru dari source file yang sama, lalu jalankan ingestion
 - `GET /ingest/{batch_id}/rejected` list rejected rows
+- `POST /ingest/{batch_id}/rejected/{rejected_id}/ignore` ignore rejected row
+- `POST /ingest/{batch_id}/rejected/{rejected_id}/solve` solve + apply (default tidak rerun, pakai `?rerun=true` jika ingin rerun)
 
 Dataset yang didukung:
 
@@ -37,6 +39,7 @@ Isi nilainya sesuai environment:
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
 INGEST_UPLOAD_DIR=./ingestion_service/uploads
 INGEST_REJECT_THRESHOLD=0.2
+INGEST_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 3. Jalankan API:
@@ -54,3 +57,19 @@ Flow ada di `ingestion_service/flows.py` (`csv-ingestion`):
 - business logic tetap di `ingestion_service/pipeline.py`
 
 Untuk observability UI Prefect, jalankan worker/server Prefect sesuai environment Anda.
+
+## Catatan `Solve & Apply`
+
+- Tidak semua error bisa auto-solve.
+- Auto-solve saat ini hanya untuk conflict `dim_rule` overlap dengan period yang sama persis:
+  - sistem akan update `point_redeem` di rule existing
+  - lalu hapus rejected row dan rerun batch
+- Error FK/dependency (merchant/cluster/rule tidak ditemukan) tetap butuh perbaikan data referensi terlebih dahulu.
+
+## Integrasi Dashboard (Next.js)
+
+Set env di aplikasi dashboard:
+
+```env
+NEXT_PUBLIC_INGESTION_API_URL=http://127.0.0.1:8001
+```

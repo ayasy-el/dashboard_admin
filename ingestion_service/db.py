@@ -35,6 +35,25 @@ def create_batch(dataset: str, source_file: Path) -> str:
         return row["batch_id"]
 
 
+def create_rerun_batch(source_batch_id: str) -> str:
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into audit.batches (dataset, status, source_file)
+            select dataset, 'UPLOADED', source_file
+            from audit.batches
+            where batch_id = %s::uuid
+            returning batch_id::text
+            """,
+            (source_batch_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"Batch not found: {source_batch_id}")
+        conn.commit()
+        return row["batch_id"]
+
+
 def get_batch(batch_id: str) -> dict[str, Any] | None:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
@@ -136,3 +155,31 @@ def get_rejected_rows(batch_id: str) -> list[dict[str, Any]]:
             (batch_id,),
         )
         return cur.fetchall()
+
+
+def get_rejected_row(batch_id: str, rejected_id: int) -> dict[str, Any] | None:
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            select id, batch_id::text as batch_id, dataset, row_num,
+                   error_type, error_message, raw_payload, created_at
+            from stg.rejected_rows
+            where batch_id = %s::uuid and id = %s
+            """,
+            (batch_id, rejected_id),
+        )
+        return cur.fetchone()
+
+
+def delete_rejected_row(batch_id: str, rejected_id: int) -> bool:
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            delete from stg.rejected_rows
+            where batch_id = %s::uuid and id = %s
+            """,
+            (batch_id, rejected_id),
+        )
+        deleted = cur.rowcount > 0
+        conn.commit()
+        return deleted

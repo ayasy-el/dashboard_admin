@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { IconCalendarMonth, IconHome } from "@tabler/icons-react";
+import { IconHome } from "@tabler/icons-react";
 
 const routeTitles: Record<string, string> = {
   "/": "Overview",
   "/operational": "Operational",
+  "/ingestion": "Ingestion",
 };
 
 export function SiteHeader() {

@@ -9,6 +9,7 @@ import {
   IconShoppingBag,
   IconTicket,
 } from "@tabler/icons-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
@@ -40,6 +41,11 @@ const navItems = [
     title: "Operational",
     url: "/operational",
     icon: IconChartBar,
+  },
+  {
+    title: "Ingestion",
+    url: "/ingestion",
+    icon: IconSettings,
   },
   {
     title: "Merchants",
@@ -75,14 +81,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-0">
-              <a href="#" className="px-2 py-1.5">
+              <Link href="/" className="px-2 py-1.5">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
                   T
                 </div>
                 <span className="text-base font-bold tracking-tight">
                   Telkomsel<span className="text-primary">Poin</span>
                 </span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -101,10 +107,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   data-active={isActive}
                   className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
                 >
-                  <a href={item.url}>
+                  <Link href={item.url}>
                     <item.icon />
                     <span>{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
@@ -118,10 +124,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {systemItems.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild>
-                <a href={item.url}>
+                <Link href={item.url}>
                   <item.icon />
                   <span>{item.title}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
