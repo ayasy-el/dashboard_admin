@@ -13,6 +13,7 @@ from psycopg.types.json import Json
 
 from ingestion_service.config import REJECT_THRESHOLD
 from ingestion_service.db import get_batch, get_conn, touch_batch
+from ingestion_service.issues import issue_fields
 from ingestion_service.utils import (
     normalize_status,
     parse_date_master,
@@ -185,9 +186,118 @@ def _insert_rejected(
         insert into stg.rejected_rows
             (batch_id, dataset, row_num, error_type, error_message, raw_payload)
         values (%s::uuid, %s, %s, %s, %s, %s)
+        returning id
         """,
         (batch_id, dataset, row_num, error_type, error_message, Json(raw_payload)),
     )
+    rejected_row_id = int(cur.fetchone()["id"])
+    _upsert_global_issue_link(
+        cur,
+        batch_id=batch_id,
+        rejected_row_id=rejected_row_id,
+        row_num=row_num,
+        dataset=dataset,
+        error_type=error_type,
+        error_message=error_message,
+        raw_payload=raw_payload,
+    )
+
+
+def _upsert_global_issue_link(
+    cur,
+    *,
+    batch_id: str,
+    rejected_row_id: int,
+    row_num: int,
+    dataset: str,
+    error_type: str,
+    error_message: str,
+    raw_payload: dict[str, Any],
+) -> None:
+    issue = issue_fields(
+        dataset=dataset,
+        error_type=error_type,
+        error_message=error_message,
+        raw_payload=raw_payload,
+    )
+
+    cur.execute(
+        """
+        insert into audit.ingestion_issues (
+            issue_fingerprint, dataset, issue_kind,
+            conflict_merchant_key, conflict_start_period, conflict_end_period,
+            error_type, error_message, raw_payload, status, resolved_at, resolved_by_batch_id, last_seen_at, updated_at
+        )
+        values (
+            %s, %s, %s,
+            %s::uuid, %s::date, %s::date,
+            %s, %s, %s, 'OPEN', null, null, now(), now()
+        )
+        on conflict (issue_fingerprint) do update
+        set dataset = excluded.dataset,
+            issue_kind = excluded.issue_kind,
+            conflict_merchant_key = excluded.conflict_merchant_key,
+            conflict_start_period = excluded.conflict_start_period,
+            conflict_end_period = excluded.conflict_end_period,
+            error_type = excluded.error_type,
+            error_message = excluded.error_message,
+            raw_payload = excluded.raw_payload,
+            status = 'OPEN',
+            resolved_at = null,
+            resolved_by_batch_id = null,
+            last_seen_at = now(),
+            updated_at = now()
+        returning issue_id
+        """,
+        (
+            issue["fingerprint"],
+            dataset,
+            issue["kind"],
+            issue["merchant_key"],
+            issue["start_period"],
+            issue["end_period"],
+            error_type,
+            error_message,
+            Json(raw_payload),
+        ),
+    )
+    issue_id = int(cur.fetchone()["issue_id"])
+
+    cur.execute(
+        """
+        insert into audit.batch_issue_links (batch_id, issue_id, rejected_row_id, row_num, state, updated_at)
+        values (%s::uuid, %s, %s, %s, 'ACTIVE', now())
+        on conflict (batch_id, rejected_row_id) do update
+        set issue_id = excluded.issue_id,
+            row_num = excluded.row_num,
+            state = 'ACTIVE',
+            updated_at = now()
+        """,
+        (batch_id, issue_id, rejected_row_id, row_num),
+    )
+
+
+def _sync_batch_rejected_issues(cur, batch_id: str) -> None:
+    cur.execute(
+        """
+        select id, dataset, row_num, error_type, error_message, raw_payload
+        from stg.rejected_rows
+        where batch_id = %s::uuid
+        order by id asc
+        """,
+        (batch_id,),
+    )
+    for row in cur.fetchall():
+        _upsert_global_issue_link(
+            cur,
+            batch_id=batch_id,
+            rejected_row_id=int(row["id"]),
+            row_num=int(row["row_num"]),
+            dataset=str(row["dataset"]),
+            error_type=str(row["error_type"]),
+            error_message=str(row["error_message"]),
+            raw_payload=dict(row["raw_payload"] or {}),
+        )
 
 
 def _clear_batch_tables(cur, batch_id: str, dataset: str) -> None:
@@ -206,6 +316,7 @@ def _clear_batch_tables(cur, batch_id: str, dataset: str) -> None:
         ),
         (batch_id,),
     )
+    cur.execute("delete from audit.batch_issue_links where batch_id = %s::uuid", (batch_id,))
     cur.execute("delete from stg.rejected_rows where batch_id = %s::uuid", (batch_id,))
 
 
@@ -465,6 +576,7 @@ def clean_data(batch_id: str) -> int:
                     raw_payload=raw_payload,
                 )
 
+        _sync_batch_rejected_issues(cur, batch_id)
         conn.commit()
 
     return cleaned

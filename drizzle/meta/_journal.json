@@ -36,6 +36,20 @@
       "when": 1772078519306,
       "tag": "0004_ingestion_service",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772668800000,
+      "tag": "0005_ingestion_global_issues",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772755200000,
+      "tag": "0006_batch_public_id",
+      "breakpoints": true
     }
   ]
 }

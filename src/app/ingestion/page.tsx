@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { Button } from "@/components/ui/button";
@@ -84,26 +84,10 @@ const conflictSearchBlob = (row: RejectedRow) => {
   return `${JSON.stringify(incoming)} ${JSON.stringify(existing)}`.toLowerCase();
 };
 
+const COMPACT_CONFLICT_FIELDS = [...CONFLICT_INFO_FIELDS, ...CONFLICT_CHANGE_FIELDS];
 const normalized = (value: unknown) => toText(value).trim().toLowerCase();
-
-const infoFieldList = () => CONFLICT_INFO_FIELDS;
-const isChanged = (incoming: Record<string, unknown>, existing: Record<string, unknown>, field: string) =>
+const fieldChanged = (incoming: Record<string, unknown>, existing: Record<string, unknown>, field: string) =>
   normalized(incoming[field]) !== normalized(existing[field]);
-
-const incomingChangedFieldList = (incoming: Record<string, unknown>, existing: Array<Record<string, unknown>>) =>
-  CONFLICT_CHANGE_FIELDS.filter((field) => {
-    if (!(field in incoming) && existing.every((item) => !(field in item))) return false;
-    if (existing.length === 0) return true;
-    const inc = normalized(incoming[field]);
-    return existing.some((item) => normalized(item[field]) !== inc);
-  });
-
-const existingChangedFieldList = (incoming: Record<string, unknown>, existing: Record<string, unknown>) =>
-  CONFLICT_CHANGE_FIELDS.filter((field) => {
-    if (!(field in existing) && !(field in incoming)) return false;
-    if (!(field in incoming)) return true;
-    return normalized(existing[field]) !== normalized(incoming[field]);
-  });
 
 const resolveSuggestion = (row: RejectedRow) => {
   if (row.resolution?.help) return row.resolution.help;
@@ -127,6 +111,7 @@ export default function IngestionPage() {
   const [batchDetail, setBatchDetail] = useState<BatchDetail | null>(null);
   const [rejected, setRejected] = useState<RejectedRow[]>([]);
   const [selectedRejectedIds, setSelectedRejectedIds] = useState<number[]>([]);
+  const [expandedComparisonIds, setExpandedComparisonIds] = useState<number[]>([]);
   const [issueSearch, setIssueSearch] = useState("");
   const [issueTypeFilter, setIssueTypeFilter] = useState("ALL");
   const [issueSolveFilter, setIssueSolveFilter] = useState("ALL");
@@ -153,6 +138,7 @@ export default function IngestionPage() {
     setBatchDetail(statusData);
     setRejected(rejectedData.items ?? []);
     setSelectedRejectedIds([]);
+    setExpandedComparisonIds([]);
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -262,6 +248,11 @@ export default function IngestionPage() {
     }
   };
 
+  const onDownloadSource = (batchId: string) => {
+    const url = `${API_BASE}/ingest/${batchId}/source`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const onToggleRejected = (rejectedId: number, checked: boolean) => {
     setSelectedRejectedIds((prev) => {
       if (checked) return [...new Set([...prev, rejectedId])];
@@ -276,6 +267,12 @@ export default function IngestionPage() {
       return;
     }
     setSelectedRejectedIds((prev) => [...new Set([...prev, ...filteredRejected.map((row) => row.id)])]);
+  };
+
+  const onToggleComparison = (rejectedId: number) => {
+    setExpandedComparisonIds((prev) =>
+      prev.includes(rejectedId) ? prev.filter((id) => id !== rejectedId) : [...prev, rejectedId],
+    );
   };
 
   const onBulkIgnore = async () => {
@@ -326,6 +323,21 @@ export default function IngestionPage() {
     }
   };
 
+  const formatBatchTime = (value?: string | null) => {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
   const selectedBatchLabel = useMemo(
     () => (selectedBatchId ? `Selected batch: ${selectedBatchId}` : "Pilih batch dari tabel di bawah"),
     [selectedBatchId],
@@ -357,8 +369,8 @@ export default function IngestionPage() {
 
   return (
     <DashboardPageShell sidebarWidth="16rem">
-      <div className="grid min-w-0 gap-4 px-4 lg:px-6">
-        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+      <div className="grid min-w-0 gap-4 bg-gradient-to-b from-background via-background to-rose-50/20 px-4 pb-6 lg:px-6">
+        <Card className="min-w-0 gap-0 overflow-hidden border border-rose-200/70 bg-gradient-to-br from-card to-rose-50/40 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <CardTitle>CSV Ingestion Admin</CardTitle>
             <CardDescription>
@@ -386,27 +398,34 @@ export default function IngestionPage() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 disabled={busy}
               />
-              <Button className="h-10 w-full sm:w-auto" onClick={onUpload} disabled={busy || !file}>
+              <Button className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed" onClick={onUpload} disabled={busy || !file}>
                 {busy ? "Processing..." : "Upload & Run"}
               </Button>
-              <Button className="h-10 w-full sm:w-auto" variant="outline" onClick={() => void refreshAll()} disabled={busy}>
+              <Button
+                className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
+                variant="outline"
+                onClick={() => void refreshAll()}
+                disabled={busy}
+              >
                 Refresh
               </Button>
             </div>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <p className="text-xs text-muted-foreground">{selectedBatchLabel}</p>
+            <p className="text-sm text-foreground/75">{selectedBatchLabel}</p>
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <CardTitle>Batch Monitoring</CardTitle>
+            <CardDescription>Klik baris untuk memilih batch dan melihat detail issue di bawah.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
+                    <th className="p-2"></th>
                     <th className="p-2">Batch</th>
                     <th className="p-2">Dataset</th>
                     <th className="p-2">Status</th>
@@ -417,240 +436,389 @@ export default function IngestionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {batches.map((batch) => (
-                    <tr
-                      key={batch.batch_id}
-                      className={`cursor-pointer border-b hover:bg-muted/40 ${selectedBatchId === batch.batch_id ? "bg-muted/40" : ""}`}
-                      onClick={() => {
-                        setSelectedBatchId(batch.batch_id);
-                        void loadBatchDetail(batch.batch_id);
-                      }}
-                    >
-                      <td className="p-2 font-mono text-xs">{batch.batch_id}</td>
-                      <td className="p-2">{batch.dataset}</td>
-                      <td className="p-2">{batch.status}</td>
-                      <td className="p-2">{batch.loaded_rows}</td>
-                      <td className="p-2">{batch.rejected_rows}</td>
-                      <td className="p-2">{(Number(batch.reject_rate || 0) * 100).toFixed(2)}%</td>
-                      <td className="p-2">
-                        <Button
-                          size="sm"
-                          className="h-9 min-w-20"
-                          variant="outline"
-                          disabled={busy || !RERUN_ALLOWED_STATUSES.has(batch.status)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void onRerun(batch.batch_id);
-                          }}
-                        >
-                          Rerun
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {batches.map((batch) => {
+                    const isSelected = selectedBatchId === batch.batch_id;
+                    return (
+                      <tr
+                        key={batch.batch_id}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? "bg-rose-50/70 ring-1 ring-inset ring-rose-300" : "hover:bg-slate-50"
+                        }`}
+                        title="Klik baris untuk pilih batch"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setSelectedBatchId(batch.batch_id);
+                          void loadBatchDetail(batch.batch_id);
+                        }}
+                      >
+                        <td className="p-2">
+                          <span
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                              isSelected ? "border-rose-500 bg-rose-100" : "border-slate-300 bg-white"
+                            }`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${isSelected ? "bg-rose-600" : "bg-transparent"}`} />
+                          </span>
+                        </td>
+                        <td className="p-2 font-mono text-xs">{batch.batch_id}</td>
+                        <td className="p-2">{batch.dataset}</td>
+                        <td className="p-2">{batch.status}</td>
+                        <td className="p-2">{batch.loaded_rows}</td>
+                        <td className="p-2">{batch.rejected_rows}</td>
+                        <td className="p-2">{(Number(batch.reject_rate || 0) * 100).toFixed(2)}%</td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              className="h-9 w-9 cursor-pointer p-0 disabled:cursor-not-allowed"
+                              variant="outline"
+                              title={`Download source ${batch.batch_id}`}
+                              aria-label={`Download source ${batch.batch_id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDownloadSource(batch.batch_id);
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M12 3v12" />
+                                <path d="m7 10 5 5 5-5" />
+                                <path d="M5 21h14" />
+                              </svg>
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-9 w-9 cursor-pointer p-0 disabled:cursor-not-allowed"
+                              variant="outline"
+                              disabled={busy || !RERUN_ALLOWED_STATUSES.has(batch.status)}
+                              title={`Rerun batch ${batch.batch_id}`}
+                              aria-label={`Rerun batch ${batch.batch_id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void onRerun(batch.batch_id);
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                <path d="M21 3v6h-6" />
+                              </svg>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 py-0 shadow-sm">
+        <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
-            <CardTitle>Issue Resolution</CardTitle>
-            <CardDescription>
-              {batchDetail
-                ? `status=${batchDetail.status} failed_step=${batchDetail.failed_step ?? "-"} total=${batchDetail.metrics.total} loaded=${batchDetail.metrics.loaded} rejected=${batchDetail.metrics.rejected}`
-                : "Pilih batch untuk melihat detail conflict/error/rejected."}
-            </CardDescription>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Issue Resolution</CardTitle>
+                <CardDescription className="mt-2 text-sm text-foreground/70">
+                  {batchDetail ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-rose-600">●</span>
+                      <span>status={batchDetail.status}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span>failed_step={batchDetail.failed_step ?? "-"}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span>total={batchDetail.metrics.total}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span className="font-semibold text-emerald-700">loaded={batchDetail.metrics.loaded}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span className="font-semibold text-rose-700">rejected={batchDetail.metrics.rejected}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span>created_at={formatBatchTime(batchDetail.created_at)}</span>
+                      <span className="text-muted-foreground">|</span>
+                      <span>updated_at={formatBatchTime(batchDetail.updated_at)}</span>
+                    </span>
+                  ) : (
+                    "Pilih batch untuk melihat detail conflict/error/rejected."
+                  )}
+                </CardDescription>
+              </div>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button
+                  size="sm"
+                  className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
+                  variant="outline"
+                  disabled={busy || selectedRejectedIds.length === 0}
+                  onClick={() => void onBulkIgnore()}
+                >
+                  Ignore All
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
+                  disabled={busy || selectedRejectedIds.length === 0}
+                  onClick={() => void onBulkSolve()}
+                >
+                  Solve All Selected
+                </Button>
+              </div>
+            </div>
+            <CardDescription>{selectedRejectedIds.length > 0 ? `${selectedRejectedIds.length} row selected` : "Belum ada row yang dipilih."}</CardDescription>
           </CardHeader>
           <CardContent className="px-6 py-5">
-            <div className="mb-3 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
               <Input
                 placeholder="Cari row/type/error..."
-                className="h-10"
+                className="h-11"
                 value={issueSearch}
                 onChange={(e) => setIssueSearch(e.target.value)}
                 disabled={busy}
               />
               <select
-                className="h-10 w-full rounded-md border px-3 text-sm"
+                className="h-11 w-full rounded-md border px-3 text-sm"
                 value={issueTypeFilter}
                 onChange={(e) => setIssueTypeFilter(e.target.value)}
                 disabled={busy}
               >
                 {issueTypes.map((item) => (
                   <option key={item} value={item}>
-                    {item === "ALL" ? "Semua Type" : item}
+                    {item === "ALL" ? "All Error Types" : item}
                   </option>
                 ))}
               </select>
               <select
-                className="h-10 w-full rounded-md border px-3 text-sm"
+                className="h-11 w-full rounded-md border px-3 text-sm"
                 value={issueSolveFilter}
                 onChange={(e) => setIssueSolveFilter(e.target.value)}
                 disabled={busy}
               >
-                <option value="ALL">Semua Solveability</option>
-                <option value="SOLVABLE">Bisa Auto Solve</option>
+                <option value="ALL">All Solveability</option>
+                <option value="SOLVABLE">Auto Solvable</option>
                 <option value="MANUAL">Manual Required</option>
               </select>
-            </div>
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                size="sm"
-                className="h-10 w-full sm:w-auto"
-                variant="outline"
-                disabled={busy || selectedRejectedIds.length === 0}
-                onClick={() => void onBulkIgnore()}
-              >
-                Ignore Selected ({selectedRejectedIds.length})
-              </Button>
-              <Button
-                size="sm"
-                className="h-10 w-full sm:w-auto"
-                disabled={busy || selectedRejectedIds.length === 0}
-                onClick={() => void onBulkSolve()}
-              >
-                Solve Selected
-              </Button>
             </div>
             {batchDetail?.failed_reason ? (
               <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 {batchDetail.failed_reason}
               </div>
             ) : null}
-            <div className="no-scrollbar overflow-x-auto">
+            <div className="mb-3">
+              <label className="inline-flex items-center gap-2 text-sm text-foreground/80">
+                <input
+                  type="checkbox"
+                  checked={filteredRejected.length > 0 && filteredRejected.every((row) => selectedRejectedIds.includes(row.id))}
+                  onChange={(e) => onToggleAllRejected(e.target.checked)}
+                  disabled={busy || filteredRejected.length === 0}
+                />
+                Select all shown issue
+              </label>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-border/80">
               <table className="min-w-[1120px] w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left">
-                    <th className="p-2">
-                      <input
-                        type="checkbox"
-                        checked={filteredRejected.length > 0 && filteredRejected.every((row) => selectedRejectedIds.includes(row.id))}
-                        onChange={(e) => onToggleAllRejected(e.target.checked)}
-                        disabled={busy || filteredRejected.length === 0}
-                      />
-                    </th>
-                    <th className="p-2">Row</th>
-                    <th className="p-2">Type</th>
-                    <th className="p-2">Error</th>
-                    <th className="p-2">Suggested Solve</th>
-                    <th className="p-2">Action</th>
+                  <tr className="border-b bg-slate-100/80 text-left text-xs tracking-wide text-slate-600 uppercase">
+                    <th className="p-3">Pick</th>
+                    <th className="p-3">Row</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3">Error Description</th>
+                    <th className="p-3">Suggested Solve</th>
+                    <th className="p-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRejected.length === 0 ? (
                     <tr>
-                      <td className="p-3 text-muted-foreground" colSpan={6}>
+                      <td className="p-6 text-center text-sm text-muted-foreground" colSpan={6}>
                         Tidak ada issue sesuai filter.
                       </td>
                     </tr>
                   ) : (
-                    filteredRejected.map((row) => (
-                      <tr key={row.id} className="border-b align-top">
-                        <td className="p-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedRejectedIds.includes(row.id)}
-                            onChange={(e) => onToggleRejected(row.id, e.target.checked)}
-                            disabled={busy}
-                          />
-                        </td>
-                        <td className="p-2">{row.row_num}</td>
-                        <td className="p-2">{row.error_type}</td>
-                        <td className="p-2 max-w-[28rem] break-words">
-                          <div>{row.error_message}</div>
-                          {(() => {
-                            const incoming = row.conflict?.incoming;
-                            if (!incoming) return null;
-                            return (
-                            <div className="mt-2 rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-3 text-xs">
-                              <div className="mb-2 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">Incoming</div>
-                              <div className="grid gap-1.5 sm:grid-cols-2">
-                                {infoFieldList().map((field) => (
-                                  <div key={`incoming-info-${field}`} className="rounded-lg border border-white/80 bg-white/90 px-2 py-1.5 shadow-[0_1px_0_rgba(0,0,0,0.03)]">
-                                    <div className="text-[10px] text-muted-foreground">{prettyLabel(field)}</div>
-                                    <div className="font-medium break-words">{toText(incoming[field])}</div>
-                                  </div>
-                                ))}
-                                {incomingChangedFieldList(incoming, row.conflict?.existing ?? []).map((field) => (
-                                  <div key={`incoming-change-${field}`} className="rounded-lg border border-emerald-300 bg-emerald-50/80 px-2 py-1.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[10px] text-emerald-800">{prettyLabel(field)}</span>
-                                      <span className="rounded-full bg-emerald-200 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-900">changed</span>
-                                    </div>
-                                    <div className="font-semibold break-words text-emerald-900">{toText(incoming[field])}</div>
-                                  </div>
-                                ))}
+                    filteredRejected.map((row) => {
+                      const incoming = row.conflict?.incoming ?? null;
+                      const existingList = row.conflict?.existing ?? [];
+                      const existing = existingList[0] ?? null;
+                      const hasComparison = Boolean(incoming || existing);
+                      const isComparisonExpanded = expandedComparisonIds.includes(row.id);
+                      const visibleConflictFields = COMPACT_CONFLICT_FIELDS.filter((field) => {
+                        const incomingValue = incoming ? toText(incoming[field]) : "-";
+                        const existingValue = existing ? toText(existing[field]) : "-";
+                        return incomingValue !== "-" || existingValue !== "-";
+                      });
+                      const changedFields =
+                        incoming && existing
+                          ? visibleConflictFields.filter((field) => fieldChanged(incoming, existing, field))
+                          : [];
+                      const hasValueChanges = changedFields.length > 0;
+                      const changedValuePairs =
+                        incoming && existing
+                          ? changedFields.map((field) => ({
+                              field: prettyLabel(field),
+                              before: toText(existing[field]),
+                              after: toText(incoming[field]),
+                            }))
+                          : [];
+                      const comparisonKeyword = incoming ? toText(incoming.keyword) : existing ? toText(existing.keyword) : "-";
+
+                      return (
+                        <Fragment key={`issue-${row.id}`}>
+                          <tr className="border-b align-top hover:bg-slate-50/70">
+                            <td className="p-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedRejectedIds.includes(row.id)}
+                                onChange={(e) => onToggleRejected(row.id, e.target.checked)}
+                                disabled={busy}
+                              />
+                            </td>
+                            <td className="p-3 font-semibold text-foreground">Row {row.row_num}</td>
+                            <td className="p-3">
+                              <span className="rounded-md bg-slate-200 px-2 py-1 text-xs font-semibold tracking-wide text-slate-700">
+                                {row.error_type}
+                              </span>
+                            </td>
+                            <td className="p-3 max-w-[28rem] break-words text-foreground/90">{row.error_message}</td>
+                            <td className="p-3 max-w-[22rem] break-words text-foreground/80">{resolveSuggestion(row)}</td>
+                            <td className="p-3">
+                              <div className="flex flex-col gap-2">
+                                <Button
+                                  size="sm"
+                                  className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
+                                  variant="outline"
+                                  disabled={busy}
+                                  onClick={() => void onIgnore(row.id)}
+                                >
+                                  Ignore
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
+                                  disabled={busy || !row.resolution?.can_solve}
+                                  onClick={() => void onSolve(row.id)}
+                                  title={row.resolution?.can_solve ? "Apply solve ke database" : row.resolution?.help ?? "Tidak bisa auto-solve"}
+                                >
+                                  Solve & Apply
+                                </Button>
                               </div>
-                            </div>
-                            );
-                          })()}
-                          {row.conflict?.existing && row.conflict.existing.length > 0 ? (
-                            <div className="mt-2 rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-amber-100/60 p-3 text-xs">
-                              <div className="mb-2 text-[10px] font-semibold tracking-wide text-amber-700 uppercase">Existing</div>
-                              <div className="grid gap-2">
-                                {row.conflict.existing.map((existing, index) => (
-                                  <div key={`existing-${row.id}-${index}`} className="rounded-lg border border-white/80 bg-white/90 p-2 shadow-[0_1px_0_rgba(0,0,0,0.03)]">
-                                    <div className="mb-1 text-[10px] text-muted-foreground">Rule #{index + 1}</div>
-                                    <div className="grid gap-1.5 sm:grid-cols-2">
-                                      {infoFieldList().map((field) => (
-                                        <div key={`existing-info-${index}-${field}`} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                          <div className="text-[10px] text-muted-foreground">{prettyLabel(field)}</div>
-                                          <div className="font-medium break-words">{toText(existing[field])}</div>
-                                        </div>
-                                      ))}
-                                      {existingChangedFieldList(row.conflict?.incoming ?? {}, existing).map((field) => (
-                                        <div
-                                          key={`existing-change-${index}-${field}`}
-                                          className={`rounded-lg border px-2 py-1.5 ${
-                                            isChanged(row.conflict?.incoming ?? {}, existing, field)
-                                              ? "border-amber-300 bg-amber-50/80"
-                                              : "border-slate-200 bg-white"
-                                          }`}
-                                        >
-                                          <div className="flex items-center justify-between gap-2">
-                                            <span className="text-[10px] text-amber-800">{prettyLabel(field)}</span>
-                                            <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-semibold text-amber-900">changed</span>
-                                          </div>
-                                          <div className="font-semibold break-words text-amber-900">{toText(existing[field])}</div>
-                                        </div>
-                                      ))}
+                            </td>
+                          </tr>
+                          {hasComparison && hasValueChanges ? (
+                            <tr className="border-b bg-slate-50/60">
+                              <td className="p-3" colSpan={6}>
+                                <button
+                                  type="button"
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                                  onClick={() => onToggleComparison(row.id)}
+                                  aria-expanded={isComparisonExpanded}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-xs font-semibold text-slate-600">
+                                          <svg
+                                            viewBox="0 0 24 24"
+                                            className={`h-3.5 w-3.5 transition-transform ${isComparisonExpanded ? "rotate-90" : ""}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <path d="M9 6l6 6-6 6" />
+                                          </svg>
+                                        </span>
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
+                                          Keyword
+                                        </span>
+                                        <span className="truncate font-mono text-sm font-semibold text-slate-800">{comparisonKeyword}</span>
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8">
+                                        {changedValuePairs.length > 0 ? (
+                                          changedValuePairs.map((item) => (
+                                            <span
+                                              key={`diff-summary-${row.id}-${item.field}`}
+                                              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-xs"
+                                            >
+                                              <span className="font-medium text-slate-600">{item.field}</span>
+                                              <span className="max-w-[8rem] truncate rounded bg-rose-100 px-1 py-0.5 font-mono text-rose-700">
+                                                {item.before}
+                                              </span>
+                                              <span className="text-slate-400">-&gt;</span>
+                                              <span className="max-w-[8rem] truncate rounded bg-emerald-100 px-1 py-0.5 font-mono text-emerald-700">
+                                                {item.after}
+                                              </span>
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-xs text-slate-500">Tidak ada perubahan nilai.</span>
+                                        )}
+                                      </div>
                                     </div>
+                                    <span className="shrink-0 rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold tracking-wide text-rose-700 uppercase">
+                                      {changedFields.length} changed
+                                    </span>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
+                                </button>
+                                {isComparisonExpanded ? (
+                                  <div className="mt-2 overflow-x-auto rounded-lg border">
+                                    <table className="min-w-[860px] w-full">
+                                      <thead>
+                                        <tr className="border-b bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+                                          <th className="p-2.5 text-left">Field Name</th>
+                                          <th className="p-2.5 text-left text-emerald-700">Incoming Data</th>
+                                          <th className="p-2.5 text-left text-amber-700">Existing Data</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {visibleConflictFields.map((field) => {
+                                          const changed = incoming && existing ? fieldChanged(incoming, existing, field) : false;
+                                          return (
+                                            <tr key={`compare-row-${row.id}-${field}`} className={`border-b ${changed ? "bg-rose-50/50" : ""}`}>
+                                              <td className={`p-2.5 text-sm font-medium ${changed ? "text-rose-700" : "text-slate-600"}`}>
+                                                {prettyLabel(field)}
+                                              </td>
+                                              <td className="p-2.5 text-sm text-foreground">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="break-words">{incoming ? toText(incoming[field]) : "-"}</span>
+                                                  {changed ? (
+                                                    <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white uppercase">
+                                                      Changed
+                                                    </span>
+                                                  ) : null}
+                                                </div>
+                                              </td>
+                                              <td className={`p-2.5 text-sm ${changed ? "text-slate-400 line-through" : "text-slate-500"}`}>
+                                                {existing ? toText(existing[field]) : "-"}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : null}
+                              </td>
+                            </tr>
                           ) : null}
-                        </td>
-                        <td className="p-2 max-w-[22rem] break-words text-muted-foreground">{resolveSuggestion(row)}</td>
-                        <td className="p-2">
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <Button
-                              size="sm"
-                              className="h-9 w-full sm:w-auto"
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() => void onIgnore(row.id)}
-                            >
-                              Ignore
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="h-9 w-full sm:w-auto"
-                              disabled={busy || !row.resolution?.can_solve}
-                              onClick={() => void onSolve(row.id)}
-                              title={row.resolution?.can_solve ? "Apply solve ke database" : row.resolution?.help ?? "Tidak bisa auto-solve"}
-                            >
-                              Solve & Apply
-                            </Button>
-                          </div>
-                          <p className="mt-2 max-w-[18rem] text-xs text-muted-foreground">
-                            {row.resolution?.label ?? "Manual review"}
-                          </p>
-                        </td>
-                      </tr>
-                    ))
+                        </Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
