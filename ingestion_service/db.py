@@ -7,10 +7,8 @@ from typing import Any, Iterator
 
 import psycopg
 from psycopg.rows import dict_row
-from psycopg.types.json import Json
 
 from ingestion_service.config import DATABASE_URL
-from ingestion_service.issues import issue_fields
 
 _UNSET = object()
 
@@ -206,20 +204,14 @@ def get_rejected_rows(batch_id: str) -> list[dict[str, Any]]:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            select id, %s as batch_id, dataset, row_num,
-                   error_type, error_message, raw_payload, created_at
-            from stg.rejected_rows
-            where batch_id = %s::uuid
-              and exists (
-                  select 1
-                  from audit.batch_issue_links bil
-                  join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
-                  where bil.batch_id = stg.rejected_rows.batch_id
-                    and bil.rejected_row_id = stg.rejected_rows.id
-                    and bil.state = 'ACTIVE'
-                    and ii.status = 'OPEN'
-              )
-            order by row_num asc, id asc
+            select bil.id, %s as batch_id, bil.dataset, bil.row_num,
+                   bil.error_type, bil.error_message, bil.raw_payload, bil.created_at
+            from audit.batch_issue_links bil
+            join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
+            where bil.batch_id = %s::uuid
+              and bil.state = 'ACTIVE'
+              and ii.status = 'OPEN'
+            order by bil.row_num asc, bil.id asc
             """,
             (batch_id, internal_batch_id),
         )
@@ -234,19 +226,14 @@ def get_rejected_row(batch_id: str, rejected_id: int) -> dict[str, Any] | None:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            select id, %s as batch_id, dataset, row_num,
-                   error_type, error_message, raw_payload, created_at
-            from stg.rejected_rows
-            where batch_id = %s::uuid and id = %s
-              and exists (
-                  select 1
-                  from audit.batch_issue_links bil
-                  join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
-                  where bil.batch_id = stg.rejected_rows.batch_id
-                    and bil.rejected_row_id = stg.rejected_rows.id
-                    and bil.state = 'ACTIVE'
-                    and ii.status = 'OPEN'
-              )
+            select bil.id, %s as batch_id, bil.dataset, bil.row_num,
+                   bil.error_type, bil.error_message, bil.raw_payload, bil.created_at
+            from audit.batch_issue_links bil
+            join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
+            where bil.batch_id = %s::uuid
+              and bil.id = %s
+              and bil.state = 'ACTIVE'
+              and ii.status = 'OPEN'
             """,
             (batch_id, internal_batch_id, rejected_id),
         )
@@ -263,14 +250,9 @@ def delete_rejected_row(batch_id: str, rejected_id: int) -> bool:
             """
             update audit.batch_issue_links
             set state = 'CLOSED', updated_at = now()
-            where batch_id = %s::uuid and rejected_row_id = %s
-            """,
-            (internal_batch_id, rejected_id),
-        )
-        cur.execute(
-            """
-            delete from stg.rejected_rows
-            where batch_id = %s::uuid and id = %s
+            where batch_id = %s::uuid
+              and id = %s
+              and state = 'ACTIVE'
             """,
             (internal_batch_id, rejected_id),
         )
@@ -291,7 +273,7 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
             select bil.issue_id
             from audit.batch_issue_links bil
             where bil.batch_id = %s::uuid
-              and bil.rejected_row_id = %s
+              and bil.id = %s
             limit 1
             """,
             (internal_batch_id, rejected_id),
@@ -315,7 +297,7 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
 
         cur.execute(
             """
-            select b.batch_public_id as batch_id, bil.rejected_row_id
+            select b.batch_public_id as batch_id
             from audit.batch_issue_links bil
             join audit.batches b on b.batch_id = bil.batch_id
             where bil.issue_id = %s
@@ -329,7 +311,6 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
             return []
 
         affected_batches = sorted({str(item["batch_id"]) for item in active_links})
-        rejected_ids = [int(item["rejected_row_id"]) for item in active_links]
 
         cur.execute(
             """
@@ -341,116 +322,5 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
             """,
             (issue_id,),
         )
-        cur.execute(
-            """
-            delete from stg.rejected_rows
-            where id = any(%s::bigint[])
-            """,
-            (rejected_ids,),
-        )
         conn.commit()
         return affected_batches
-
-
-def backfill_issue_links_for_batch(batch_id: str) -> int:
-    internal_batch_id = resolve_batch_uuid(batch_id)
-    if not internal_batch_id:
-        return 0
-
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            select rr.id, rr.dataset, rr.row_num, rr.error_type, rr.error_message, rr.raw_payload
-            from stg.rejected_rows rr
-            where rr.batch_id = %s::uuid
-              and not exists (
-                  select 1
-                  from audit.batch_issue_links bil
-                  where bil.batch_id = rr.batch_id
-                    and bil.rejected_row_id = rr.id
-              )
-            order by rr.id asc
-            """,
-            (internal_batch_id,),
-        )
-        rows = cur.fetchall()
-        created = 0
-        for row in rows:
-            raw_payload = dict(row["raw_payload"] or {})
-            issue = issue_fields(
-                dataset=str(row["dataset"]),
-                error_type=str(row["error_type"]),
-                error_message=str(row["error_message"]),
-                raw_payload=raw_payload,
-            )
-            cur.execute(
-                """
-                insert into audit.ingestion_issues (
-                    issue_fingerprint, dataset, issue_kind,
-                    conflict_merchant_key, conflict_start_period, conflict_end_period,
-                    error_type, error_message, raw_payload, status, resolved_at, resolved_by_batch_id, last_seen_at, updated_at
-                )
-                values (
-                    %s, %s, %s,
-                    %s::uuid, %s::date, %s::date,
-                    %s, %s, %s, 'OPEN', null, null, now(), now()
-                )
-                on conflict (issue_fingerprint) do update
-                set dataset = excluded.dataset,
-                    issue_kind = excluded.issue_kind,
-                    conflict_merchant_key = excluded.conflict_merchant_key,
-                    conflict_start_period = excluded.conflict_start_period,
-                    conflict_end_period = excluded.conflict_end_period,
-                    error_type = excluded.error_type,
-                    error_message = excluded.error_message,
-                    raw_payload = excluded.raw_payload,
-                    status = 'OPEN',
-                    resolved_at = null,
-                    resolved_by_batch_id = null,
-                    last_seen_at = now(),
-                    updated_at = now()
-                returning issue_id
-                """,
-                (
-                    issue["fingerprint"],
-                    str(row["dataset"]),
-                    issue["kind"],
-                    issue["merchant_key"],
-                    issue["start_period"],
-                    issue["end_period"],
-                    str(row["error_type"]),
-                    str(row["error_message"]),
-                    Json(raw_payload),
-                ),
-            )
-            issue_id = int(cur.fetchone()["issue_id"])
-            cur.execute(
-                """
-                insert into audit.batch_issue_links (batch_id, issue_id, rejected_row_id, row_num, state, updated_at)
-                values (%s::uuid, %s, %s, %s, 'ACTIVE', now())
-                on conflict (batch_id, rejected_row_id) do nothing
-                """,
-                (internal_batch_id, issue_id, int(row["id"]), int(row["row_num"])),
-            )
-            created += 1
-        conn.commit()
-        return created
-
-
-def backfill_issue_links_all() -> dict[str, int]:
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("select distinct batch_id::text as batch_id from stg.rejected_rows")
-        batches = [str(row["batch_id"]) for row in cur.fetchall()]
-
-    total_links = 0
-    touched_batches = 0
-    for batch_id in batches:
-        created = backfill_issue_links_for_batch(batch_id)
-        if created > 0:
-            touched_batches += 1
-            total_links += created
-    return {
-        "batch_count": len(batches),
-        "touched_batches": touched_batches,
-        "created_links": total_links,
-    }

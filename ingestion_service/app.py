@@ -11,8 +11,6 @@ from fastapi.responses import FileResponse
 
 from ingestion_service.config import DATASETS, FAILED_STATUSES, REJECT_THRESHOLD, UPLOAD_DIR
 from ingestion_service.db import (
-    backfill_issue_links_all,
-    backfill_issue_links_for_batch,
     create_batch,
     create_rerun_batch,
     delete_rejected_row,
@@ -368,7 +366,12 @@ def _refresh_batch_metrics_after_rejected_cleanup(batch_id: str) -> dict[str, An
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "select count(*) as rejected_rows from stg.rejected_rows where batch_id = %s::uuid",
+            """
+            select count(*) as rejected_rows
+            from audit.batch_issue_links
+            where batch_id = %s::uuid
+              and state = 'ACTIVE'
+            """,
             (internal_batch_id,),
         )
         rejected_rows = int(cur.fetchone()["rejected_rows"] or 0)
@@ -415,7 +418,12 @@ def _refresh_batch_metrics_after_solve(batch_id: str) -> dict[str, Any]:
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "select count(*) as rejected_rows from stg.rejected_rows where batch_id = %s::uuid",
+            """
+            select count(*) as rejected_rows
+            from audit.batch_issue_links
+            where batch_id = %s::uuid
+              and state = 'ACTIVE'
+            """,
             (internal_batch_id,),
         )
         rejected_rows = int(cur.fetchone()["rejected_rows"] or 0)
@@ -524,15 +532,6 @@ def download_batch_source(batch_id: str):
     )
 
 
-@app.post("/ingest/issues/backfill")
-def backfill_issue_links():
-    summary = backfill_issue_links_all()
-    return {
-        "status": "ok",
-        **summary,
-    }
-
-
 @app.post("/ingest/{batch_id}/rerun")
 def rerun_batch(batch_id: str, background_tasks: BackgroundTasks):
     batch = get_batch(batch_id)
@@ -564,9 +563,6 @@ def get_batch_rejected(batch_id: str):
     batch = get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-
-    # Gradual migration path: ensure legacy rejected rows are linked to global issues.
-    backfill_issue_links_for_batch(batch_id)
 
     rows = [_decorate_rejected_row(row) for row in get_rejected_rows(batch_id)]
 
@@ -610,9 +606,6 @@ def solve_rejected(
     batch = get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-
-    # Ensure legacy rows are linked before solve path (migration-safe).
-    backfill_issue_links_for_batch(batch_id)
 
     row = get_rejected_row(batch_id, rejected_id)
     if not row:

@@ -181,20 +181,9 @@ def _insert_rejected(
     error_message: str,
     raw_payload: dict[str, Any],
 ) -> None:
-    cur.execute(
-        """
-        insert into stg.rejected_rows
-            (batch_id, dataset, row_num, error_type, error_message, raw_payload)
-        values (%s::uuid, %s, %s, %s, %s, %s)
-        returning id
-        """,
-        (batch_id, dataset, row_num, error_type, error_message, Json(raw_payload)),
-    )
-    rejected_row_id = int(cur.fetchone()["id"])
     _upsert_global_issue_link(
         cur,
         batch_id=batch_id,
-        rejected_row_id=rejected_row_id,
         row_num=row_num,
         dataset=dataset,
         error_type=error_type,
@@ -207,7 +196,6 @@ def _upsert_global_issue_link(
     cur,
     *,
     batch_id: str,
-    rejected_row_id: int,
     row_num: int,
     dataset: str,
     error_type: str,
@@ -265,39 +253,23 @@ def _upsert_global_issue_link(
 
     cur.execute(
         """
-        insert into audit.batch_issue_links (batch_id, issue_id, rejected_row_id, row_num, state, updated_at)
-        values (%s::uuid, %s, %s, %s, 'ACTIVE', now())
-        on conflict (batch_id, rejected_row_id) do update
+        insert into audit.batch_issue_links (
+            batch_id, issue_id, row_num, state,
+            dataset, error_type, error_message, raw_payload, updated_at
+        )
+        values (%s::uuid, %s, %s, 'ACTIVE', %s, %s, %s, %s, now())
+        on conflict (batch_id, row_num, issue_id) do update
         set issue_id = excluded.issue_id,
             row_num = excluded.row_num,
             state = 'ACTIVE',
+            dataset = excluded.dataset,
+            error_type = excluded.error_type,
+            error_message = excluded.error_message,
+            raw_payload = excluded.raw_payload,
             updated_at = now()
         """,
-        (batch_id, issue_id, rejected_row_id, row_num),
+        (batch_id, issue_id, row_num, dataset, error_type, error_message, Json(raw_payload)),
     )
-
-
-def _sync_batch_rejected_issues(cur, batch_id: str) -> None:
-    cur.execute(
-        """
-        select id, dataset, row_num, error_type, error_message, raw_payload
-        from stg.rejected_rows
-        where batch_id = %s::uuid
-        order by id asc
-        """,
-        (batch_id,),
-    )
-    for row in cur.fetchall():
-        _upsert_global_issue_link(
-            cur,
-            batch_id=batch_id,
-            rejected_row_id=int(row["id"]),
-            row_num=int(row["row_num"]),
-            dataset=str(row["dataset"]),
-            error_type=str(row["error_type"]),
-            error_message=str(row["error_message"]),
-            raw_payload=dict(row["raw_payload"] or {}),
-        )
 
 
 def _clear_batch_tables(cur, batch_id: str, dataset: str) -> None:
@@ -317,7 +289,6 @@ def _clear_batch_tables(cur, batch_id: str, dataset: str) -> None:
         (batch_id,),
     )
     cur.execute("delete from audit.batch_issue_links where batch_id = %s::uuid", (batch_id,))
-    cur.execute("delete from stg.rejected_rows where batch_id = %s::uuid", (batch_id,))
 
 
 def stage_csv(batch_id: str) -> int:
@@ -576,7 +547,6 @@ def clean_data(batch_id: str) -> int:
                     raw_payload=raw_payload,
                 )
 
-        _sync_batch_rejected_issues(cur, batch_id)
         conn.commit()
 
     return cleaned
@@ -644,12 +614,9 @@ def load_data(batch_id: str) -> int:
             # Resolve cluster by cluster name from dim_cluster and reject missing/ambiguous rows.
             cur.execute(
                 """
-                insert into stg.rejected_rows
-                  (batch_id, dataset, row_num, error_type, error_message, raw_payload)
                 with candidates as (
                     select
                         c.id as clean_id,
-                        c.batch_id,
                         c.row_num,
                         c.raw_payload,
                         c.cluster,
@@ -660,22 +627,32 @@ def load_data(batch_id: str) -> int:
                       on upper(trim(dcl.cluster)) = upper(trim(c.cluster))
                     where c.batch_id = %s::uuid
                 )
-                select batch_id, 'master', row_num,
+                select row_num,
                        case
                          when cluster_match_count = 0 then 'FK_MISSING'
                          else 'FK_AMBIGUOUS'
-                       end,
+                       end as error_type,
                        case
                          when cluster_match_count = 0
                            then 'cluster tidak ditemukan di dim_cluster untuk cluster=' || cluster
                          else 'cluster ambigu di dim_cluster untuk cluster=' || cluster
-                       end,
+                       end as error_message,
                        raw_payload
                 from candidates
                 where cluster_match_count = 0 or cluster_match_count > 1
                 """,
                 (batch_id,),
             )
+            for rejected in cur.fetchall():
+                _insert_rejected(
+                    cur,
+                    batch_id=batch_id,
+                    dataset=dataset,
+                    row_num=int(rejected["row_num"]),
+                    error_type=str(rejected["error_type"]),
+                    error_message=str(rejected["error_message"]),
+                    raw_payload=dict(rejected["raw_payload"] or {}),
+                )
 
             cur.execute(
                 """
@@ -870,14 +847,12 @@ def load_data(batch_id: str) -> int:
         elif dataset == "transactions":
             cur.execute(
                 """
-                insert into stg.rejected_rows
-                  (batch_id, dataset, row_num, error_type, error_message, raw_payload)
-                select c.batch_id, 'transactions', c.row_num,
-                       'FK_MISSING',
+                select c.row_num,
+                       'FK_MISSING' as error_type,
                        case
                          when m.merchant_key is null then 'merchant tidak ditemukan untuk keyword=' || c.keyword
                          when r.rule_key is null then 'rule tidak ditemukan untuk keyword=' || c.keyword || ' at ' || c.transaction_at::date
-                       end,
+                       end as error_message,
                        c.raw_payload
                 from stg.transactions_clean c
                 left join public.dim_merchant m on m.keyword_code = c.keyword
@@ -889,6 +864,16 @@ def load_data(batch_id: str) -> int:
                 """,
                 (batch_id,),
             )
+            for rejected in cur.fetchall():
+                _insert_rejected(
+                    cur,
+                    batch_id=batch_id,
+                    dataset=dataset,
+                    row_num=int(rejected["row_num"]),
+                    error_type=str(rejected["error_type"]),
+                    error_message=str(rejected["error_message"]),
+                    raw_payload=dict(rejected["raw_payload"] or {}),
+                )
 
             # Recalculate point_redeem for matching transactions from older batches.
             cur.execute(
@@ -977,12 +962,9 @@ def load_data(batch_id: str) -> int:
             # Reject when cluster is missing or ambiguous (same name maps to multiple cluster_id).
             cur.execute(
                 """
-                insert into stg.rejected_rows
-                  (batch_id, dataset, row_num, error_type, error_message, raw_payload)
                 with candidates as (
                     select
                         c.id as clean_id,
-                        c.batch_id,
                         c.row_num,
                         c.raw_payload,
                         c.cluster,
@@ -993,22 +975,32 @@ def load_data(batch_id: str) -> int:
                       on upper(trim(dcl.cluster)) = upper(trim(c.cluster))
                     where c.batch_id = %s::uuid
                 )
-                select batch_id, 'total_point', row_num,
+                select row_num,
                        case
                          when cluster_match_count = 0 then 'FK_MISSING'
                          else 'FK_AMBIGUOUS'
-                       end,
+                       end as error_type,
                        case
                          when cluster_match_count = 0
                            then 'cluster tidak ditemukan di dim_cluster untuk cluster=' || cluster
                          else 'cluster ambigu di dim_cluster untuk cluster=' || cluster
-                       end,
+                       end as error_message,
                        raw_payload
                 from candidates
                 where cluster_match_count = 0 or cluster_match_count > 1
                 """,
                 (batch_id,),
             )
+            for rejected in cur.fetchall():
+                _insert_rejected(
+                    cur,
+                    batch_id=batch_id,
+                    dataset=dataset,
+                    row_num=int(rejected["row_num"]),
+                    error_type=str(rejected["error_type"]),
+                    error_message=str(rejected["error_message"]),
+                    raw_payload=dict(rejected["raw_payload"] or {}),
+                )
 
             cur.execute(
                 """
@@ -1052,7 +1044,12 @@ def quality_check(batch_id: str) -> BatchMetrics:
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "select count(*) as rejected_rows from stg.rejected_rows where batch_id = %s::uuid",
+            """
+            select count(*) as rejected_rows
+            from audit.batch_issue_links
+            where batch_id = %s::uuid
+              and state = 'ACTIVE'
+            """,
             (batch_id,),
         )
         rejected_rows = cur.fetchone()["rejected_rows"]
