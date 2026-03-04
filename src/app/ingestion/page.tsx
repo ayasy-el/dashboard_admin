@@ -112,6 +112,7 @@ export default function IngestionPage() {
   const [rejected, setRejected] = useState<RejectedRow[]>([]);
   const [selectedRejectedIds, setSelectedRejectedIds] = useState<number[]>([]);
   const [expandedComparisonIds, setExpandedComparisonIds] = useState<number[]>([]);
+  const [loadingIssueResolution, setLoadingIssueResolution] = useState(false);
   const [issueSearch, setIssueSearch] = useState("");
   const [issueTypeFilter, setIssueTypeFilter] = useState("ALL");
   const [issueSolveFilter, setIssueSolveFilter] = useState("ALL");
@@ -124,21 +125,26 @@ export default function IngestionPage() {
   }, []);
 
   const loadBatchDetail = useCallback(async (batchId: string) => {
-    const [statusRes, rejectedRes] = await Promise.all([
-      fetch(`${API_BASE}/ingest/${batchId}`, { cache: "no-store" }),
-      fetch(`${API_BASE}/ingest/${batchId}/rejected`, { cache: "no-store" }),
-    ]);
+    setLoadingIssueResolution(true);
+    try {
+      const [statusRes, rejectedRes] = await Promise.all([
+        fetch(`${API_BASE}/ingest/${batchId}`, { cache: "no-store" }),
+        fetch(`${API_BASE}/ingest/${batchId}/rejected`, { cache: "no-store" }),
+      ]);
 
-    if (!statusRes.ok) throw new Error("Gagal mengambil detail batch");
-    if (!rejectedRes.ok) throw new Error("Gagal mengambil rejected rows");
+      if (!statusRes.ok) throw new Error("Gagal mengambil detail batch");
+      if (!rejectedRes.ok) throw new Error("Gagal mengambil rejected rows");
 
-    const statusData = (await statusRes.json()) as BatchDetail;
-    const rejectedData = await rejectedRes.json();
+      const statusData = (await statusRes.json()) as BatchDetail;
+      const rejectedData = await rejectedRes.json();
 
-    setBatchDetail(statusData);
-    setRejected(rejectedData.items ?? []);
-    setSelectedRejectedIds([]);
-    setExpandedComparisonIds([]);
+      setBatchDetail(statusData);
+      setRejected(rejectedData.items ?? []);
+      setSelectedRejectedIds([]);
+      setExpandedComparisonIds([]);
+    } finally {
+      setLoadingIssueResolution(false);
+    }
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -537,7 +543,9 @@ export default function IngestionPage() {
               <div>
                 <CardTitle>Issue Resolution</CardTitle>
                 <CardDescription className="mt-2 text-sm text-foreground/70">
-                  {batchDetail ? (
+                  {loadingIssueResolution ? (
+                    <span className="inline-block h-5 w-[32rem] max-w-full animate-pulse rounded bg-slate-200/80" />
+                  ) : batchDetail ? (
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="text-rose-600">●</span>
                       <span>status={batchDetail.status}</span>
@@ -564,7 +572,7 @@ export default function IngestionPage() {
                   size="sm"
                   className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
                   variant="outline"
-                  disabled={busy || selectedRejectedIds.length === 0}
+                  disabled={busy || loadingIssueResolution || selectedRejectedIds.length === 0}
                   onClick={() => void onBulkIgnore()}
                 >
                   Ignore All
@@ -572,14 +580,20 @@ export default function IngestionPage() {
                 <Button
                   size="sm"
                   className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
-                  disabled={busy || selectedRejectedIds.length === 0}
+                  disabled={busy || loadingIssueResolution || selectedRejectedIds.length === 0}
                   onClick={() => void onBulkSolve()}
                 >
                   Solve All Selected
                 </Button>
               </div>
             </div>
-            <CardDescription>{selectedRejectedIds.length > 0 ? `${selectedRejectedIds.length} row selected` : "Belum ada row yang dipilih."}</CardDescription>
+            <CardDescription>
+              {loadingIssueResolution
+                ? "Loading issues..."
+                : selectedRejectedIds.length > 0
+                  ? `${selectedRejectedIds.length} row selected`
+                  : "Belum ada row yang dipilih."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="px-6 py-5">
             <div className="mb-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
@@ -624,7 +638,7 @@ export default function IngestionPage() {
                   type="checkbox"
                   checked={filteredRejected.length > 0 && filteredRejected.every((row) => selectedRejectedIds.includes(row.id))}
                   onChange={(e) => onToggleAllRejected(e.target.checked)}
-                  disabled={busy || filteredRejected.length === 0}
+                  disabled={busy || loadingIssueResolution || filteredRejected.length === 0}
                 />
                 Select all shown issue
               </label>
@@ -642,7 +656,19 @@ export default function IngestionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRejected.length === 0 ? (
+                  {loadingIssueResolution ? (
+                    Array.from({ length: 3 }).map((_, idx) => (
+                      <tr key={`issue-skeleton-${idx}`} className="border-b">
+                        <td className="p-3" colSpan={6}>
+                          <div className="space-y-2">
+                            <div className="h-4 w-1/4 animate-pulse rounded bg-slate-200/80" />
+                            <div className="h-4 w-11/12 animate-pulse rounded bg-slate-200/70" />
+                            <div className="h-4 w-9/12 animate-pulse rounded bg-slate-200/60" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : filteredRejected.length === 0 ? (
                     <tr>
                       <td className="p-6 text-center text-sm text-muted-foreground" colSpan={6}>
                         Tidak ada issue sesuai filter.
