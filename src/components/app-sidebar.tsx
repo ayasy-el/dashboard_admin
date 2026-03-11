@@ -42,33 +42,23 @@ const navItems = [
     url: "/operational",
     icon: IconChartBar,
   },
-  {
-    title: "Ingestion",
-    url: "/ingestion",
-    icon: IconSettings,
-  },
-  {
-    title: "Merchants",
-    url: "#",
-    icon: IconShoppingBag,
-  },
-  {
-    title: "Redemption",
-    url: "#",
-    icon: IconTicket,
-  },
 ];
 
 const systemItems = [
   {
-    title: "Settings",
-    url: "#",
+    title: "Upload Data",
+    url: "/ingestion",
     icon: IconSettings,
   },
   {
-    title: "Help Center",
+    title: "Program & Promotions",
     url: "#",
-    icon: IconHelp,
+    icon: IconTicket,
+  },
+  {
+    title: "Feedback Center",
+    url: "#",
+    icon: IconShoppingBag,
   },
 ];
 
@@ -95,7 +85,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <div className="px-2 pb-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-          Menu
+          Dashboard
         </div>
         <SidebarMenu>
           {navItems.map((item) => {
@@ -118,7 +108,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
         <SidebarSeparator className="my-3 mx-0" />
         <div className="px-2 pb-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-          System
+          Management
         </div>
         <SidebarMenu>
           {systemItems.map((item) => (

@@ -62,6 +62,28 @@ def _iso_date(value: Any) -> str | None:
     return str(value) if value is not None else None
 
 
+def _parse_total_point_period(value: str) -> tuple[int, int]:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("period wajib diisi")
+
+    token = raw.replace("/", "_").replace("-", "_")
+    parts = [p for p in token.split("_") if p]
+    if len(parts) != 2:
+        raise ValueError(f"format period tidak valid: {raw}")
+
+    if len(parts[0]) == 4:
+        year = int(parts[0])
+        month = int(parts[1])
+    else:
+        month = int(parts[0])
+        year = int(parts[1])
+
+    if month < 1 or month > 12:
+        raise ValueError(f"bulan period tidak valid: {raw}")
+    return month, year
+
+
 def _build_master_load_error(cur, row: dict[str, Any], exc: Exception) -> tuple[str, str, dict[str, Any]]:
     payload = dict(row.get("raw_payload") or {})
     payload["__incoming"] = {
@@ -478,38 +500,9 @@ def clean_data(batch_id: str) -> int:
                     if not cluster:
                         raise ValueError("cluster wajib diisi")
 
-                    for key, value in raw_payload.items():
-                        lower = key.lower()
-                        if not (lower.startswith("poin_") or lower.startswith("own_")):
-                            continue
-                        parts = lower.split("_")
-                        if len(parts) != 3:
-                            continue
-                        try:
-                            month = int(parts[1])
-                            year = int(parts[2])
-                        except ValueError:
-                            logger.warning(
-                                "Skip invalid period column '%s' for batch_id=%s row_num=%s",
-                                key,
-                                batch_id,
-                                row_num,
-                            )
-                            continue
-                        if month < 1 or month > 12:
-                            continue
-
+                    def insert_total_point(month: int, year: int, total_point: int, point_owner: int) -> None:
                         month_year = f"{year:04d}-{month:02d}-01"
-                        if lower.startswith("poin_"):
-                            total_point = parse_int_loose(value)
-                            point_owner = parse_int_loose(raw_payload.get(f"own_{parts[1]}_{parts[2]}", "0"))
-                        else:
-                            point_owner = parse_int_loose(value)
-                            total_point = parse_int_loose(raw_payload.get(f"poin_{parts[1]}_{parts[2]}", "0"))
-
-                        point_key = stable_uuid(
-                            "cluster_point", cluster.strip().upper(), month_year
-                        )
+                        point_key = stable_uuid("cluster_point", cluster.strip().upper(), month_year)
                         cur.execute(
                             """
                             insert into stg.total_point_clean
@@ -531,6 +524,11 @@ def clean_data(batch_id: str) -> int:
                                 Json(raw_payload),
                             ),
                         )
+
+                    month, year = _parse_total_point_period(str(raw_payload.get("period", "")))
+                    total_point = parse_int_loose(str(raw_payload.get("poin", "0")))
+                    point_owner = parse_int_loose(str(raw_payload.get("own", "0")))
+                    insert_total_point(month, year, total_point, point_owner)
 
                 else:
                     raise ValueError(f"Unsupported dataset: {dataset}")
