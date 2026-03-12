@@ -191,8 +191,14 @@ export function ComparisonProgressTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
-                <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                <TableRow
+                  className={cn(
+                    darkHeader
+                      ? "bg-muted/60 hover:bg-muted/60 dark:bg-black dark:hover:bg-black"
+                      : "bg-muted/40 hover:bg-muted/40",
+                  )}
+                >
+                <TableHead className={cn("px-4", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   {isColumnSortable(0) ? (
                     <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(0)}>
                       <span>{headers[0]}</span>
@@ -206,7 +212,7 @@ export function ComparisonProgressTableCard({
                     <span>{headers[0]}</span>
                   )}
                 </TableHead>
-                <TableHead className={cn("px-4 text-center", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-center", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   {isColumnSortable(1) ? (
                     <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(1)}>
                       <span>{headers[1]}</span>
@@ -220,7 +226,7 @@ export function ComparisonProgressTableCard({
                     <span>{headers[1]}</span>
                   )}
                 </TableHead>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   {isColumnSortable(2) ? (
                     <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(2)}>
                       <span>{headers[2]}</span>
@@ -234,7 +240,7 @@ export function ComparisonProgressTableCard({
                     <span>{headers[2]}</span>
                   )}
                 </TableHead>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   {isColumnSortable(3) ? (
                     <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort(3)}>
                       <span>{headers[3]}</span>

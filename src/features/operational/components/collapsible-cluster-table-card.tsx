@@ -130,8 +130,14 @@ export function CollapsibleClusterTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
-                <TableHead className={cn("px-4", darkHeader ? "text-white" : undefined)}>
+              <TableRow
+                className={cn(
+                  darkHeader
+                    ? "bg-muted/60 hover:bg-muted/60 dark:bg-black dark:hover:bg-black"
+                    : "bg-muted/40 hover:bg-muted/40",
+                )}
+              >
+                <TableHead className={cn("px-4", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("name")}>
                     <span>Branch</span>
                     <SortIndicator
@@ -141,7 +147,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("totalMerchant")}>
                     <span>Jumlah Merchant</span>
                     <SortIndicator
@@ -151,7 +157,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("uniqueMerchant")}>
                     <span>Unique Merchant</span>
                     <SortIndicator
@@ -161,7 +167,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("totalPoint")}>
                     <span>Total Point</span>
                     <SortIndicator
@@ -171,7 +177,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("totalTransaksi")}>
                     <span>Total Transaksi</span>
                     <SortIndicator
@@ -181,7 +187,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("uniqueRedeemer")}>
                     <span>Unique Redeemer</span>
                     <SortIndicator
@@ -191,7 +197,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("merchantAktif")}>
                     <span>Merchant Aktif</span>
                     <SortIndicator
@@ -201,7 +207,7 @@ export function CollapsibleClusterTableCard({
                     />
                   </button>
                 </TableHead>
-                <TableHead className={cn("px-4 text-right", darkHeader ? "text-white" : undefined)}>
+                <TableHead className={cn("px-4 text-right", darkHeader ? "text-foreground dark:text-white" : undefined)}>
                   <button type="button" className="ml-auto inline-flex items-center gap-1 font-inherit" onClick={() => toggleSort("merchantProduktif")}>
                     <span>Merchant Produktif</span>
                     <SortIndicator

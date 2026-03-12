@@ -199,7 +199,9 @@ export function DataTableCard({
             <TableHeader>
               <TableRow
                 className={cn(
-                  darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40",
+                  darkHeader
+                    ? "bg-muted/60 hover:bg-muted/60 dark:bg-black dark:hover:bg-black"
+                    : "bg-muted/40 hover:bg-muted/40",
                   headerRowClassName,
                 )}
               >
@@ -208,7 +210,7 @@ export function DataTableCard({
                     key={`header-${index}`}
                     className={cn(
                       "px-4",
-                      darkHeader ? "text-white" : undefined,
+                      darkHeader ? "text-foreground dark:text-white" : undefined,
                       headerCellClassName,
                     )}
                   >

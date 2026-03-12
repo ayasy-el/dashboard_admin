@@ -102,7 +102,11 @@ export function RankedMetricsTableCard({
   paginationInfo,
 }: RankedMetricsTableCardProps) {
   const toneClass =
-    tone === "green" ? "bg-green-50/40" : tone === "yellow" ? "bg-yellow-50/40" : "bg-red-50/40";
+    tone === "green"
+      ? "bg-green-50/50 dark:bg-green-500/10"
+      : tone === "yellow"
+        ? "bg-yellow-50/60 dark:bg-yellow-500/10"
+        : "bg-red-50/50 dark:bg-primary/10";
   const isPaginationEnabled = Boolean(pagination?.enabled);
   const [sortState, setSortState] = React.useState<{ column: number; direction: SortDirection } | null>(null);
   const pageSize = pagination?.pageSize ?? 4;
@@ -176,12 +180,22 @@ export function RankedMetricsTableCard({
         <div className="no-scrollbar overflow-x-auto">
           <Table>
           <TableHeader>
-            <TableRow className={cn(darkHeader ? "bg-black hover:bg-black" : "bg-muted/40 hover:bg-muted/40")}>
-              <TableHead className={cn("w-10 px-3 text-center", darkHeader ? "text-white" : undefined)}>{rankHeader}</TableHead>
+            <TableRow
+              className={cn(
+                darkHeader
+                  ? "bg-muted/60 hover:bg-muted/60 dark:bg-black dark:hover:bg-black"
+                  : "bg-muted/40 hover:bg-muted/40",
+              )}
+            >
+              <TableHead className={cn("w-10 px-3 text-center", darkHeader ? "text-foreground dark:text-white" : undefined)}>{rankHeader}</TableHead>
               {headerCols.map((header, index) => (
                 <TableHead
                   key={`header-${index}`}
-                  className={cn("px-3", index === 0 ? undefined : "text-right", darkHeader ? "text-white" : undefined)}
+                  className={cn(
+                    "px-3",
+                    index === 0 ? undefined : "text-right",
+                    darkHeader ? "text-foreground dark:text-white" : undefined,
+                  )}
                 >
                   {isColumnSortable(index) ? (
                     <button
