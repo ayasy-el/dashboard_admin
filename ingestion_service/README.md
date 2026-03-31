@@ -19,6 +19,15 @@ Dataset yang didukung:
 - `total_point`
 - `list_kota`
 
+Header CSV wajib per dataset:
+
+- `list_kota`: `region`, `branch`, `cluster`
+- `master`: `keyword`, `uniq_merchant`, `merchant_name`, `category`, `point_redeem`, `start_period`, `end_period`, `cluster`
+- `transactions`: `timestamp`, `keyword`, `msisdn`, `quantity`, `status`
+- `total_point`: `cluster`, `period`, `poin`, `own`
+
+Upload akan ditolak lebih awal dengan HTTP `400` jika header CSV tidak sesuai.
+
 ## Setup
 
 1. Install dependency:

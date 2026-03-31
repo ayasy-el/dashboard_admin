@@ -51,3 +51,14 @@ export type RejectedRow = {
     existing?: Array<Record<string, unknown>>;
   };
 };
+
+export type RejectedListResponse = {
+  batch_id: string;
+  dataset: string;
+  rejected_count: number;
+  auto_removed_count: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  items: RejectedRow[];
+};

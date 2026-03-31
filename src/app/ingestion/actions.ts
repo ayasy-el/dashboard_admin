@@ -1,6 +1,6 @@
 "use server";
 
-import { BatchDetail, BatchListItem, Dataset, RejectedRow } from "./types";
+import { BatchDetail, BatchListItem, Dataset, RejectedListResponse } from "./types";
 
 const API_BASE =
   process.env.INGESTION_API_URL ??
@@ -34,9 +34,8 @@ export async function getBatchDetail(batchId: string): Promise<BatchDetail> {
   return requestJson<BatchDetail>(`/ingest/${batchId}`);
 }
 
-export async function getRejected(batchId: string): Promise<RejectedRow[]> {
-  const data = await requestJson<ListResponse<RejectedRow>>(`/ingest/${batchId}/rejected`);
-  return data.items ?? [];
+export async function getRejected(batchId: string, limit = 100, offset = 0): Promise<RejectedListResponse> {
+  return requestJson<RejectedListResponse>(`/ingest/${batchId}/rejected?limit=${limit}&offset=${offset}`);
 }
 
 export async function uploadBatch(dataset: Dataset, formData: FormData): Promise<{ batch_id: string }> {

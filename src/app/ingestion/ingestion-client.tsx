@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ const conflictSearchBlob = (row: RejectedRow) => {
 };
 
 const COMPACT_CONFLICT_FIELDS = [...CONFLICT_INFO_FIELDS, ...CONFLICT_CHANGE_FIELDS];
+const REJECTED_PAGE_SIZE = 100;
 const normalized = (value: unknown) => toText(value).trim().toLowerCase();
 const fieldChanged = (incoming: Record<string, unknown>, existing: Record<string, unknown>, field: string) =>
   normalized(incoming[field]) !== normalized(existing[field]);
@@ -106,37 +107,58 @@ export default function IngestionClient({ initialBatches, initialError = null }:
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [batchDetail, setBatchDetail] = useState<BatchDetail | null>(null);
   const [rejected, setRejected] = useState<RejectedRow[]>([]);
+  const [rejectedCount, setRejectedCount] = useState(0);
+  const [rejectedPage, setRejectedPage] = useState(1);
+  const [hasMoreRejected, setHasMoreRejected] = useState(false);
   const [selectedRejectedIds, setSelectedRejectedIds] = useState<number[]>([]);
   const [expandedComparisonIds, setExpandedComparisonIds] = useState<number[]>([]);
   const [loadingIssueResolution, setLoadingIssueResolution] = useState(false);
   const [issueSearch, setIssueSearch] = useState("");
   const [issueTypeFilter, setIssueTypeFilter] = useState("ALL");
   const [issueSolveFilter, setIssueSolveFilter] = useState("ALL");
+  const batchDetailRequestId = useRef(0);
+  const deferredIssueSearch = useDeferredValue(issueSearch);
 
   const loadBatches = useCallback(async () => {
     const data = await getBatches();
     setBatches(data);
   }, []);
 
-  const loadBatchDetail = useCallback(async (batchId: string) => {
+  const loadBatchDetail = useCallback(async (batchId: string, page = 1) => {
+    const requestId = batchDetailRequestId.current + 1;
+    batchDetailRequestId.current = requestId;
     setLoadingIssueResolution(true);
     try {
-      const [statusData, rejectedData] = await Promise.all([getBatchDetail(batchId), getRejected(batchId)]);
+      const offset = (page - 1) * REJECTED_PAGE_SIZE;
+      const [statusData, rejectedData] = await Promise.all([
+        getBatchDetail(batchId),
+        getRejected(batchId, REJECTED_PAGE_SIZE, offset),
+      ]);
+      if (page > 1 && rejectedData.items.length === 0 && rejectedData.rejected_count > 0) {
+        await loadBatchDetail(batchId, page - 1);
+        return;
+      }
+      if (batchDetailRequestId.current !== requestId) return;
       setBatchDetail(statusData);
-      setRejected(rejectedData);
+      setRejected(rejectedData.items);
+      setRejectedCount(rejectedData.rejected_count);
+      setRejectedPage(page);
+      setHasMoreRejected(rejectedData.has_more);
       setSelectedRejectedIds([]);
       setExpandedComparisonIds([]);
     } finally {
-      setLoadingIssueResolution(false);
+      if (batchDetailRequestId.current === requestId) {
+        setLoadingIssueResolution(false);
+      }
     }
   }, []);
 
   const refreshAll = useCallback(async () => {
     await loadBatches();
     if (selectedBatchId) {
-      await loadBatchDetail(selectedBatchId);
+      await loadBatchDetail(selectedBatchId, rejectedPage);
     }
-  }, [loadBatches, loadBatchDetail, selectedBatchId]);
+  }, [loadBatches, loadBatchDetail, rejectedPage, selectedBatchId]);
 
   useEffect(() => {
     if (initialBatches.length === 0 && !initialError) {
@@ -160,7 +182,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
       const batchId = body.batch_id as string;
       setSelectedBatchId(batchId);
       await loadBatches();
-      await loadBatchDetail(batchId);
+      await loadBatchDetail(batchId, 1);
       setFile(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload gagal");
@@ -174,7 +196,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
     setBusy(true);
     try {
       await ignoreRejected(selectedBatchId, rejectedId);
-      await loadBatchDetail(selectedBatchId);
+      await loadBatchDetail(selectedBatchId, rejectedPage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal ignore rejected row");
     } finally {
@@ -187,8 +209,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
     setBusy(true);
     try {
       await solveRejected(selectedBatchId, rejectedId);
-      await loadBatchDetail(selectedBatchId);
-      await loadBatches();
+      await Promise.all([loadBatchDetail(selectedBatchId, rejectedPage), loadBatches()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal solve rejected row");
     } finally {
@@ -205,9 +226,9 @@ export default function IngestionClient({ initialBatches, initialError = null }:
       await loadBatches();
       if (newBatchId) {
         setSelectedBatchId(newBatchId);
-        await loadBatchDetail(newBatchId);
+        await loadBatchDetail(newBatchId, 1);
       } else if (selectedBatchId === batchId) {
-        await loadBatchDetail(batchId);
+        await loadBatchDetail(batchId, rejectedPage);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal rerun batch");
@@ -269,8 +290,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
           await ignoreRejected(selectedBatchId, rejectedId);
         }),
       );
-      await loadBatchDetail(selectedBatchId);
-      await loadBatches();
+      await Promise.all([loadBatchDetail(selectedBatchId, rejectedPage), loadBatches()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal bulk ignore");
     } finally {
@@ -290,8 +310,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
           await solveRejected(selectedBatchId, rejectedId);
         }),
       );
-      await loadBatchDetail(selectedBatchId);
-      await loadBatches();
+      await Promise.all([loadBatchDetail(selectedBatchId, rejectedPage), loadBatches()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal bulk solve");
     } finally {
@@ -314,10 +333,9 @@ export default function IngestionClient({ initialBatches, initialError = null }:
     });
   };
 
-  const selectedBatchLabel = useMemo(
-    () => (selectedBatchId ? `Selected batch: ${selectedBatchId}` : "Pilih batch dari tabel di bawah"),
-    [selectedBatchId],
-  );
+  const selectedBatchLabel = selectedBatchId
+    ? `Selected batch: ${selectedBatchId}`
+    : "Pilih batch dari tabel di bawah";
 
   const issueTypes = useMemo(
     () => ["ALL", ...Array.from(new Set(rejected.map((row) => row.error_type))).sort()],
@@ -326,7 +344,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
 
   const filteredRejected = useMemo(() => {
     return rejected.filter((row) => {
-      const search = issueSearch.trim().toLowerCase();
+      const search = deferredIssueSearch.trim().toLowerCase();
       const conflictBlob = conflictSearchBlob(row);
       const matchesSearch =
         search.length === 0 ||
@@ -341,7 +359,11 @@ export default function IngestionClient({ initialBatches, initialError = null }:
         (issueSolveFilter === "MANUAL" && !row.resolution?.can_solve);
       return matchesSearch && matchesType && matchesSolve;
     });
-  }, [rejected, issueSearch, issueTypeFilter, issueSolveFilter]);
+  }, [rejected, deferredIssueSearch, issueTypeFilter, issueSolveFilter]);
+
+  const totalRejectedPages = Math.max(1, Math.ceil(rejectedCount / REJECTED_PAGE_SIZE));
+  const rejectedPageStart = rejectedCount === 0 ? 0 : (rejectedPage - 1) * REJECTED_PAGE_SIZE + 1;
+  const rejectedPageEnd = rejectedCount === 0 ? 0 : Math.min(rejectedPage * REJECTED_PAGE_SIZE, rejectedCount);
 
   return (
     <DashboardPageShell sidebarWidth="16rem">
@@ -429,7 +451,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
                         aria-selected={isSelected}
                         onClick={() => {
                           setSelectedBatchId(batch.batch_id);
-                          void loadBatchDetail(batch.batch_id);
+                          void loadBatchDetail(batch.batch_id, 1);
                         }}
                       >
                         <td className="p-2">
@@ -567,7 +589,9 @@ export default function IngestionClient({ initialBatches, initialError = null }:
                 ? "Loading issues..."
                 : selectedRejectedIds.length > 0
                   ? `${selectedRejectedIds.length} row selected`
-                  : "Belum ada row yang dipilih."}
+                  : batchDetail
+                    ? `Menampilkan ${rejected.length} dari ${rejectedCount} rejected row`
+                    : "Belum ada row yang dipilih."}
             </CardDescription>
           </CardHeader>
           <CardContent className="px-6 py-5">
@@ -611,6 +635,36 @@ export default function IngestionClient({ initialBatches, initialError = null }:
             {batchDetail?.failed_reason ? (
               <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 {batchDetail.failed_reason}
+              </div>
+            ) : null}
+            {batchDetail ? (
+              <div className="mb-3 flex flex-col gap-2 text-sm text-foreground/75 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  Rejected rows besar dimuat per halaman agar dashboard tidak hang. Menampilkan {rejectedPageStart}-{rejectedPageEnd} dari {rejectedCount}.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-9 cursor-pointer disabled:cursor-not-allowed"
+                    variant="outline"
+                    disabled={busy || loadingIssueResolution || rejectedPage <= 1}
+                    onClick={() => selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage - 1)}
+                  >
+                    Prev
+                  </Button>
+                  <span className="min-w-24 text-center text-xs font-medium text-muted-foreground">
+                    Page {rejectedPage} / {totalRejectedPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="h-9 cursor-pointer disabled:cursor-not-allowed"
+                    variant="outline"
+                    disabled={busy || loadingIssueResolution || !hasMoreRejected}
+                    onClick={() => selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             ) : null}
             <div className="mb-3">

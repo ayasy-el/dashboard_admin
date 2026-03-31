@@ -196,25 +196,49 @@ def touch_batch(
         conn.commit()
 
 
-def get_rejected_rows(batch_id: str) -> list[dict[str, Any]]:
+def count_rejected_rows(batch_id: str) -> int:
     internal_batch_id = resolve_batch_uuid(batch_id)
     if not internal_batch_id:
-        return []
+        return 0
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            select bil.id, %s as batch_id, bil.dataset, bil.row_num,
-                   bil.error_type, bil.error_message, bil.raw_payload, bil.created_at
+            select count(*) as total
             from audit.batch_issue_links bil
             join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
             where bil.batch_id = %s::uuid
               and bil.state = 'ACTIVE'
               and ii.status = 'OPEN'
-            order by bil.row_num asc, bil.id asc
             """,
-            (batch_id, internal_batch_id),
+            (internal_batch_id,),
         )
+        row = cur.fetchone()
+        return int(row["total"] or 0) if row else 0
+
+
+def get_rejected_rows(batch_id: str, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
+    internal_batch_id = resolve_batch_uuid(batch_id)
+    if not internal_batch_id:
+        return []
+
+    query = """
+        select bil.id, %s as batch_id, bil.dataset, bil.row_num,
+               bil.error_type, bil.error_message, bil.raw_payload, bil.created_at
+        from audit.batch_issue_links bil
+        join audit.ingestion_issues ii on ii.issue_id = bil.issue_id
+        where bil.batch_id = %s::uuid
+          and bil.state = 'ACTIVE'
+          and ii.status = 'OPEN'
+        order by bil.row_num asc, bil.id asc
+    """
+    params: list[Any] = [batch_id, internal_batch_id]
+    if limit is not None:
+        query += " limit %s offset %s"
+        params.extend([limit, max(offset, 0)])
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(query, tuple(params))
         return cur.fetchall()
 
 

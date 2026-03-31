@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 from pathlib import Path
 import uuid
 import os
@@ -9,8 +11,14 @@ from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from ingestion_service.config import DATASETS, FAILED_STATUSES, REJECT_THRESHOLD, UPLOAD_DIR
+from ingestion_service.config import (
+    DATASETS,
+    FAILED_STATUSES,
+    REJECT_THRESHOLD,
+    UPLOAD_DIR,
+)
 from ingestion_service.db import (
+    count_rejected_rows,
     create_batch,
     create_rerun_batch,
     delete_rejected_row,
@@ -26,6 +34,21 @@ from ingestion_service.flows import run_ingestion_flow
 
 app = FastAPI(title="Data Ingestion Service", version="0.1.0")
 RERUN_ALLOWED_STATUSES = FAILED_STATUSES | {"SUCCESS"}
+REQUIRED_CSV_HEADERS: dict[str, set[str]] = {
+    "list_kota": {"region", "branch", "cluster"},
+    "master": {
+        "keyword",
+        "uniq_merchant",
+        "merchant_name",
+        "category",
+        "point_redeem",
+        "start_period",
+        "end_period",
+        "cluster",
+    },
+    "transactions": {"timestamp", "keyword", "msisdn", "quantity", "status"},
+    "total_point": {"cluster", "period", "poin", "own"},
+}
 
 allowed_origins = [
     origin.strip()
@@ -52,6 +75,60 @@ def _to_iso(value: Any) -> str | None:
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value) if value is not None else None
+
+
+def _normalize_csv_header(value: str) -> str:
+    return value.strip().lower()
+
+
+def _detect_csv_delimiter(sample_text: str) -> str:
+    return ";" if sample_text.count(";") >= sample_text.count(",") else ","
+
+
+def _validate_csv_headers(dataset: str, content: bytes) -> None:
+    sample_text = content.decode("utf-8-sig", errors="ignore")
+    if not sample_text.strip():
+        raise HTTPException(status_code=400, detail="File CSV kosong")
+
+    delimiter = _detect_csv_delimiter(sample_text[:4096])
+    reader = csv.reader(io.StringIO(sample_text), delimiter=delimiter)
+    try:
+        raw_headers = next(reader)
+    except StopIteration:
+        raise HTTPException(status_code=400, detail="CSV tidak memiliki header")
+
+    normalized_headers = [
+        _normalize_csv_header(header) for header in raw_headers if header.strip()
+    ]
+    if not normalized_headers:
+        raise HTTPException(
+            status_code=400, detail="CSV tidak memiliki header yang valid"
+        )
+
+    duplicated_headers = sorted(
+        {
+            header
+            for header in normalized_headers
+            if normalized_headers.count(header) > 1
+        }
+    )
+    if duplicated_headers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Header CSV duplikat: {', '.join(duplicated_headers)}",
+        )
+
+    expected_headers = REQUIRED_CSV_HEADERS[dataset]
+    header_set = set(normalized_headers)
+    missing_headers = sorted(expected_headers - header_set)
+    if missing_headers:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Header CSV untuk dataset {dataset} tidak sesuai. "
+                f"Kolom wajib yang belum ada: {', '.join(missing_headers)}"
+            ),
+        )
 
 
 def _merchant_info_map(merchant_keys: list[str]) -> dict[str, dict[str, Any]]:
@@ -84,7 +161,9 @@ def _merchant_info_map(merchant_keys: list[str]) -> dict[str, dict[str, Any]]:
     return {row["merchant_key"]: row for row in rows}
 
 
-def _enrich_conflict_payload(payload: dict[str, Any], incoming: dict[str, Any], existing: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _enrich_conflict_payload(
+    payload: dict[str, Any], incoming: dict[str, Any], existing: list[dict[str, Any]]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     # Fill incoming business fields from raw_payload (legacy rejected rows may miss these keys).
     for key in ["keyword", "merchant_name", "uniq_merchant", "category", "cluster"]:
         if not incoming.get(key):
@@ -106,8 +185,12 @@ def _enrich_conflict_payload(payload: dict[str, Any], incoming: dict[str, Any], 
     incoming_info = info_map.get(incoming_merchant_key)
     if incoming_info:
         incoming["keyword"] = incoming.get("keyword") or incoming_info.get("keyword")
-        incoming["merchant_name"] = incoming.get("merchant_name") or incoming_info.get("merchant_name")
-        incoming["uniq_merchant"] = incoming.get("uniq_merchant") or incoming_info.get("uniq_merchant")
+        incoming["merchant_name"] = incoming.get("merchant_name") or incoming_info.get(
+            "merchant_name"
+        )
+        incoming["uniq_merchant"] = incoming.get("uniq_merchant") or incoming_info.get(
+            "uniq_merchant"
+        )
         incoming["category"] = incoming.get("category") or incoming_info.get("category")
         incoming["cluster"] = incoming.get("cluster") or incoming_info.get("cluster")
 
@@ -118,8 +201,12 @@ def _enrich_conflict_payload(payload: dict[str, Any], incoming: dict[str, Any], 
         info = info_map.get(mk)
         if info:
             current["keyword"] = current.get("keyword") or info.get("keyword")
-            current["merchant_name"] = current.get("merchant_name") or info.get("merchant_name")
-            current["uniq_merchant"] = current.get("uniq_merchant") or info.get("uniq_merchant")
+            current["merchant_name"] = current.get("merchant_name") or info.get(
+                "merchant_name"
+            )
+            current["uniq_merchant"] = current.get("uniq_merchant") or info.get(
+                "uniq_merchant"
+            )
             current["category"] = current.get("category") or info.get("category")
             current["cluster"] = current.get("cluster") or info.get("cluster")
         enriched_existing.append(current)
@@ -127,7 +214,9 @@ def _enrich_conflict_payload(payload: dict[str, Any], incoming: dict[str, Any], 
     return incoming, enriched_existing
 
 
-def _current_existing_rules_for_incoming(incoming: dict[str, Any], limit: int = 5) -> list[dict[str, Any]] | None:
+def _current_existing_rules_for_incoming(
+    incoming: dict[str, Any], limit: int = 5
+) -> list[dict[str, Any]] | None:
     merchant_key = str(incoming.get("merchant_key") or "").strip()
     start_period = incoming.get("start_period")
     end_period = incoming.get("end_period")
@@ -183,7 +272,9 @@ def _current_existing_rules_for_incoming(incoming: dict[str, Any], limit: int = 
     ]
 
 
-def _has_exact_period_match(incoming: dict[str, Any], existing: list[dict[str, Any]]) -> bool:
+def _has_exact_period_match(
+    incoming: dict[str, Any], existing: list[dict[str, Any]]
+) -> bool:
     return any(
         item.get("start_period") == incoming.get("start_period")
         and item.get("end_period") == incoming.get("end_period")
@@ -191,7 +282,9 @@ def _has_exact_period_match(incoming: dict[str, Any], existing: list[dict[str, A
     )
 
 
-def _find_extendable_period_match(incoming: dict[str, Any], existing: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _find_extendable_period_match(
+    incoming: dict[str, Any], existing: list[dict[str, Any]]
+) -> dict[str, Any] | None:
     incoming_start = incoming.get("start_period")
     incoming_end = incoming.get("end_period")
     if not incoming_start or not incoming_end:
@@ -210,7 +303,11 @@ def _find_extendable_period_match(incoming: dict[str, Any], existing: list[dict[
     return candidates[-1]
 
 
-def _resolution_for_row(row: dict[str, Any], incoming: dict[str, Any] | None = None, existing: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _resolution_for_row(
+    row: dict[str, Any],
+    incoming: dict[str, Any] | None = None,
+    existing: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     payload = row.get("raw_payload") or {}
     conflict = payload.get("__conflict") if isinstance(payload, dict) else None
     kind = conflict.get("kind") if isinstance(conflict, dict) else None
@@ -222,20 +319,22 @@ def _resolution_for_row(row: dict[str, Any], incoming: dict[str, Any] | None = N
         can_extend_period = False
         if incoming is not None and existing is not None:
             auto_solve = _has_exact_period_match(incoming, existing)
-            can_extend_period = _find_extendable_period_match(incoming, existing) is not None
+            can_extend_period = (
+                _find_extendable_period_match(incoming, existing) is not None
+            )
         if auto_solve:
             return {
                 "can_solve": True,
                 "solve_mode": "APPLY_TO_EXISTING_EXACT_PERIOD",
                 "label": "Apply data baru ke rule existing (period sama)",
-                "help": "Akan update point_redeem pada rule existing yang period-nya sama persis.",
+                "help": "-",
             }
         if can_extend_period:
             return {
                 "can_solve": True,
                 "solve_mode": "EXTEND_EXISTING_PERIOD",
                 "label": "Perpanjang end_period rule existing",
-                "help": "Akan extend end_period rule existing (start_period sama dan end_period incoming lebih panjang).",
+                "help": "-",
             }
         return {
             "can_solve": False,
@@ -252,7 +351,11 @@ def _resolution_for_row(row: dict[str, Any], incoming: dict[str, Any] | None = N
             "help": "Data referensi/dependency perlu diperbaiki dulu, lalu rerun batch.",
         }
 
-    if "cluster tidak ditemukan" in msg or "merchant tidak ditemukan" in msg or "rule tidak ditemukan" in msg:
+    if (
+        "cluster tidak ditemukan" in msg
+        or "merchant tidak ditemukan" in msg
+        or "rule tidak ditemukan" in msg
+    ):
         return {
             "can_solve": False,
             "solve_mode": "MANUAL_REQUIRED",
@@ -296,8 +399,13 @@ def _decorate_rejected_row(row: dict[str, Any]) -> dict[str, Any]:
 def _apply_solve_for_row(row: dict[str, Any]) -> None:
     payload = row.get("raw_payload") or {}
     conflict = payload.get("__conflict") if isinstance(payload, dict) else None
-    if not isinstance(conflict, dict) or conflict.get("kind") not in {"RULE_PERIOD_OVERLAP", "RULE_PERIOD_SHORTER"}:
-        raise HTTPException(status_code=409, detail="Tipe error ini belum support auto-solve")
+    if not isinstance(conflict, dict) or conflict.get("kind") not in {
+        "RULE_PERIOD_OVERLAP",
+        "RULE_PERIOD_SHORTER",
+    }:
+        raise HTTPException(
+            status_code=409, detail="Tipe error ini belum support auto-solve"
+        )
 
     incoming = conflict.get("incoming") or {}
     existing = _current_existing_rules_for_incoming(incoming) or []
@@ -307,10 +415,9 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
 
     exact_match = None
     for item in existing:
-        if (
-            item.get("start_period") == incoming.get("start_period")
-            and item.get("end_period") == incoming.get("end_period")
-        ):
+        if item.get("start_period") == incoming.get("start_period") and item.get(
+            "end_period"
+        ) == incoming.get("end_period"):
             exact_match = item
             break
     extendable_match = _find_extendable_period_match(incoming, existing)
@@ -318,7 +425,10 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
     with get_conn() as conn, conn.cursor() as cur:
         if resolution["solve_mode"] == "APPLY_TO_EXISTING_EXACT_PERIOD":
             if not exact_match:
-                raise HTTPException(status_code=409, detail="Tidak ditemukan existing rule dengan period yang sama persis")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Tidak ditemukan existing rule dengan period yang sama persis",
+                )
             cur.execute(
                 """
                 update public.dim_rule
@@ -329,7 +439,10 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
             )
         elif resolution["solve_mode"] == "EXTEND_EXISTING_PERIOD":
             if not extendable_match:
-                raise HTTPException(status_code=409, detail="Tidak ditemukan rule existing yang bisa di-extend")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Tidak ditemukan rule existing yang bisa di-extend",
+                )
             cur.execute(
                 """
                 update public.dim_rule
@@ -349,7 +462,9 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
 
         if cur.rowcount == 0:
             conn.rollback()
-            raise HTTPException(status_code=409, detail="Existing rule tidak ditemukan saat apply solve")
+            raise HTTPException(
+                status_code=409, detail="Existing rule tidak ditemukan saat apply solve"
+            )
         conn.commit()
 
 
@@ -468,9 +583,11 @@ async def ingest_csv(
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="File harus CSV")
 
+    content = await file.read()
+    _validate_csv_headers(dataset, content)
+
     safe_name = Path(file.filename).name
     target_file = UPLOAD_DIR / f"{dataset}__{uuid.uuid4().hex}__{safe_name}"
-    content = await file.read()
     target_file.write_bytes(content)
 
     batch = create_batch(dataset, target_file)
@@ -559,18 +676,29 @@ def rerun_batch(batch_id: str, background_tasks: BackgroundTasks):
 
 
 @app.get("/ingest/{batch_id}/rejected")
-def get_batch_rejected(batch_id: str):
+def get_batch_rejected(
+    batch_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
     batch = get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
-    rows = [_decorate_rejected_row(row) for row in get_rejected_rows(batch_id)]
+    total_count = count_rejected_rows(batch_id)
+    rows = [
+        _decorate_rejected_row(row)
+        for row in get_rejected_rows(batch_id, limit=limit, offset=offset)
+    ]
 
     return {
         "batch_id": batch_id,
         "dataset": batch["dataset"],
-        "rejected_count": len(rows),
+        "rejected_count": total_count,
         "auto_removed_count": 0,
+        "limit": limit,
+        "offset": offset,
+        "has_more": (offset + len(rows)) < total_count,
         "items": rows,
     }
 
@@ -614,7 +742,9 @@ def solve_rejected(
     _apply_solve_for_row(row)
     affected_batches = resolve_issue_and_delete_links(batch_id, rejected_id, batch_id)
     if not affected_batches:
-        raise HTTPException(status_code=409, detail="Issue link tidak ditemukan untuk rejected row ini")
+        raise HTTPException(
+            status_code=409, detail="Issue link tidak ditemukan untuk rejected row ini"
+        )
 
     metrics = _refresh_batch_metrics_after_solve(batch_id)
     for affected_batch_id in affected_batches:
@@ -626,7 +756,9 @@ def solve_rejected(
     if rerun:
         rerun_batch_meta = create_rerun_batch(batch_id)
         rerun_batch_id = rerun_batch_meta["batch_id"]
-        background_tasks.add_task(run_ingestion_flow, rerun_batch_meta["internal_batch_id"])
+        background_tasks.add_task(
+            run_ingestion_flow, rerun_batch_meta["internal_batch_id"]
+        )
         queued = True
 
     return {
