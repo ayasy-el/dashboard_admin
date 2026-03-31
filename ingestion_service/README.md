@@ -50,6 +50,11 @@ uvicorn ingestion_service.main:app --reload --port 8001
 
 ## Prefect
 
+```bash
+cd ingestion_service
+prefect server start
+```
+
 Flow ada di `ingestion_service/flows.py` (`csv-ingestion`):
 
 - retry task otomatis (`retries=2`)

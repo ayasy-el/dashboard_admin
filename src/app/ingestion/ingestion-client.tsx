@@ -71,6 +71,31 @@ const base64ToBlob = (base64: string, contentType?: string | null) => {
   return new Blob([bytes], { type: contentType ?? "application/octet-stream" });
 };
 
+const selectClassName =
+  "h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] dark:[color-scheme:dark] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50";
+
+const tallSelectClassName =
+  "h-11 w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] dark:[color-scheme:dark] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50";
+
+function SelectChevron() {
+  return (
+    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </span>
+  );
+}
+
 export default function IngestionClient({ initialBatches, initialError = null }: IngestionClientProps) {
   const [dataset, setDataset] = useState<Dataset>("transactions");
   const [file, setFile] = useState<File | null>(null);
@@ -330,18 +355,21 @@ export default function IngestionClient({ initialBatches, initialError = null }:
           </CardHeader>
           <CardContent className="grid gap-3 px-6 py-5">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto_auto] lg:items-center">
-              <select
-                className="h-10 w-full rounded-md border px-3 text-sm"
-                value={dataset}
-                onChange={(e) => setDataset(e.target.value as Dataset)}
-                disabled={busy}
-              >
-                {DATASETS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  className={selectClassName}
+                  value={dataset}
+                  onChange={(e) => setDataset(e.target.value as Dataset)}
+                  disabled={busy}
+                >
+                  {DATASETS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <SelectChevron />
+              </div>
               <Input
                 type="file"
                 accept=".csv"
@@ -551,28 +579,34 @@ export default function IngestionClient({ initialBatches, initialError = null }:
                 onChange={(e) => setIssueSearch(e.target.value)}
                 disabled={busy}
               />
-              <select
-                className="h-11 w-full rounded-md border px-3 text-sm"
-                value={issueTypeFilter}
-                onChange={(e) => setIssueTypeFilter(e.target.value)}
-                disabled={busy}
-              >
-                {issueTypes.map((item) => (
-                  <option key={item} value={item}>
-                    {item === "ALL" ? "All Error Types" : item}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-11 w-full rounded-md border px-3 text-sm"
-                value={issueSolveFilter}
-                onChange={(e) => setIssueSolveFilter(e.target.value)}
-                disabled={busy}
-              >
-                <option value="ALL">All Solveability</option>
-                <option value="SOLVABLE">Auto Solvable</option>
-                <option value="MANUAL">Manual Required</option>
-              </select>
+              <div className="relative">
+                <select
+                  className={tallSelectClassName}
+                  value={issueTypeFilter}
+                  onChange={(e) => setIssueTypeFilter(e.target.value)}
+                  disabled={busy}
+                >
+                  {issueTypes.map((item) => (
+                    <option key={item} value={item}>
+                      {item === "ALL" ? "All Error Types" : item}
+                    </option>
+                  ))}
+                </select>
+                <SelectChevron />
+              </div>
+              <div className="relative">
+                <select
+                  className={tallSelectClassName}
+                  value={issueSolveFilter}
+                  onChange={(e) => setIssueSolveFilter(e.target.value)}
+                  disabled={busy}
+                >
+                  <option value="ALL">All Solveability</option>
+                  <option value="SOLVABLE">Auto Solvable</option>
+                  <option value="MANUAL">Manual Required</option>
+                </select>
+                <SelectChevron />
+              </div>
             </div>
             {batchDetail?.failed_reason ? (
               <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
