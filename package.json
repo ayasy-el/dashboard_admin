@@ -11,7 +11,8 @@
     "db:migrate": "bash -lc \"set -a; source .env; set +a; drizzle-kit migrate\"",
     "db:push": "bash -lc \"set -a; source .env; set +a; drizzle-kit push\"",
     "db:push:force": "bash -lc \"set -a; source .env; set +a; drizzle-kit push --force\"",
-    "db:studio": "bash -lc \"set -a; source .env; set +a; drizzle-kit studio\""
+    "db:studio": "bash -lc \"set -a; source .env; set +a; drizzle-kit studio\"",
+    "db:seed-admin": "node --env-file=.env scripts/seed-admin.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

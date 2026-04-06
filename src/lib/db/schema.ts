@@ -1,4 +1,4 @@
-import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType, pgSchema, text, numeric, jsonb, bigserial, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType, pgSchema, text, numeric, jsonb, bigserial, uniqueIndex, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const transactionStatus = pgEnum("transaction_status", ['success', 'failed'])
@@ -7,6 +7,39 @@ const dateRange = customType<{ data: string; driverData: string }>({
 		return "daterange";
 	},
 });
+
+export const adminUsers = pgTable("admin_users", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	email: varchar("email", { length: 320 }).notNull(),
+	fullName: varchar("full_name", { length: 120 }).notNull(),
+	passwordHash: text("password_hash").notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	unique("admin_users_email_unique").on(table.email),
+	index("admin_users_active_idx").on(table.isActive),
+]);
+
+export const adminSessions = pgTable("admin_sessions", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	sessionTokenHash: text("session_token_hash").notNull(),
+	ipAddress: varchar("ip_address", { length: 64 }),
+	userAgent: text("user_agent"),
+	expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+	lastUsedAt: timestamp("last_used_at", { mode: "string" }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	unique("admin_sessions_token_hash_unique").on(table.sessionTokenHash),
+	index("admin_sessions_user_id_idx").on(table.userId),
+	index("admin_sessions_expires_at_idx").on(table.expiresAt),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [adminUsers.id],
+		name: "admin_sessions_user_id_admin_users_id_fk"
+	}).onDelete("cascade"),
+]);
 
 
 export const dimCategory = pgTable("dim_category", {

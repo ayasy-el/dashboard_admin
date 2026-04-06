@@ -18,10 +18,12 @@ import {
   downloadSource,
 } from "./actions";
 import type { BatchDetail, BatchListItem, Dataset, RejectedRow } from "./types";
+import type { AuthenticatedAdmin } from "@/lib/auth";
 
 type IngestionClientProps = {
   initialBatches: BatchListItem[];
   initialError?: string | null;
+  user: AuthenticatedAdmin;
 };
 
 const DATASETS: Dataset[] = ["master", "transactions", "total_point", "list_kota"];
@@ -97,7 +99,11 @@ function SelectChevron() {
   );
 }
 
-export default function IngestionClient({ initialBatches, initialError = null }: IngestionClientProps) {
+export default function IngestionClient({
+  initialBatches,
+  initialError = null,
+  user,
+}: IngestionClientProps) {
   const [dataset, setDataset] = useState<Dataset>("transactions");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -366,7 +372,7 @@ export default function IngestionClient({ initialBatches, initialError = null }:
   const rejectedPageEnd = rejectedCount === 0 ? 0 : Math.min(rejectedPage * REJECTED_PAGE_SIZE, rejectedCount);
 
   return (
-    <DashboardPageShell sidebarWidth="16rem">
+    <DashboardPageShell sidebarWidth="16rem" user={user}>
       <div className="grid min-w-0 gap-4 bg-gradient-to-b from-background via-background to-rose-50/20 px-4 pb-6 lg:px-6">
         <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">

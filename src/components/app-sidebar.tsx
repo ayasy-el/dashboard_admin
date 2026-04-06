@@ -4,7 +4,6 @@ import * as React from "react";
 import {
   IconChartBar,
   IconDashboard,
-  IconHelp,
   IconSettings,
   IconShoppingBag,
   IconTicket,
@@ -23,14 +22,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { NavUser } from "./nav-user";
-
-const data = {
-  user: {
-    name: "Admin Dashboard",
-    email: "admin@telkomsel.co.id",
-    avatar: "",
-  },
-};
+import type { AuthenticatedAdmin } from "@/lib/auth";
 const navItems = [
   {
     title: "Overview",
@@ -62,7 +54,12 @@ const systemItems = [
   },
 ];
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  user: AuthenticatedAdmin;
+}) {
   const pathname = usePathname();
 
   return (
@@ -124,7 +121,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: user.fullName,
+            email: user.email,
+            avatar: "",
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
   );

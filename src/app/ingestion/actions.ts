@@ -1,6 +1,7 @@
 "use server";
 
 import { BatchDetail, BatchListItem, Dataset, RejectedListResponse } from "./types";
+import { requireAdminUser } from "@/lib/auth";
 
 const API_BASE =
   process.env.INGESTION_API_URL ??
@@ -26,19 +27,23 @@ const requestJson = async <T,>(path: string, init?: RequestInit): Promise<T> => 
 };
 
 export async function getBatches(): Promise<BatchListItem[]> {
+  await requireAdminUser("/ingestion");
   const data = await requestJson<ListResponse<BatchListItem>>("/ingest");
   return data.items ?? [];
 }
 
 export async function getBatchDetail(batchId: string): Promise<BatchDetail> {
+  await requireAdminUser("/ingestion");
   return requestJson<BatchDetail>(`/ingest/${batchId}`);
 }
 
 export async function getRejected(batchId: string, limit = 100, offset = 0): Promise<RejectedListResponse> {
+  await requireAdminUser("/ingestion");
   return requestJson<RejectedListResponse>(`/ingest/${batchId}/rejected?limit=${limit}&offset=${offset}`);
 }
 
 export async function uploadBatch(dataset: Dataset, formData: FormData): Promise<{ batch_id: string }> {
+  await requireAdminUser("/ingestion");
   return requestJson<{ batch_id: string }>(`/ingest/${dataset}`, {
     method: "POST",
     body: formData,
@@ -46,18 +51,21 @@ export async function uploadBatch(dataset: Dataset, formData: FormData): Promise
 }
 
 export async function rerunBatch(batchId: string): Promise<{ new_batch_id?: string }> {
+  await requireAdminUser("/ingestion");
   return requestJson<{ new_batch_id?: string }>(`/ingest/${batchId}/rerun`, {
     method: "POST",
   });
 }
 
 export async function ignoreRejected(batchId: string, rejectedId: number): Promise<void> {
+  await requireAdminUser("/ingestion");
   await requestJson(`/ingest/${batchId}/rejected/${rejectedId}/ignore`, {
     method: "POST",
   });
 }
 
 export async function solveRejected(batchId: string, rejectedId: number): Promise<void> {
+  await requireAdminUser("/ingestion");
   await requestJson(`/ingest/${batchId}/rejected/${rejectedId}/solve`, {
     method: "POST",
   });
@@ -68,6 +76,7 @@ export async function downloadSource(batchId: string): Promise<{
   contentType: string | null;
   base64: string;
 }> {
+  await requireAdminUser("/ingestion");
   const res = await fetch(`${toBaseUrl()}/ingest/${batchId}/source`, { cache: "no-store" });
   if (!res.ok) {
     const body = await res.text();

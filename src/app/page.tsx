@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
+
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { getMonthOptions } from "@/features/shared/get-month-options";
 import { getOverviewDashboard } from "@/features/overview/get-overview-dashboard";
 import { OverviewContent } from "@/features/overview/components/overview-content";
 import { OverviewRepositoryDrizzle } from "@/features/overview/overview.repository.drizzle";
+import { requireAdminUser } from "@/lib/auth";
+
+export const metadata: Metadata = {
+  title: "Overview | Telkomsel Poin Merchant Dashboard",
+  description: "Overview dashboard admin Telkomsel Poin Merchant.",
+};
 
 type PageProps = {
   searchParams?: Promise<{
@@ -19,6 +27,7 @@ const toArrayParam = (value: string | string[] | undefined) => {
 };
 
 export default async function Page({ searchParams }: PageProps) {
+  const user = await requireAdminUser("/");
   const params = (await searchParams) ?? {};
   const monthQuery = Array.isArray(params.month) ? params.month[0] ?? null : params.month ?? null;
   const categoryQuery = toArrayParam(params.category);
@@ -34,7 +43,7 @@ export default async function Page({ searchParams }: PageProps) {
   });
 
   return (
-    <DashboardPageShell sidebarWidth="16rem">
+    <DashboardPageShell sidebarWidth="16rem" user={user}>
       <OverviewContent data={data} monthOptions={monthOptions} selectedMonth={data.month} />
     </DashboardPageShell>
   );
