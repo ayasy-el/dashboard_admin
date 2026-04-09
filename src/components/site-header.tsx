@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,6 +11,7 @@ import { IconHome } from "@tabler/icons-react";
 const routeTitles: Record<string, string> = {
   "/": "Overview",
   "/operational": "Operational",
+  "/merchant": "Merchant",
   "/ingestion": "Ingestion",
 };
 
@@ -19,6 +19,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const title = useMemo(() => {
     if (!pathname) return "Overview";
+    if (pathname.startsWith("/merchant/")) return "Merchant Detail";
+    if (pathname.startsWith("/operational/merchant/")) return "Merchant Detail";
     return routeTitles[pathname] ?? "Overview";
   }, [pathname]);
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   IconChartBar,
   IconDashboard,
+  IconBuildingStore,
   IconSettings,
   IconShoppingBag,
   IconTicket,
@@ -33,6 +34,11 @@ const navItems = [
     title: "Operational",
     url: "/operational",
     icon: IconChartBar,
+  },
+  {
+    title: "Merchant",
+    url: "/merchant",
+    icon: IconBuildingStore,
   },
 ];
 
