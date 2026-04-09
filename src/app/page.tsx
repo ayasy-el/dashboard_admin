@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { getMonthOptions } from "@/features/shared/get-month-options";
@@ -6,40 +7,26 @@ import { getOverviewDashboard } from "@/features/overview/get-overview-dashboard
 import { OverviewContent } from "@/features/overview/components/overview-content";
 import { OverviewRepositoryDrizzle } from "@/features/overview/overview.repository.drizzle";
 import { requireAdminUser } from "@/lib/auth";
+import { DASHBOARD_FILTER_COOKIE_NAME, parseDashboardFilterCookie } from "@/lib/dashboard-filters";
 
 export const metadata: Metadata = {
   title: "Overview | Telkomsel Poin Merchant Dashboard",
   description: "Overview dashboard admin Telkomsel Poin Merchant.",
 };
 
-type PageProps = {
-  searchParams?: Promise<{
-    month?: string | string[];
-    category?: string | string[];
-    branch?: string | string[];
-  }>;
-};
-
-const toArrayParam = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) return value.map((item) => item.trim()).filter(Boolean);
-  if (typeof value === "string" && value.trim()) return [value.trim()];
-  return [];
-};
-
-export default async function Page({ searchParams }: PageProps) {
+export default async function Page() {
   const user = await requireAdminUser("/");
-  const params = (await searchParams) ?? {};
-  const monthQuery = Array.isArray(params.month) ? params.month[0] ?? null : params.month ?? null;
-  const categoryQuery = toArrayParam(params.category);
-  const branchQuery = toArrayParam(params.branch);
+  const cookieStore = await cookies();
+  const persistedFilters = parseDashboardFilterCookie(cookieStore.get(DASHBOARD_FILTER_COOKIE_NAME)?.value);
 
   const monthOptions = await getMonthOptions();
-  const effectiveMonth = monthQuery ?? monthOptions[0]?.value ?? null;
+  const effectiveMonth =
+    monthOptions.find((option) => option.value === persistedFilters.month)?.value ?? monthOptions[0]?.value ?? null;
 
   const repo = new OverviewRepositoryDrizzle();
   const data = await getOverviewDashboard(repo, effectiveMonth, {
-    categories: categoryQuery,
-    branches: branchQuery,
+    categories: persistedFilters.categories,
+    branches: persistedFilters.branches,
   });
 
   return (

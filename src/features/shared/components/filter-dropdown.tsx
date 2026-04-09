@@ -2,11 +2,17 @@
 
 import * as React from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  DASHBOARD_FILTER_COOKIE_MAX_AGE,
+  DASHBOARD_FILTER_COOKIE_NAME,
+  parseDashboardFilterCookie,
+  serializeDashboardFilterCookie,
+} from "@/lib/dashboard-filters";
 import { cn } from "@/lib/utils";
 
 export type FilterOption = {
@@ -32,20 +38,31 @@ type SingleFilterDropdownProps = {
 
 const normalize = (value: string) => value.toLowerCase().trim();
 
-function updateMultiParam({
-  params,
+const updateDashboardFilterCookie = ({
   paramKey,
-  values,
+  value,
 }: {
-  params: URLSearchParams;
   paramKey: string;
-  values: string[];
-}) {
-  params.delete(paramKey);
-  for (const value of values) {
-    params.append(paramKey, value);
-  }
-}
+  value: string | string[];
+}) => {
+  const cookieValue = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith(`${DASHBOARD_FILTER_COOKIE_NAME}=`))
+    ?.split("=")
+    .slice(1)
+    .join("=");
+  const currentFilters = parseDashboardFilterCookie(cookieValue);
+  const nextFilters =
+    paramKey === "month"
+      ? { ...currentFilters, month: typeof value === "string" ? value : currentFilters.month }
+      : paramKey === "category"
+        ? { ...currentFilters, categories: Array.isArray(value) ? value : currentFilters.categories }
+        : paramKey === "branch"
+          ? { ...currentFilters, branches: Array.isArray(value) ? value : currentFilters.branches }
+          : currentFilters;
+
+  document.cookie = `${DASHBOARD_FILTER_COOKIE_NAME}=${serializeDashboardFilterCookie(nextFilters)}; path=/; max-age=${DASHBOARD_FILTER_COOKIE_MAX_AGE}; samesite=lax`;
+};
 
 export function MultiFilterDropdown({
   title,
@@ -55,8 +72,7 @@ export function MultiFilterDropdown({
   className,
 }: MultiFilterDropdownProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
   const [query, setQuery] = React.useState("");
 
   const selectedSet = React.useMemo(() => new Set(selectedValues), [selectedValues]);
@@ -68,9 +84,10 @@ export function MultiFilterDropdown({
   }, [options, query]);
 
   const pushValues = (values: string[]) => {
-    const params = new URLSearchParams(searchParams.toString());
-    updateMultiParam({ params, paramKey, values });
-    router.push(`${pathname}?${params.toString()}`);
+    updateDashboardFilterCookie({ paramKey, value: values });
+    startTransition(() => {
+      router.refresh();
+    });
   };
 
   const toggleValue = (value: string) => {
@@ -161,6 +178,7 @@ export function MultiFilterDropdown({
                     type="button"
                     size="xs"
                     variant="secondary"
+                    disabled={isPending}
                     className="h-7 px-2 text-[11px] opacity-0 pointer-events-none transition-opacity group-hover/item:opacity-100 group-hover/item:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
                     onClick={() => selectOnly(option.value)}
                   >
@@ -187,8 +205,7 @@ export function SingleFilterDropdown({
   className,
 }: SingleFilterDropdownProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
 
@@ -200,10 +217,11 @@ export function SingleFilterDropdown({
   }, [options, query]);
 
   const setValue = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(paramKey, value);
-    router.push(`${pathname}?${params.toString()}`);
+    updateDashboardFilterCookie({ paramKey, value });
     setOpen(false);
+    startTransition(() => {
+      router.refresh();
+    });
   };
 
   return (
@@ -233,6 +251,7 @@ export function SingleFilterDropdown({
                 <button
                   key={option.value}
                   type="button"
+                  disabled={isPending}
                   className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-sm hover:bg-muted/50"
                   onClick={() => setValue(option.value)}
                 >
