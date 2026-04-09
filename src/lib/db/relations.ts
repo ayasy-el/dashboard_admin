@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { dimCategory, dimMerchant, dimCluster, dimRule, factTransaction, factClusterPoint } from "./schema";
+import { dimCategory, dimMerchant, dimCluster, factClusterPoint, factTransaction, dimRule, adminUsers, adminSessions, users, merchantFeedback, merchantUsers } from "./schema";
 
 export const dimMerchantRelations = relations(dimMerchant, ({one, many}) => ({
 	dimCategory: one(dimCategory, {
@@ -46,5 +46,35 @@ export const factClusterPointRelations = relations(factClusterPoint, ({one}) => 
 	dimCluster: one(dimCluster, {
 		fields: [factClusterPoint.clusterId],
 		references: [dimCluster.clusterId]
+	}),
+}));
+
+export const adminSessionsRelations = relations(adminSessions, ({one}) => ({
+	adminUser: one(adminUsers, {
+		fields: [adminSessions.userId],
+		references: [adminUsers.id]
+	}),
+}));
+
+export const adminUsersRelations = relations(adminUsers, ({many}) => ({
+	adminSessions: many(adminSessions),
+}));
+
+export const merchantFeedbackRelations = relations(merchantFeedback, ({one}) => ({
+	user: one(users, {
+		fields: [merchantFeedback.userId],
+		references: [users.id]
+	}),
+}));
+
+export const usersRelations = relations(users, ({many}) => ({
+	merchantFeedbacks: many(merchantFeedback),
+	merchantUsers: many(merchantUsers),
+}));
+
+export const merchantUsersRelations = relations(merchantUsers, ({one}) => ({
+	user: one(users, {
+		fields: [merchantUsers.userId],
+		references: [users.id]
 	}),
 }));

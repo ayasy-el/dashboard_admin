@@ -190,7 +190,9 @@ export async function getCurrentAdminUser() {
     .limit(1);
 
   if (!session || !session.isActive) {
-    await clearSessionCookie();
+    await db
+      .delete(adminSessions)
+      .where(eq(adminSessions.sessionTokenHash, tokenHash));
     return null;
   }
 

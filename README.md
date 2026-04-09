@@ -83,7 +83,7 @@ Gunakan email dan password admin yang dibuat saat menjalankan `db:seed-admin`.
 - [`src/lib/db`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/db) koneksi dan schema database
 - [`src/lib/auth.ts`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/auth.ts) logic autentikasi dan session
 - [`src/features`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/features) fitur dashboard per domain
-- [`drizzle`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/drizzle) migration SQL
+- [`src/lib/db/migration`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/db/migration) migration SQL
 - [`ingestion_service`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/ingestion_service) service ingestion terpisah (python)
 
 ## Catatan

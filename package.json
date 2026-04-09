@@ -10,6 +10,7 @@
     "db:generate": "bash -lc \"set -a; source .env; set +a; drizzle-kit generate\"",
     "db:migrate": "bash -lc \"set -a; source .env; set +a; drizzle-kit migrate\"",
     "db:push": "bash -lc \"set -a; source .env; set +a; drizzle-kit push\"",
+    "db:pull": "bash -lc \"set -a; source .env; set +a; drizzle-kit pull\"",
     "db:push:force": "bash -lc \"set -a; source .env; set +a; drizzle-kit push --force\"",
     "db:studio": "bash -lc \"set -a; source .env; set +a; drizzle-kit studio\"",
     "db:seed-admin": "node --env-file=.env scripts/seed-admin.mjs"

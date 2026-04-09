@@ -33,12 +33,6 @@ export function SiteHeader() {
           <h1 className="text-base font-semibold text-foreground">{title}</h1>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <Button variant="outline" size="sm" className="hidden border-primary/20 text-primary sm:inline-flex">
-            Import CSV
-          </Button>
-          <Button size="sm" className="hidden bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex">
-            Export
-          </Button>
           <ThemeToggle />
         </div>
       </div>

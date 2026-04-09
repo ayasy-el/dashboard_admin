@@ -1,45 +1,14 @@
-import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, check, date, timestamp, pgEnum, pgView, customType, pgSchema, text, numeric, jsonb, bigserial, uniqueIndex, boolean } from "drizzle-orm/pg-core"
+import { pgTable, integer, varchar, index, foreignKey, unique, uuid, bigint, date, check, timestamp, text, boolean, pgView, pgEnum, customType, pgSchema, numeric, bigserial, jsonb, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
+export const merchantScopeType = pgEnum("merchant_scope_type", ['merchant', 'canonical'])
 export const transactionStatus = pgEnum("transaction_status", ['success', 'failed'])
-const dateRange = customType<{ data: string; driverData: string }>({
+
+const daterange = customType<{ data: string; driverData: string }>({
 	dataType() {
 		return "daterange";
 	},
-});
-
-export const adminUsers = pgTable("admin_users", {
-	id: uuid("id").defaultRandom().primaryKey().notNull(),
-	email: varchar("email", { length: 320 }).notNull(),
-	fullName: varchar("full_name", { length: 120 }).notNull(),
-	passwordHash: text("password_hash").notNull(),
-	isActive: boolean("is_active").default(true).notNull(),
-	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow().notNull(),
-}, (table) => [
-	unique("admin_users_email_unique").on(table.email),
-	index("admin_users_active_idx").on(table.isActive),
-]);
-
-export const adminSessions = pgTable("admin_sessions", {
-	id: uuid("id").defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	sessionTokenHash: text("session_token_hash").notNull(),
-	ipAddress: varchar("ip_address", { length: 64 }),
-	userAgent: text("user_agent"),
-	expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
-	lastUsedAt: timestamp("last_used_at", { mode: "string" }).defaultNow().notNull(),
-	createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
-}, (table) => [
-	unique("admin_sessions_token_hash_unique").on(table.sessionTokenHash),
-	index("admin_sessions_user_id_idx").on(table.userId),
-	index("admin_sessions_expires_at_idx").on(table.expiresAt),
-	foreignKey({
-		columns: [table.userId],
-		foreignColumns: [adminUsers.id],
-		name: "admin_sessions_user_id_admin_users_id_fk"
-	}).onDelete("cascade"),
-]);
+})
 
 
 export const dimCategory = pgTable("dim_category", {
@@ -75,10 +44,11 @@ export const dimRule = pgTable("dim_rule", {
 	ruleKey: uuid("rule_key").primaryKey().notNull(),
 	ruleMerchant: uuid("rule_merchant").notNull(),
 	pointRedeem: integer("point_redeem").notNull(),
-	period: dateRange("period").notNull(),
+	period: daterange("period").notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).notNull(),
 }, (table) => [
 	index("dim_rule_idx_dim_rule_merchant").using("btree", table.ruleMerchant.asc().nullsLast().op("uuid_ops")),
+	index("dim_rule_idx_dim_rule_period").using("gist", table.period.asc().nullsLast().op("range_ops")),
 	foreignKey({
 			columns: [table.ruleMerchant],
 			foreignColumns: [dimMerchant.merchantKey],
@@ -99,7 +69,7 @@ export const factTransaction = pgTable("fact_transaction", {
 	msisdn: varchar({ length: 20 }).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).notNull(),
 }, (table) => [
-	index("fact_transaction_idx_ft_merchant_status_time").using("btree", table.merchantKey.asc().nullsLast().op("uuid_ops"), table.status.asc().nullsLast().op("enum_ops"), table.transactionAt.asc().nullsLast().op("timestamp_ops")),
+	index("fact_transaction_idx_ft_merchant_status_time").using("btree", table.merchantKey.asc().nullsLast().op("timestamp_ops"), table.status.asc().nullsLast().op("timestamp_ops"), table.transactionAt.asc().nullsLast().op("uuid_ops")),
 	index("fact_transaction_index_6").using("btree", table.msisdn.asc().nullsLast().op("text_ops")),
 	index("fact_transaction_rule").using("btree", table.ruleKey.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
@@ -116,6 +86,7 @@ export const factTransaction = pgTable("fact_transaction", {
 	check("ck_fact_transaction_point_positive", sql`point_redeem >= 0`),
 	check("ck_fact_transaction_msisdn_digits", sql`(msisdn)::text ~ '^[0-9]{8,20}$'::text`),
 ]);
+
 
 export const dimCluster = pgTable("dim_cluster", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -135,12 +106,12 @@ export const factClusterPoint = pgTable("fact_cluster_point", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	pointOwner: bigint("point_owner", { mode: "number" }).notNull(),
 }, (table) => [
-	index("fact_cluster_point_idx_fcp_month_cluster").using("btree", table.monthYear.asc().nullsLast().op("date_ops"), table.clusterId.asc().nullsLast().op("int8_ops")),
+	index("fact_cluster_point_idx_fcp_month_cluster").using("btree", table.monthYear.asc().nullsLast().op("date_ops"), table.clusterId.asc().nullsLast().op("date_ops")),
 	foreignKey({
 			columns: [table.clusterId],
 			foreignColumns: [dimCluster.clusterId],
 			name: "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id"
-	}),
+		}),
 ]);
 
 const auditSchema = pgSchema("audit");
@@ -177,6 +148,127 @@ export const stgRejectedRows = stgSchema.table("rejected_rows", {
 }, (table) => [
 	index("idx_rejected_batch").on(table.batchId, table.rowNum),
 ]);
+
+export const adminUsers = pgTable("admin_users", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	email: varchar({ length: 320 }).notNull(),
+	fullName: varchar("full_name", { length: 120 }).notNull(),
+	passwordHash: text("password_hash").notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("admin_users_active_idx").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
+	unique("admin_users_email_unique").on(table.email),
+]);
+
+export const adminSessions = pgTable("admin_sessions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	sessionTokenHash: text("session_token_hash").notNull(),
+	ipAddress: varchar("ip_address", { length: 64 }),
+	userAgent: text("user_agent"),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
+	lastUsedAt: timestamp("last_used_at", { mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("admin_sessions_expires_at_idx").using("btree", table.expiresAt.asc().nullsLast().op("timestamp_ops")),
+	index("admin_sessions_user_id_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [adminUsers.id],
+			name: "admin_sessions_user_id_admin_users_id_fk"
+		}).onDelete("cascade"),
+	unique("admin_sessions_token_hash_unique").on(table.sessionTokenHash),
+]);
+
+export const merchantCanonicalMap = pgTable("merchant_canonical_map", {
+	merchantKey: uuid("merchant_key").primaryKey().notNull(),
+	canonicalMerchantKey: uuid("canonical_merchant_key").notNull(),
+	uniqMerchant: text("uniq_merchant").notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+export const providerBanners = pgTable("provider_banners", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "provider_banners_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	imageKey: text("image_key").notNull(),
+	title: text().notNull(),
+	subtitle: text().notNull(),
+	cta: text().notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	sortOrder: integer("sort_order").default(0).notNull(),
+	startsAt: timestamp("starts_at", { withTimezone: true, mode: 'string' }),
+	endsAt: timestamp("ends_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_provider_banners_active").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
+	index("idx_provider_banners_sort").using("btree", table.sortOrder.asc().nullsLast().op("int4_ops")),
+]);
+
+export const users = pgTable("users", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "users_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	email: text().notNull(),
+	username: text(),
+	passwordHash: text("password_hash").notNull(),
+	role: text().default('merchant').notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("users_email_unique").on(table.email),
+	unique("users_username_unique").on(table.username),
+	check("users_role_check", sql`role = ANY (ARRAY['merchant'::text, 'admin'::text])`),
+]);
+
+export const merchantFeedback = pgTable("merchant_feedback", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "merchant_feedback_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	merchantKey: uuid("merchant_key").notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	userId: bigint("user_id", { mode: "number" }).notNull(),
+	type: text().notNull(),
+	category: text().notNull(),
+	title: text().notNull(),
+	message: text().notNull(),
+	status: text().default('open').notNull(),
+	reply: text(),
+	repliedAt: timestamp("replied_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_merchant_feedback_merchant").using("btree", table.merchantKey.asc().nullsLast().op("uuid_ops")),
+	index("idx_merchant_feedback_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	index("idx_merchant_feedback_user").using("btree", table.userId.asc().nullsLast().op("int8_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "merchant_feedback_user_id_users_id_fk"
+		}).onDelete("cascade"),
+	check("merchant_feedback_type_check", sql`type = ANY (ARRAY['report'::text, 'critic'::text, 'suggestion'::text])`),
+	check("merchant_feedback_status_check", sql`status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text])`),
+]);
+
+export const merchantUsers = pgTable("merchant_users", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	userId: bigint("user_id", { mode: "number" }).primaryKey().notNull(),
+	merchantKey: uuid("merchant_key").notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	scopeType: merchantScopeType("scope_type").default('merchant').notNull(),
+}, (table) => [
+	index("idx_merchant_users_merchant_key").using("btree", table.merchantKey.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "merchant_users_user_id_users_id_fk"
+		}).onDelete("cascade"),
+	unique("merchant_users_user_id_merchant_key_unique").on(table.userId, table.merchantKey),
+]);
+
 
 export const stgListKotaRaw = stgSchema.table("list_kota_raw", {
 	id: bigserial("id", { mode: "number" }).primaryKey().notNull(),
@@ -307,13 +399,13 @@ export const vwOverviewTransaction = pgView("vw_overview_transaction", {
 	cluster: varchar("cluster", { length: 500 }),
 	branch: varchar("branch", { length: 500 }),
 	region: varchar("region", { length: 500 }),
-}).existing();
+}).as(sql`SELECT ft.transaction_key, ft.transaction_at, ft.status, ft.merchant_key, ft.qty, ft.point_redeem, (ft.qty * ft.point_redeem)::bigint AS total_point, ft.msisdn, dm.keyword_code, dm.merchant_name, dm.uniq_merchant, dcat.category_id, dcat.category, dcl.cluster_id, dcl.cluster, dcl.branch, dcl.region FROM fact_transaction ft JOIN dim_merchant dm ON dm.merchant_key = ft.merchant_key JOIN dim_category dcat ON dcat.category_id = dm.category_id JOIN dim_cluster dcl ON dcl.cluster_id = dm.cluster_id`);
 
-export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {
+export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {	
 	ruleKey: uuid("rule_key"),
 	merchantKey: uuid("merchant_key"),
 	pointRedeem: integer("point_redeem"),
-	period: dateRange("period"),
+	period: daterange("period"),
 	startPeriod: date("start_period"),
 	endPeriod: date("end_period"),
 	merchantName: varchar("merchant_name", { length: 500 }),
@@ -325,9 +417,9 @@ export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {
 	branch: varchar("branch", { length: 500 }),
 	cluster: varchar("cluster", { length: 500 }),
 	region: varchar("region", { length: 500 }),
-}).existing();
+}).as(sql`SELECT dr.rule_key, dr.rule_merchant AS merchant_key, dr.point_redeem, dr.period, lower(dr.period) AS start_period, (upper(dr.period) - '1 day'::interval)::date AS end_period, dm.merchant_name, dm.keyword_code, dm.uniq_merchant, dm.cluster_id, dm.category_id, dcat.category, dcl.branch, dcl.cluster, dcl.region FROM dim_rule dr JOIN dim_merchant dm ON dm.merchant_key = dr.rule_merchant JOIN dim_category dcat ON dcat.category_id = dm.category_id JOIN dim_cluster dcl ON dcl.cluster_id = dm.cluster_id`);
 
-export const vwMerchantTxMonthlyAgg = pgView("vw_merchant_tx_monthly_agg", {
+export const vwMerchantTxMonthlyAgg = pgView("vw_merchant_tx_monthly_agg", {	
 	monthYear: date("month_year"),
 	merchantKey: uuid("merchant_key"),
 	category: varchar("category", { length: 500 }),
@@ -340,4 +432,4 @@ export const vwMerchantTxMonthlyAgg = pgView("vw_merchant_tx_monthly_agg", {
 	uniqueRedeemer: integer("unique_redeemer"),
 	uniqueRedeemerSuccess: integer("unique_redeemer_success"),
 	totalPointSuccess: bigint("total_point_success", { mode: "number" }),
-}).existing();
+}).as(sql`SELECT date_trunc('month'::text, transaction_at)::date AS month_year, merchant_key, category, branch, cluster, uniq_merchant, count(*)::integer AS tx_count, count(*) FILTER (WHERE status = 'success'::transaction_status)::integer AS success_tx_count, count(*) FILTER (WHERE status = 'failed'::transaction_status)::integer AS failed_tx_count, count(DISTINCT msisdn)::integer AS unique_redeemer, count(DISTINCT msisdn) FILTER (WHERE status = 'success'::transaction_status)::integer AS unique_redeemer_success, COALESCE(sum(total_point) FILTER (WHERE status = 'success'::transaction_status), 0::numeric)::bigint AS total_point_success FROM vw_overview_transaction vt GROUP BY (date_trunc('month'::text, transaction_at)::date), merchant_key, category, branch, cluster, uniq_merchant`);
