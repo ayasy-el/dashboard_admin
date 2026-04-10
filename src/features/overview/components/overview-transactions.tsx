@@ -1,8 +1,15 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { IconAdjustmentsHorizontal, IconDotsVertical, IconRocket, IconStars, IconTrophy } from "@tabler/icons-react";
+import {
+  IconAdjustmentsHorizontal,
+  IconDotsVertical,
+  IconRocket,
+  IconStars,
+  IconTrophy,
+} from "@tabler/icons-react";
 
 import {
   Card,
@@ -27,9 +34,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DashboardFilterLink } from "@/features/shared/components/dashboard-filter-link";
 import { formatNumber } from "@/lib/dashboard-metrics";
 
 type OverviewTransactionsProps = {
+  selectedMonth: string;
   monthLabel: string;
   previousMonthLabel: string;
   dailySeries: { date: string; value: number }[];
@@ -39,6 +48,7 @@ type OverviewTransactionsProps = {
   totalRedeem: number;
   totalUniqueRedeem: number;
   topMerchants: {
+    keyword: string;
     merchant: string;
     category: string;
     branch: string;
@@ -61,6 +71,7 @@ const getPreviousMonth = (month: string) => {
 };
 
 export function OverviewTransactions({
+  selectedMonth,
   monthLabel,
   dailySeries,
   dailyUniqueSeries,
@@ -134,7 +145,9 @@ export function OverviewTransactions({
                 <p className="text-2xl font-bold">{formatNumber(totalRedeem)}</p>
               </div>
               <div>
-                <p className="text-xs tracking-wide text-muted-foreground uppercase">Unique Redeem</p>
+                <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Unique Redeem
+                </p>
                 <p className="text-2xl font-bold">{formatNumber(totalUniqueRedeem)}</p>
               </div>
             </div>
@@ -183,11 +196,13 @@ export function OverviewTransactions({
                           const previousMonth = getPreviousMonth(month);
                           const previousValue = Number(
                             name === "redeem"
-                              ? monthlySeriesByMonth.get(previousMonth)?.redeem ?? 0
-                              : monthlySeriesByMonth.get(previousMonth)?.uniqueRedeem ?? 0,
+                              ? (monthlySeriesByMonth.get(previousMonth)?.redeem ?? 0)
+                              : (monthlySeriesByMonth.get(previousMonth)?.uniqueRedeem ?? 0),
                           );
                           const momPercent =
-                            previousValue > 0 ? ((currentValue - previousValue) / previousValue) * 100 : null;
+                            previousValue > 0
+                              ? ((currentValue - previousValue) / previousValue) * 100
+                              : null;
 
                           return (
                             <div className="grid min-w-[10rem] gap-1">
@@ -204,9 +219,12 @@ export function OverviewTransactions({
                                 <span className="font-mono font-medium tabular-nums text-foreground">
                                   {momPercent == null
                                     ? "-"
-                                    : `${momPercent >= 0 ? "+" : ""}${momPercent.toLocaleString("id-ID", {
-                                        maximumFractionDigits: 1,
-                                      })}%`}
+                                    : `${momPercent >= 0 ? "+" : ""}${momPercent.toLocaleString(
+                                        "id-ID",
+                                        {
+                                          maximumFractionDigits: 1,
+                                        },
+                                      )}%`}
                                 </span>
                               </div>
                             </div>
@@ -215,8 +233,18 @@ export function OverviewTransactions({
                       />
                     }
                   />
-                  <Bar dataKey="redeem" fill="var(--chart-1)" stackId="merchant" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="uniqueRedeem" fill="var(--chart-2)" stackId="merchant" radius={[3, 3, 0, 0]} />
+                  <Bar
+                    dataKey="redeem"
+                    fill="var(--chart-1)"
+                    stackId="merchant"
+                    radius={[3, 3, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="uniqueRedeem"
+                    fill="var(--chart-2)"
+                    stackId="merchant"
+                    radius={[3, 3, 0, 0]}
+                  />
                 </BarChart>
               </ChartContainer>
             </TabsContent>
@@ -307,7 +335,10 @@ export function OverviewTransactions({
               </TableHeader>
               <TableBody>
                 {topMerchants.map((item, index) => (
-                  <TableRow key={`${item.merchant}-${item.branch}-${index}`} className="hover:bg-red-50/40">
+                  <TableRow
+                    key={`${item.merchant}-${item.branch}-${index}`}
+                    className="hover:bg-red-50/40"
+                  >
                     <TableCell className="px-3 text-muted-foreground">
                       {index < 3 ? (
                         <IconTrophy
@@ -317,10 +348,31 @@ export function OverviewTransactions({
                         String(index + 1)
                       )}
                     </TableCell>
-                    <TableCell className="px-3 font-medium">{item.merchant}</TableCell>
-                    <TableCell className="px-3">{item.category}</TableCell>
-                    <TableCell className="px-3">{item.branch}</TableCell>
-                    <TableCell className="px-3 text-right font-semibold">{formatNumber(item.redeem)}</TableCell>
+                    <TableCell className="px-3 font-medium">
+                      <Link
+                        href={`/merchant/${encodeURIComponent(item.keyword)}?month=${encodeURIComponent(selectedMonth)}`}
+                        className="text-black underline-offset-4 hover:underline"
+                      >
+                        {item.merchant}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="px-3">
+                      <DashboardFilterLink
+                        month={selectedMonth}
+                        category={item.category}
+                        className="font-medium"
+                      >
+                        {item.category}
+                      </DashboardFilterLink>
+                    </TableCell>
+                    <TableCell className="px-3">
+                      <DashboardFilterLink month={selectedMonth} branch={item.branch}>
+                        {item.branch}
+                      </DashboardFilterLink>
+                    </TableCell>
+                    <TableCell className="px-3 text-right font-semibold">
+                      {formatNumber(item.redeem)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

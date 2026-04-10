@@ -33,6 +33,7 @@ export type OverviewRawData = {
   monthlyRedeemerRaw: { month: string; value: number }[];
   categoryRaw: { name: string; value: number }[];
   topMerchantsRaw: {
+    keyword: string;
     merchant: string;
     category: string;
     branch: string;

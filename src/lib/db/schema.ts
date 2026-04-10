@@ -234,6 +234,10 @@ export const merchantFeedback = pgTable("merchant_feedback", {
 	title: text().notNull(),
 	message: text().notNull(),
 	status: text().default('open').notNull(),
+	attachmentKey: text("attachment_key"),
+	attachmentFileName: text("attachment_file_name"),
+	attachmentMimeType: text("attachment_mime_type"),
+	attachmentSize: integer("attachment_size"),
 	reply: text(),
 	repliedAt: timestamp("replied_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -248,7 +252,7 @@ export const merchantFeedback = pgTable("merchant_feedback", {
 			name: "merchant_feedback_user_id_users_id_fk"
 		}).onDelete("cascade"),
 	check("merchant_feedback_type_check", sql`type = ANY (ARRAY['report'::text, 'critic'::text, 'suggestion'::text])`),
-	check("merchant_feedback_status_check", sql`status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text])`),
+	check("merchant_feedback_status_check", sql`status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text, 'canceled'::text])`),
 ]);
 
 export const merchantUsers = pgTable("merchant_users", {

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   MultiFilterDropdown,
   SingleFilterDropdown,
@@ -9,6 +10,7 @@ import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { SectionCards, type StatCard } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { CollapsibleClusterTableCard } from "@/features/operational/components/collapsible-cluster-table-card";
+import { DashboardFilterLink } from "@/features/shared/components/dashboard-filter-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNumber } from "@/lib/dashboard-metrics";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -119,6 +121,30 @@ const formatShare = (value: number, total: number) => {
 
 export function OperationalContent({ data, monthOptions, selectedMonth }: OperationalContentProps) {
   const [merchantStatusTab, setMerchantStatusTab] = React.useState<MerchantStatusTab>("active");
+  const branchLink = (branch: string, key: string) => (
+    <DashboardFilterLink key={key} month={selectedMonth} branch={branch}>
+      {branch}
+    </DashboardFilterLink>
+  );
+  const categoryLink = (category: string, key: string) => (
+    <DashboardFilterLink
+      key={key}
+      month={selectedMonth}
+      category={category}
+      className="font-medium"
+    >
+      {category}
+    </DashboardFilterLink>
+  );
+  const keywordLink = (keyword: string, key: string) => (
+    <Link
+      key={key}
+      href={`/merchant/${encodeURIComponent(keyword)}?month=${encodeURIComponent(selectedMonth)}`}
+      className="text-black underline-offset-4 hover:underline"
+    >
+      {keyword}
+    </Link>
+  );
   const stats: StatCard[] = [
     {
       id: "transaction-success",
@@ -138,34 +164,34 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     },
   ];
   const activeMerchantRows = data.activeMerchants.map((row) => [
-    row.branch,
+    branchLink(row.branch, `active-branch-${row.keyword}`),
     row.merchant,
-    row.keyword,
+    keywordLink(row.keyword, `active-keyword-${row.keyword}`),
     row.transactionCount.toLocaleString("id-ID"),
     row.uniqRedeemer.toLocaleString("id-ID"),
   ]);
   const productiveMerchantRows = data.productiveMerchants.map((row) => [
-    row.branch,
+    branchLink(row.branch, `productive-branch-${row.keyword}`),
     row.merchant,
-    row.keyword,
+    keywordLink(row.keyword, `productive-keyword-${row.keyword}`),
     row.transactionCount.toLocaleString("id-ID"),
     row.uniqRedeemer.toLocaleString("id-ID"),
   ]);
   const notActiveMerchantRows = data.notActiveMerchants.map((row) => [
-    row.branch,
+    branchLink(row.branch, `not-active-branch-${row.keyword}`),
     row.merchant,
-    row.keyword,
+    keywordLink(row.keyword, `not-active-keyword-${row.keyword}`),
     row.transactionCount.toLocaleString("id-ID"),
   ]);
   const expiredRuleRows = data.expiredRules.map((row) => [
-    row.branch,
+    branchLink(row.branch, `expired-branch-${row.keyword}`),
     row.merchant,
-    row.keyword,
+    keywordLink(row.keyword, `expired-keyword-${row.keyword}`),
     row.startPeriod,
     row.endPeriod,
   ]);
   const categoryMetricRows = data.categoryMetrics.map((row) => [
-    row.name,
+    categoryLink(row.name, `category-${row.name}`),
     row.totalMerchant.toLocaleString("id-ID"),
     row.uniqueMerchant.toLocaleString("id-ID"),
     row.totalPoint.toLocaleString("id-ID"),
@@ -373,7 +399,10 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
           className="min-w-0"
           darkHeader={true}
           title="Cluster Metrics"
-          rows={data.clusterMetrics}
+          rows={data.clusterMetrics.map((row) => ({
+            ...row,
+            name: branchLink(row.name, `cluster-branch-${row.name}`),
+          }))}
         />
       </div>
     </div>

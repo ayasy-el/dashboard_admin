@@ -5,8 +5,8 @@ import {
   IconChartBar,
   IconDashboard,
   IconBuildingStore,
+  IconMessageCircle,
   IconSettings,
-  IconShoppingBag,
   IconTicket,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -55,8 +55,8 @@ const systemItems = [
   },
   {
     title: "Feedback Center",
-    url: "#",
-    icon: IconShoppingBag,
+    url: "/feedback",
+    icon: IconMessageCircle,
   },
 ];
 
@@ -114,16 +114,24 @@ export function AppSidebar({
           Management
         </div>
         <SidebarMenu>
-          {systemItems.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <Link href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {systemItems.map((item) => {
+            const isActive =
+              item.url !== "#" && (item.url === "/" ? pathname === "/" : pathname.startsWith(item.url));
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  data-active={isActive}
+                  className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                >
+                  <Link href={item.url}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>

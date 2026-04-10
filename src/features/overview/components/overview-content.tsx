@@ -1,8 +1,13 @@
-import { MultiFilterDropdown, SingleFilterDropdown } from "@/features/shared/components/filter-dropdown";
+import Link from "next/link";
+import {
+  MultiFilterDropdown,
+  SingleFilterDropdown,
+} from "@/features/shared/components/filter-dropdown";
 import { SectionCards } from "@/features/shared/components/section-cards";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { OverviewTransactions } from "@/features/overview/components/overview-transactions";
 import { ComparisonProgressTableCard } from "@/features/shared/components/comparison-progress-table-card";
+import { DashboardFilterLink } from "@/features/shared/components/dashboard-filter-link";
 import { DataTableCard } from "@/features/shared/components/data-table-card";
 import { DistributionPieCard } from "@/features/shared/components/distribution-pie-card";
 import { RankedMetricsTableCard } from "@/features/shared/components/ranked-metrics-table-card";
@@ -35,8 +40,84 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     inactiveDetailRows,
     expiredRows,
     totalExpiredMerchants,
-    merchantPerMonthRows,
   } = buildOverviewContentViewModel(data);
+  const filterLinkClassName = "font-medium";
+  const keywordLinkClassName = "font-medium text-black underline-offset-4 hover:underline";
+  const branchLink = (branch: string, key: string) => (
+    <DashboardFilterLink key={key} month={selectedMonth} branch={branch}>
+      {branch}
+    </DashboardFilterLink>
+  );
+  const categoryLink = (category: string, key: string) => (
+    <DashboardFilterLink
+      key={key}
+      month={selectedMonth}
+      category={category}
+      className={filterLinkClassName}
+    >
+      {category}
+    </DashboardFilterLink>
+  );
+  const keywordLink = (keyword: string, key: string) => (
+    <Link
+      key={key}
+      href={`/merchant/${encodeURIComponent(keyword)}?month=${encodeURIComponent(selectedMonth)}`}
+      className={keywordLinkClassName}
+    >
+      {keyword}
+    </Link>
+  );
+
+  const regionRowsWithLinks = regionRows.map((row, index) =>
+    index === 0
+      ? row
+      : {
+          ...row,
+          label: branchLink(String(row.label), `region-branch-${row.id}`),
+        },
+  );
+
+  const activeRowsWithLinks = activeRows.map((row, index) => [
+    branchLink(String(row[0]), `active-branch-${index}-${row[0]}`),
+    ...row.slice(1),
+  ]);
+
+  const productiveRowsWithLinks = productiveRows.map((row, index) => [
+    branchLink(String(row[0]), `productive-branch-${index}-${row[0]}`),
+    ...row.slice(1),
+  ]);
+
+  const inactiveRowsWithLinks = inactiveRows.map((row, index) => [
+    branchLink(String(row[0]), `inactive-summary-branch-${index}-${row[0]}`),
+    ...row.slice(1),
+  ]);
+
+  const inactiveDetailRowsWithLinks = data.notActiveMerchants.map((merchant) => [
+    branchLink(merchant.branch, `inactive-branch-${merchant.branch}-${merchant.keyword}`),
+    merchant.merchant,
+    keywordLink(merchant.keyword, `inactive-keyword-${merchant.keyword}`),
+  ]);
+
+  const expiredRowsWithLinks = data.expiredMerchants.map((merchant) => [
+    branchLink(merchant.branch, `expired-branch-${merchant.branch}-${merchant.keyword}`),
+    merchant.merchant,
+    keywordLink(merchant.keyword, `expired-keyword-${merchant.keyword}`),
+  ]);
+
+  const merchantPerMonthRowsWithLinks = [...data.merchantPerMonth]
+    .sort((a, b) => b.redeem - a.redeem)
+    .map((row, index) => [
+      String(index + 1),
+      categoryLink(row.category, `category-${row.keyword}`),
+      branchLink(row.branch, `branch-${row.keyword}`),
+      row.merchant,
+      keywordLink(row.keyword, `keyword-${row.keyword}`),
+      row.startPeriod,
+      row.endPeriod,
+      new Intl.NumberFormat("id-ID").format(row.point),
+      new Intl.NumberFormat("id-ID").format(row.redeem),
+      new Intl.NumberFormat("id-ID").format(row.uniqueRedeem),
+    ]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -82,6 +163,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
         className="[&_[data-slot=card]]:border-border/80 [&_[data-slot=card]]:shadow-sm [&_[data-slot=card]]:transition [&_[data-slot=card]]:hover:shadow-md"
       />
       <OverviewTransactions
+        selectedMonth={selectedMonth}
         monthLabel={data.monthLabel}
         previousMonthLabel={data.previousMonthLabel}
         dailySeries={data.dailyTransactions}
@@ -107,7 +189,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             title="POIN Redeem Region Jatim"
             icon={<IconTargetArrow className="size-4 text-secondary" />}
             headers={["REGION", "KEYWORD", "STATUS REDEEM", "UNIQUE REEDEEM"]}
-            rows={regionRows}
+            rows={regionRowsWithLinks}
             darkHeader
             splitLabel="Branch"
             leftBarClassName="bg-red-400"
@@ -124,7 +206,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             icon={<IconCircleCheck className="size-4 text-green-500" />}
             headerCols={["BRANCH", "OA", "TRX", "UNIQ REDEEMER"]}
             sortableColumns={[false, true, true, true]}
-            rows={activeRows}
+            rows={activeRowsWithLinks}
             pagination={{ enabled: true, pageSize: 6 }}
           />
           <RankedMetricsTableCard
@@ -133,7 +215,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             tone="yellow"
             icon={<IconTrophy className="size-4 text-yellow-500" />}
             headerCols={["BRANCH", "OP", "TRX", "UNIQ REDEEMER"]}
-            rows={productiveRows}
+            rows={productiveRowsWithLinks}
             sortableColumns={[false, true, true, true]}
             pagination={{ enabled: true, pageSize: 6 }}
           />
@@ -143,7 +225,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             tone="red"
             icon={<IconMessage2Exclamation className="size-4 text-primary" />}
             headerCols={["BRANCH", "NOT ACTIVE", "EXPIRED"]}
-            rows={inactiveRows}
+            rows={inactiveRowsWithLinks}
             pagination={{ enabled: true, pageSize: 6 }}
             sortableColumns={[false, true, true]}
             paginationInfo={`Not Active: ${inactiveDetailRows.length} • Expired: ${totalExpiredMerchants}`}
@@ -156,7 +238,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             tone="red"
             icon={<IconCircleOff className="size-4 text-primary" />}
             headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
-            rows={inactiveDetailRows}
+            rows={inactiveDetailRowsWithLinks}
             pagination={{ enabled: true, pageSize: 6 }}
             paginationInfo={`Total: ${inactiveDetailRows.length}`}
           />
@@ -166,7 +248,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             tone="yellow"
             icon={<IconHourglassOff className="size-4 text-yellow-500" />}
             headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
-            rows={expiredRows}
+            rows={expiredRowsWithLinks}
             pagination={{ enabled: true, pageSize: 6 }}
             paginationInfo={`Total: ${expiredRows.length}`}
           />
@@ -187,7 +269,7 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             "REDEEM",
             "UNIQE REDEEM",
           ]}
-          rows={merchantPerMonthRows}
+          rows={merchantPerMonthRowsWithLinks}
           sortableColumns={[false, true, true, true, true, true, true, true, true, true]}
           pagination={{ enabled: true, pageSize: 10 }}
           columnClassNames={[
