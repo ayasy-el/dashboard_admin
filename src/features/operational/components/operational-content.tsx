@@ -140,7 +140,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     <Link
       key={key}
       href={`/merchant/${encodeURIComponent(keyword)}?month=${encodeURIComponent(selectedMonth)}`}
-      className="text-black underline-offset-4 hover:underline"
+      className="text-black underline-offset-4 hover:underline dark:text-white"
     >
       {keyword}
     </Link>

@@ -373,7 +373,7 @@ export default function IngestionClient({
 
   return (
     <DashboardPageShell sidebarWidth="16rem" user={user}>
-      <div className="grid min-w-0 gap-4 bg-gradient-to-b from-background via-background to-rose-50/20 px-4 pb-6 lg:px-6">
+      <div className="grid min-w-0 gap-4 px-4 pb-6 lg:px-6">
         <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <CardTitle>CSV Ingestion Admin</CardTitle>
@@ -550,16 +550,16 @@ export default function IngestionClient({
                     <span className="inline-block h-5 w-[32rem] max-w-full animate-pulse rounded bg-muted" />
                   ) : batchDetail ? (
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-rose-600">●</span>
+                      <span className="text-primary">●</span>
                       <span>status={batchDetail.status}</span>
                       <span className="text-muted-foreground">|</span>
                       <span>failed_step={batchDetail.failed_step ?? "-"}</span>
                       <span className="text-muted-foreground">|</span>
                       <span>total={batchDetail.metrics.total}</span>
                       <span className="text-muted-foreground">|</span>
-                      <span className="font-semibold text-emerald-700">loaded={batchDetail.metrics.loaded}</span>
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">loaded={batchDetail.metrics.loaded}</span>
                       <span className="text-muted-foreground">|</span>
-                      <span className="font-semibold text-rose-700">rejected={batchDetail.metrics.rejected}</span>
+                      <span className="font-semibold text-rose-700 dark:text-rose-300">rejected={batchDetail.metrics.rejected}</span>
                       <span className="text-muted-foreground">|</span>
                       <span>created_at={formatBatchTime(batchDetail.created_at)}</span>
                       <span className="text-muted-foreground">|</span>

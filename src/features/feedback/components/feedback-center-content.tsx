@@ -65,7 +65,7 @@ const summaryCards = (summary: FeedbackDashboardData["summary"]) => [
     value: summary.total,
     description: "Seluruh feedback merchant",
     icon: IconMessageCircle,
-    accent: "text-sky-600 bg-sky-50",
+    accent: "bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300",
   },
   {
     id: "open",
@@ -73,7 +73,7 @@ const summaryCards = (summary: FeedbackDashboardData["summary"]) => [
     value: summary.open,
     description: "Belum diproses admin",
     icon: IconAlertCircle,
-    accent: "text-rose-600 bg-rose-50",
+    accent: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
   },
   {
     id: "in-progress",
@@ -81,7 +81,7 @@ const summaryCards = (summary: FeedbackDashboardData["summary"]) => [
     value: summary.inProgress,
     description: "Sedang ditindaklanjuti",
     icon: IconClockHour4,
-    accent: "text-amber-600 bg-amber-50",
+    accent: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
   },
   {
     id: "resolved",
@@ -89,7 +89,7 @@ const summaryCards = (summary: FeedbackDashboardData["summary"]) => [
     value: summary.resolved,
     description: "Sudah selesai",
     icon: IconChecks,
-    accent: "text-emerald-600 bg-emerald-50",
+    accent: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
   },
   {
     id: "canceled",
@@ -97,7 +97,7 @@ const summaryCards = (summary: FeedbackDashboardData["summary"]) => [
     value: summary.canceled,
     description: "Dibatalkan merchant",
     icon: IconBan,
-    accent: "text-rose-700 bg-rose-50",
+    accent: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
   },
 ];
 
@@ -111,10 +111,10 @@ const formatDateTime = (value: string) =>
   });
 
 const getStatusBadgeClassName = (status: FeedbackStatus) => {
-  if (status === "resolved") return "bg-emerald-100 text-emerald-700 hover:bg-emerald-100";
-  if (status === "in_progress") return "bg-amber-100 text-amber-700 hover:bg-amber-100";
-  if (status === "canceled") return "bg-rose-100 text-rose-700 hover:bg-rose-100";
-  return "bg-slate-100 text-slate-700 hover:bg-slate-100";
+  if (status === "resolved") return "border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/15";
+  if (status === "in_progress") return "border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15";
+  if (status === "canceled") return "border-transparent bg-rose-100 text-rose-700 hover:bg-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/15";
+  return "border-transparent bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10";
 };
 
 const formatFileSize = (value: number | null) => {
@@ -125,9 +125,9 @@ const formatFileSize = (value: number | null) => {
 };
 
 const getTypeBadgeClassName = (type: FeedbackType) => {
-  if (type === "report") return "bg-rose-100 text-rose-700 hover:bg-rose-100";
-  if (type === "critic") return "bg-orange-100 text-orange-700 hover:bg-orange-100";
-  return "bg-sky-100 text-sky-700 hover:bg-sky-100";
+  if (type === "report") return "border-transparent bg-rose-100 text-rose-700 hover:bg-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/15";
+  if (type === "critic") return "border-transparent bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-300 dark:hover:bg-orange-500/15";
+  return "border-transparent bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/15";
 };
 
 function SummaryCard({
@@ -235,10 +235,10 @@ function FeedbackTicketCard({
               <div className="mb-2 text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
                 Balasan Terakhir
               </div>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-950">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
                 <div>{item.reply}</div>
                 {item.repliedAt ? (
-                  <div className="mt-2 text-xs text-emerald-700">
+                  <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
                     Dibalas pada {formatDateTime(item.repliedAt)}
                   </div>
                 ) : null}
@@ -254,7 +254,7 @@ function FeedbackTicketCard({
                 href={item.attachment.downloadUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-xl border border-slate-200 bg-background px-4 py-3 text-sm font-medium text-blue-600 underline"
+                className="inline-flex rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-blue-600 underline dark:text-blue-300"
               >
                 {item.attachment.fileName || "View attachment"}
                 {formatFileSize(item.attachment.size)
@@ -307,7 +307,7 @@ function FeedbackTicketCard({
               disabled={isPending}
             />
           </div>
-          {error ? <div className="text-sm text-rose-600">{error}</div> : null}
+          {error ? <div className="text-sm text-rose-600 dark:text-rose-300">{error}</div> : null}
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Menyimpan..." : "Submit"}
           </Button>
@@ -360,7 +360,7 @@ export function FeedbackCenterContent({ data, onUpdate }: FeedbackCenterContentP
 
   return (
     <div className="space-y-6 px-4 pb-8 lg:px-6">
-      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-white via-white to-sky-50/70 px-6 py-5 shadow-sm">
+      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-background via-background to-sky-500/10 px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <div className="text-sm font-semibold tracking-[0.24em] text-primary uppercase">

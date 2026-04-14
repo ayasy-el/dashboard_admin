@@ -140,7 +140,9 @@ function DeltaBadge({ current, previous }: { current: number; previous: number }
       variant="outline"
       className={cn(
         "rounded-full border-0 px-2.5 py-1 text-xs font-semibold",
-        isPositive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600",
+        isPositive
+          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
+          : "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
       )}
     >
       {isPositive ? "+" : ""}
@@ -165,22 +167,22 @@ function MetricCard({
   return (
     <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
       <CardHeader className="min-h-40 px-6 py-5">
-        <CardDescription className="text-xs font-semibold tracking-[0.28em] uppercase text-slate-500">
+        <CardDescription className="text-xs font-semibold tracking-[0.28em] uppercase">
           {title}
         </CardDescription>
-        <div className="pt-1 text-4xl font-bold tracking-tight text-slate-800">
+        <div className="pt-1 text-4xl font-bold tracking-tight text-foreground">
           {formatNumber(current)}
         </div>
         <CardAction>
           <DeltaBadge current={current} previous={previous} />
         </CardAction>
       </CardHeader>
-      <CardContent className="border-t-2 border-orange-400 px-6 py-4">
-        <div className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-700">
+      <CardContent className="border-t-2 border-secondary px-6 py-4">
+        <div className="flex items-center justify-between gap-4 text-sm font-semibold text-foreground">
           <span>{monthLabel}</span>
           <span>{formatNumber(current)}</span>
         </div>
-        <div className="mt-1 flex items-center justify-between gap-4 text-sm text-slate-500">
+        <div className="mt-1 flex items-center justify-between gap-4 text-sm text-muted-foreground">
           <span>{previousMonthLabel}</span>
           <span>{formatNumber(previous)}</span>
         </div>
@@ -192,18 +194,38 @@ function MetricCard({
 function StatusBadge({ status }: { status: string }) {
   const normalized = status.toLowerCase();
   if (normalized === "active") {
-    return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Active</Badge>;
+    return (
+      <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/15">
+        Active
+      </Badge>
+    );
   }
   if (normalized === "success") {
-    return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">success</Badge>;
+    return (
+      <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/15">
+        success
+      </Badge>
+    );
   }
   if (normalized === "failed") {
-    return <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100">failed</Badge>;
+    return (
+      <Badge className="border-transparent bg-rose-100 text-rose-700 hover:bg-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/15">
+        failed
+      </Badge>
+    );
   }
   if (normalized === "scheduled") {
-    return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Scheduled</Badge>;
+    return (
+      <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15">
+        Scheduled
+      </Badge>
+    );
   }
-  return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">Expired</Badge>;
+  return (
+    <Badge className="border-transparent bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
+      Expired
+    </Badge>
+  );
 }
 
 function SectionHeader({
@@ -218,10 +240,10 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+        <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
           {icon}
         </div>
-        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
       </div>
       {action}
     </div>
@@ -259,10 +281,6 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
   }, [filteredTransactions, safePage]);
 
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [deferredSearchQuery]);
-
-  React.useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
@@ -272,7 +290,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
 
   return (
     <div className="space-y-6 px-4 pb-8 lg:px-6">
-      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-white via-white to-rose-50/40 px-6 py-5 shadow-sm">
+      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-background via-background to-primary/5 px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
             <Breadcrumb>
@@ -297,49 +315,61 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
               </BreadcrumbList>
             </Breadcrumb>
             <div className="space-y-1">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
                 {data.identity.keyword}
               </h1>
-              <p className="text-base text-slate-600">{data.identity.merchant}</p>
+              <p className="text-base text-muted-foreground">{data.identity.merchant}</p>
             </div>
-            <div className="flex flex-wrap gap-2 text-sm text-slate-500">
-              <Badge variant="outline" className="rounded-full border-slate-200 bg-white px-3 py-1">
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border bg-background px-3 py-1"
+              >
                 {data.identity.category}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-slate-200 bg-white px-3 py-1">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border bg-background px-3 py-1"
+              >
                 {data.identity.branch}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-slate-200 bg-white px-3 py-1">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border bg-background px-3 py-1"
+              >
                 {data.identity.cluster}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-slate-200 bg-white px-3 py-1">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border bg-background px-3 py-1"
+              >
                 {data.identity.region}
               </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
               <div className="space-y-1">
-                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-slate-500">
+                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-muted-foreground">
                   Start Period
                 </div>
-                <div className="text-base font-semibold text-slate-800">
+                <div className="text-base font-semibold text-foreground">
                   {primaryRule?.startPeriod ?? "-"}
                 </div>
               </div>
-              <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+              <div className="hidden h-8 w-px bg-border sm:block" />
               <div className="space-y-1">
-                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-slate-500">
+                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-muted-foreground">
                   End Period
                 </div>
-                <div className="text-base font-semibold text-slate-800">
+                <div className="text-base font-semibold text-foreground">
                   {primaryRule?.endPeriod ?? "-"}
                 </div>
               </div>
-              <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+              <div className="hidden h-8 w-px bg-border sm:block" />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-base font-bold text-slate-800 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-border bg-background px-3 text-base font-bold text-foreground shadow-sm transition-colors hover:bg-accent"
                   >
                     {primaryRule ? formatNumber(primaryRule.daysLeft) : "-"}
                   </button>
@@ -359,7 +389,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
               allLabel="Semua bulan"
               placeholder="Pilih bulan"
               ariaLabel="Pilih bulan detail merchant"
-              className="w-full min-w-[220px] bg-white lg:w-[220px]"
+              className="w-full min-w-[220px] bg-background lg:w-[220px]"
             />
           </div>
         </div>
@@ -389,7 +419,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+      <div className="grid gap-6">
         <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <SectionHeader
@@ -397,7 +427,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
               title="Merchant Analytics"
               action={
                 <Tabs value={trendMode} onValueChange={(value) => setTrendMode(value as TrendMode)}>
-                  <TabsList className="rounded-full bg-slate-100 p-1">
+                  <TabsList className="rounded-full bg-muted p-1">
                     <TabsTrigger value="monthly" className="rounded-full px-3">
                       Monthly
                     </TabsTrigger>
@@ -413,23 +443,23 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
           <CardContent className="space-y-4 px-6 py-5">
             <div className="flex flex-wrap gap-8">
               <div>
-                <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                   Redeem
                 </div>
-                <div className="text-5xl font-bold tracking-tight text-slate-900">
+                <div className="text-5xl font-bold tracking-tight text-foreground">
                   {formatNumber(data.cards.totalTransactions.current)}
                 </div>
               </div>
               <div>
-                <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                   Unique Redeem
                 </div>
-                <div className="text-5xl font-bold tracking-tight text-slate-900">
+                <div className="text-5xl font-bold tracking-tight text-foreground">
                   {formatNumber(data.cards.uniqueRedeemer.current)}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-5 text-sm text-slate-600">
+            <div className="flex items-center gap-5 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="size-3 rounded-full bg-primary" />
                 <span>Redeem</span>
@@ -498,7 +528,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
+        {/* <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
           <CardHeader className="px-6 py-5">
             <SectionHeader
               icon={<IconChartDonut3 className="size-5" />}
@@ -580,13 +610,13 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
                           className="size-3 rounded-full"
                           style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                         />
-                        <span className="truncate font-medium text-slate-700">{item.name}</span>
+                        <span className="truncate font-medium text-foreground">{item.name}</span>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="font-semibold text-slate-800">
+                        <div className="font-semibold text-foreground">
                           {percent.toLocaleString("id-ID", { maximumFractionDigits: 0 })}%
                         </div>
-                        <div className="text-slate-500">{formatNumber(item.value)}</div>
+                        <div className="text-muted-foreground">{formatNumber(item.value)}</div>
                       </div>
                     </div>
                   );
@@ -594,7 +624,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       <div className="grid gap-6">
@@ -605,7 +635,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                <TableRow className="bg-muted/60 hover:bg-muted/60">
                   <TableHead>DATE</TableHead>
                   <TableHead>REDEEM</TableHead>
                   <TableHead>UNIQUE REDEEMER</TableHead>
@@ -642,19 +672,22 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
         </CardHeader>
         <CardContent className="space-y-5 px-6 py-5">
           <div className="relative">
-            <IconSearch className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <IconSearch className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search keyword / status / branch"
-              className="h-12 rounded-full border-slate-200 bg-white pl-11"
+              className="h-12 rounded-full border-border bg-background pl-11"
             />
           </div>
 
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                <TableRow className="bg-muted/60 hover:bg-muted/60">
                   <TableHead>TIME</TableHead>
                   <TableHead>KEYWORD</TableHead>
                   <TableHead>STATUS</TableHead>
@@ -690,7 +723,7 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
             </Table>
           </div>
 
-          <div className="flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <div>
               Showing {filteredTransactions.length === 0 ? 0 : (safePage - 1) * pageSize + 1} to{" "}
               {Math.min(safePage * pageSize, filteredTransactions.length)} of{" "}

@@ -59,10 +59,10 @@ type MerchantDirectoryOverviewProps = {
 };
 
 const statusTone: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-700",
-  scheduled: "bg-amber-100 text-amber-700",
-  expired: "bg-slate-200 text-slate-700",
-  inactive: "bg-slate-100 text-slate-600",
+  active: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  scheduled: "border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  expired: "border-transparent bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200",
+  inactive: "border-transparent bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300",
 };
 type SortKey =
   | "keyword"
@@ -139,14 +139,14 @@ function SummaryCard({
     <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between px-6 py-5">
         <div>
-          <CardDescription className="text-xs font-semibold tracking-[0.24em] uppercase text-slate-500">
+          <CardDescription className="text-xs font-semibold tracking-[0.24em] uppercase">
             {title}
           </CardDescription>
-          <CardTitle className="mt-2 text-3xl font-bold text-slate-900">{formatNumber(value)}</CardTitle>
+          <CardTitle className="mt-2 text-3xl font-bold text-foreground">{formatNumber(value)}</CardTitle>
         </div>
-        <div className="flex size-11 items-center justify-center rounded-full bg-rose-50 text-rose-500">{icon}</div>
+        <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">{icon}</div>
       </CardHeader>
-      <CardContent className="px-6 pb-5 pt-0 text-sm text-slate-500">{description}</CardContent>
+      <CardContent className="px-6 pb-5 pt-0 text-sm text-muted-foreground">{description}</CardContent>
     </Card>
   );
 }
@@ -217,11 +217,8 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
       if (current.key !== key) return { key, direction: "asc" };
       return { key, direction: current.direction === "asc" ? "desc" : "asc" };
     });
-  };
-
-  React.useEffect(() => {
     setCurrentPage(1);
-  }, [deferredQuery, sortState, rowsPerPage]);
+  };
 
   const totalRows = sortedMerchants.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
@@ -250,12 +247,12 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
 
   return (
     <div className="space-y-6 px-4 pb-8 lg:px-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-gradient-to-r from-white via-white to-rose-50/40 px-6 py-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-gradient-to-r from-background via-background to-primary/5 px-6 py-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <div className="text-sm font-medium uppercase tracking-[0.24em] text-slate-500">Merchant Directory</div>
+          <div className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Merchant Directory</div>
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">All Merchants</h1>
-            <p className="text-base text-slate-600">Daftar keyword merchant dan ringkasan performa untuk {data.monthLabel}.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">All Merchants</h1>
+            <p className="text-base text-muted-foreground">Daftar keyword merchant dan ringkasan performa untuk {data.monthLabel}.</p>
           </div>
         </div>
         <QueryParamSelect
@@ -265,7 +262,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
           allLabel="Semua bulan"
           placeholder="Pilih bulan"
           ariaLabel="Pilih bulan merchant"
-          className="w-full min-w-[220px] bg-white lg:w-[220px]"
+          className="w-full min-w-[220px] bg-background lg:w-[220px]"
         />
       </div>
 
@@ -298,15 +295,18 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
 
       <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
         <CardHeader className="border-b px-6 py-5">
-          <CardTitle className="text-xl text-slate-900">Merchant List</CardTitle>
+          <CardTitle className="text-xl text-foreground">Merchant List</CardTitle>
           <CardDescription>Klik merchant untuk membuka halaman detail baru.</CardDescription>
           <div className="relative mt-4">
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search keyword / merchant / category / branch / status"
-              className="h-10 rounded-full border-slate-200 bg-white pl-10"
+              className="h-10 rounded-full border-border bg-background pl-10"
             />
           </div>
         </CardHeader>
@@ -314,7 +314,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                <TableRow className="bg-muted/60 hover:bg-muted/60">
                   {sortColumns.map((column) => (
                     <TableHead key={column.key}>
                       <SortButton
@@ -340,13 +340,13 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                   return (
                     <TableRow
                       key={merchant.keyword}
-                      className="cursor-pointer transition-colors hover:bg-slate-50/80"
+                      className="cursor-pointer transition-colors hover:bg-muted/60"
                       onClick={() => router.push(href)}
                     >
-                      <TableCell className="font-semibold text-slate-900">{merchant.keyword}</TableCell>
+                      <TableCell className="font-semibold text-foreground">{merchant.keyword}</TableCell>
                       <TableCell>
-                        <div className="font-medium text-slate-800">{merchant.merchant}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="font-medium text-foreground">{merchant.merchant}</div>
+                        <div className="text-xs text-muted-foreground">
                           {merchant.cluster}, {merchant.region}
                         </div>
                       </TableCell>
@@ -357,7 +357,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                           <Badge className={cn("hover:bg-inherit", statusTone[merchant.ruleStatus] ?? statusTone.inactive)}>
                             {merchant.ruleStatus}
                           </Badge>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-muted-foreground">
                             {merchant.startPeriod && merchant.endPeriod
                               ? `${merchant.startPeriod} - ${merchant.endPeriod}`
                               : "No active rule"}
@@ -373,7 +373,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
               </TableBody>
             </Table>
           </div>
-          <div className="flex flex-col gap-3 border-t px-6 py-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-t px-6 py-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <span>
                 {totalRows === 0 ? 0 : startIndex + 1} - {Math.min(startIndex + rowsPerPage, totalRows)} of {totalRows}
@@ -381,9 +381,12 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
               <div className="flex items-center gap-2">
                 <span>Rows per page</span>
                 <select
-                  className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                  className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
                   value={rowsPerPage}
-                  onChange={(event) => setRowsPerPage(Number(event.target.value))}
+                  onChange={(event) => {
+                    setRowsPerPage(Number(event.target.value));
+                    setCurrentPage(1);
+                  }}
                 >
                   {[10, 20, 50].map((option) => (
                     <option key={option} value={option}>
@@ -418,7 +421,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                 <IconChevronLeft className="size-4" />
               </Button>
               <input
-                className="h-8 w-11 rounded-md border border-slate-200 bg-white text-center text-sm text-slate-700"
+                className="h-8 w-11 rounded-md border border-border bg-background text-center text-sm text-foreground"
                 inputMode="numeric"
                 value={pageInput}
                 onChange={(event) => setPageInput(event.target.value.replace(/[^\d]/g, ""))}

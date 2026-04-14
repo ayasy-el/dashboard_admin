@@ -60,7 +60,10 @@ export function DashboardFilterLink({
     <Link
       href="/"
       onClick={handleClick}
-      className={cn("text-black underline-offset-4 hover:underline", className)}
+      className={cn(
+        "text-black underline-offset-4 hover:underline dark:text-white",
+        className,
+      )}
     >
       {children}
     </Link>

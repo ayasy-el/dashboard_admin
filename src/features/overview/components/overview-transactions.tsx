@@ -351,7 +351,7 @@ export function OverviewTransactions({
                     <TableCell className="px-3 font-medium">
                       <Link
                         href={`/merchant/${encodeURIComponent(item.keyword)}?month=${encodeURIComponent(selectedMonth)}`}
-                        className="text-black underline-offset-4 hover:underline"
+                        className="text-black underline-offset-4 hover:underline dark:text-white"
                       >
                         {item.merchant}
                       </Link>

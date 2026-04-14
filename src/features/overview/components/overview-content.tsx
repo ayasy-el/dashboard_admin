@@ -42,7 +42,8 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     totalExpiredMerchants,
   } = buildOverviewContentViewModel(data);
   const filterLinkClassName = "font-medium";
-  const keywordLinkClassName = "font-medium text-black underline-offset-4 hover:underline";
+  const keywordLinkClassName =
+    "font-medium text-black underline-offset-4 hover:underline dark:text-white";
   const branchLink = (branch: string, key: string) => (
     <DashboardFilterLink key={key} month={selectedMonth} branch={branch}>
       {branch}
