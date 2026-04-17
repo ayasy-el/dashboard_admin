@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -13,6 +12,7 @@ const routeTitles: Record<string, string> = {
   "/": "Overview",
   "/operational": "Operational",
   "/ingestion": "Ingestion",
+  "/program-promotions": "Program & Promotions",
 };
 
 export function SiteHeader() {

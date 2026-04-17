@@ -64,6 +64,13 @@
       "when": 1775433600000,
       "tag": "0008_admin_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775779200000,
+      "tag": "0009_banner_management",
+      "breakpoints": true
     }
   ]
 }

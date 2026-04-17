@@ -192,7 +192,7 @@ export const merchantCanonicalMap = pgTable("merchant_canonical_map", {
 export const providerBanners = pgTable("provider_banners", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "provider_banners_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
-	imageKey: text("image_key").notNull(),
+	imageUrl: text("image_url").notNull(),
 	title: text().notNull(),
 	subtitle: text().notNull(),
 	cta: text().notNull(),
@@ -205,6 +205,32 @@ export const providerBanners = pgTable("provider_banners", {
 }, (table) => [
 	index("idx_provider_banners_active").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
 	index("idx_provider_banners_sort").using("btree", table.sortOrder.asc().nullsLast().op("int4_ops")),
+]);
+
+export const programBannerAssets = pgTable("program_banner_assets", {
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "program_banner_assets_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	ruleKey: uuid("rule_key"),
+	keywordCode: text("keyword_code"),
+	imageUrl: text("image_url").notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_program_banner_assets_active").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
+	index("idx_program_banner_assets_keyword_code").using("btree", table.keywordCode.asc().nullsLast().op("text_ops")),
+	index("idx_program_banner_assets_rule_key").using("btree", table.ruleKey.asc().nullsLast().op("uuid_ops")),
+	check("program_banner_assets_target_check", sql`num_nonnulls(rule_key, keyword_code) = 1`),
+	foreignKey({
+			columns: [table.ruleKey],
+			foreignColumns: [dimRule.ruleKey],
+			name: "program_banner_assets_rule_key_dim_rule_rule_key_fk"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.keywordCode],
+			foreignColumns: [dimMerchant.keywordCode],
+			name: "program_banner_assets_keyword_code_dim_merchant_keyword_code_fk"
+		}).onDelete("cascade"),
+	uniqueIndex("program_banner_assets_rule_key_unique").on(table.ruleKey),
+	uniqueIndex("program_banner_assets_keyword_code_unique").on(table.keywordCode),
 ]);
 
 export const users = pgTable("users", {
