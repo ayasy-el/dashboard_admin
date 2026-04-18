@@ -29,6 +29,7 @@ export type OverviewResponse = {
   monthlyTransactions: { month: string; value: number }[];
   monthlyRedeemers: { month: string; value: number }[];
   topMerchants: {
+    keyword: string;
     merchant: string;
     category: string;
     branch: string;

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 
 type ClusterMetricRow = {
-  name: string;
+  name: React.ReactNode;
   totalMerchant: number;
   uniqueMerchant: number;
   totalPoint: number;
@@ -40,6 +40,14 @@ const splitValueAndPercent = (value: string) => {
 };
 type SortDirection = "asc" | "desc";
 type SortColumn = "name" | keyof Omit<ClusterMetricRow, "name" | "children">;
+
+const toTextValue = (value: React.ReactNode): string => {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map((item) => toTextValue(item)).join(" ");
+  if (React.isValidElement(value)) return toTextValue((value.props as { children?: React.ReactNode }).children);
+  return String(value);
+};
 
 const numericColumns: Array<keyof Omit<ClusterMetricRow, "name" | "children">> = [
   "totalMerchant",
@@ -113,8 +121,8 @@ export function CollapsibleClusterTableCard({
         return sortState.direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
       }
 
-      const leftText = String(leftValue ?? "");
-      const rightText = String(rightValue ?? "");
+      const leftText = toTextValue(leftValue).toLowerCase();
+      const rightText = toTextValue(rightValue).toLowerCase();
       const compared = leftText.localeCompare(rightText, "id", { numeric: true, sensitivity: "base" });
       return sortState.direction === "asc" ? compared : -compared;
     });
@@ -228,11 +236,12 @@ export function CollapsibleClusterTableCard({
                 </TableRow>
               ) : (
                 sortedRows.map((row) => {
-                  const isExpanded = expandedRows.has(row.name);
+                  const rowNameKey = toTextValue(row.name);
+                  const isExpanded = expandedRows.has(rowNameKey);
                   const hasChildren = Boolean(row.children?.length);
 
                   return (
-                    <React.Fragment key={row.name}>
+                    <React.Fragment key={rowNameKey}>
                       <TableRow>
                         <TableCell className="px-4 font-medium">
                           <div className="flex items-center gap-2">
@@ -241,7 +250,7 @@ export function CollapsibleClusterTableCard({
                                 type="button"
                                 variant="ghost"
                                 size="icon-xs"
-                                onClick={() => toggleRow(row.name)}
+                                onClick={() => toggleRow(rowNameKey)}
                               >
                                 {isExpanded ? (
                                   <IconChevronUp className="size-3.5" />
@@ -256,7 +265,7 @@ export function CollapsibleClusterTableCard({
                           </div>
                         </TableCell>
                         {numericColumns.map((column) => (
-                          <TableCell key={`${row.name}-${column}`} className="px-4 text-right tabular-nums">
+                          <TableCell key={`${rowNameKey}-${column}`} className="px-4 text-right tabular-nums">
                             {(() => {
                               if (column !== "merchantAktif" && column !== "merchantProduktif") {
                                 return formatNumber(row[column]);
@@ -274,13 +283,13 @@ export function CollapsibleClusterTableCard({
                         ))}
                       </TableRow>
                       {isExpanded && row.children?.map((child) => (
-                        <TableRow key={`${row.name}-${child.name}`} className="bg-muted/20">
+                        <TableRow key={`${rowNameKey}-${toTextValue(child.name)}`} className="bg-muted/20">
                           <TableCell className="px-4">
                             <span className="pl-8 text-muted-foreground">{child.name}</span>
                           </TableCell>
                           {numericColumns.map((column) => (
                             <TableCell
-                              key={`${row.name}-${child.name}-${column}`}
+                              key={`${rowNameKey}-${toTextValue(child.name)}-${column}`}
                               className="px-4 text-right tabular-nums"
                             >
                               {(() => {

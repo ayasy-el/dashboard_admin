@@ -4,8 +4,9 @@ import * as React from "react";
 import {
   IconChartBar,
   IconDashboard,
+  IconBuildingStore,
+  IconMessageCircle,
   IconSettings,
-  IconShoppingBag,
   IconTicket,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -34,6 +35,11 @@ const navItems = [
     url: "/operational",
     icon: IconChartBar,
   },
+  {
+    title: "Merchant",
+    url: "/merchant",
+    icon: IconBuildingStore,
+  },
 ];
 
 const systemItems = [
@@ -49,8 +55,8 @@ const systemItems = [
   },
   {
     title: "Feedback Center",
-    url: "#",
-    icon: IconShoppingBag,
+    url: "/feedback",
+    icon: IconMessageCircle,
   },
 ];
 
@@ -109,7 +115,9 @@ export function AppSidebar({
         </div>
         <SidebarMenu>
           {systemItems.map((item) => {
-            const isActive = item.url === "/" ? pathname === "/" : pathname.startsWith(item.url);
+            const isActive =
+              item.url !== "#" &&
+              (item.url === "/" ? pathname === "/" : pathname.startsWith(item.url));
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton

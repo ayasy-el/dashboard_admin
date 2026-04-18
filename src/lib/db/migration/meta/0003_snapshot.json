@@ -1,6 +1,6 @@
 {
-  "id": "727cfde3-2a9d-4e02-b26c-00aa9aa48585",
-  "prevId": "d1efbe94-5208-47bb-8bb8-9fd851448365",
+  "id": "2d965505-bf8d-4e36-a4fc-33ddd9943ba7",
+  "prevId": "8f9e23d5-3336-42fe-a102-7637720769ee",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -68,8 +68,7 @@
               "expression": "expires_at",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "timestamp_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -84,8 +83,7 @@
               "expression": "user_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -182,8 +180,7 @@
               "expression": "is_active",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "bool_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -203,6 +200,187 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "audit.batch_issue_links": {
+      "name": "batch_issue_links",
+      "schema": "audit",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issue_id": {
+          "name": "issue_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "row_num": {
+          "name": "row_num",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "dataset": {
+          "name": "dataset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_type": {
+          "name": "error_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_payload": {
+          "name": "raw_payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "ux_batch_issue_links_batch_row_issue": {
+          "name": "ux_batch_issue_links_batch_row_issue",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "row_num",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_batch_issue_links_batch_state": {
+          "name": "idx_batch_issue_links_batch_state",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_batch_issue_links_issue_state": {
+          "name": "idx_batch_issue_links_issue_state",
+          "columns": [
+            {
+              "expression": "issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "batch_issue_links_batch_id_batches_batch_id_fk": {
+          "name": "batch_issue_links_batch_id_batches_batch_id_fk",
+          "tableFrom": "batch_issue_links",
+          "tableTo": "batches",
+          "schemaTo": "audit",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "batch_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "batch_issue_links_issue_id_ingestion_issues_issue_id_fk": {
+          "name": "batch_issue_links_issue_id_ingestion_issues_issue_id_fk",
+          "tableFrom": "batch_issue_links",
+          "tableTo": "ingestion_issues",
+          "schemaTo": "audit",
+          "columnsFrom": [
+            "issue_id"
+          ],
+          "columnsTo": [
+            "issue_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -296,9 +474,45 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "batch_public_id": {
+          "name": "batch_public_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {
+        "ux_batches_public_id": {
+          "name": "ux_batches_public_id",
+          "columns": [
+            {
+              "expression": "batch_public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_batches_created_at": {
+          "name": "idx_batches_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_batches_dataset_status": {
           "name": "idx_batches_dataset_status",
           "columns": [
@@ -319,12 +533,180 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "audit.ingestion_issues": {
+      "name": "ingestion_issues",
+      "schema": "audit",
+      "columns": {
+        "issue_id": {
+          "name": "issue_id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
         },
-        "idx_batches_created_at": {
-          "name": "idx_batches_created_at",
+        "issue_fingerprint": {
+          "name": "issue_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dataset": {
+          "name": "dataset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issue_kind": {
+          "name": "issue_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "conflict_merchant_key": {
+          "name": "conflict_merchant_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conflict_start_period": {
+          "name": "conflict_start_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conflict_end_period": {
+          "name": "conflict_end_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_type": {
+          "name": "error_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_payload": {
+          "name": "raw_payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OPEN'"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_by_batch_id": {
+          "name": "resolved_by_batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ux_ingestion_issues_fingerprint": {
+          "name": "ux_ingestion_issues_fingerprint",
           "columns": [
             {
-              "expression": "created_at",
+              "expression": "issue_fingerprint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ingestion_issues_status": {
+          "name": "idx_ingestion_issues_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dataset",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ingestion_issues_conflict_scope": {
+          "name": "idx_ingestion_issues_conflict_scope",
+          "columns": [
+            {
+              "expression": "issue_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "conflict_merchant_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "conflict_start_period",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "conflict_end_period",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -454,8 +836,7 @@
               "expression": "category_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "int4_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -470,8 +851,7 @@
               "expression": "cluster_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "int8_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -481,21 +861,8 @@
         }
       },
       "foreignKeys": {
-        "fk_dim_merchant_category_id_dim_category_category_id": {
-          "name": "fk_dim_merchant_category_id_dim_category_category_id",
-          "tableFrom": "dim_merchant",
-          "tableTo": "dim_category",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "category_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "fk_dim_merchant_cluster_id_dim_cluster_cluster_id": {
-          "name": "fk_dim_merchant_cluster_id_dim_cluster_cluster_id",
+        "dim_merchant_cluster_id_dim_cluster_cluster_id_fk": {
+          "name": "dim_merchant_cluster_id_dim_cluster_cluster_id_fk",
           "tableFrom": "dim_merchant",
           "tableTo": "dim_cluster",
           "columnsFrom": [
@@ -503,6 +870,19 @@
           ],
           "columnsTo": [
             "cluster_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "dim_merchant_category_id_dim_category_category_id_fk": {
+          "name": "dim_merchant_category_id_dim_category_category_id_fk",
+          "tableFrom": "dim_merchant",
+          "tableTo": "dim_category",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "category_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -544,15 +924,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "period": {
-          "name": "period",
-          "type": "daterange",
-          "primaryKey": false,
-          "notNull": true
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period": {
+          "name": "period",
+          "type": "daterange",
           "primaryKey": false,
           "notNull": true
         }
@@ -565,35 +945,18 @@
               "expression": "rule_merchant",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "dim_rule_idx_dim_rule_period": {
-          "name": "dim_rule_idx_dim_rule_period",
-          "columns": [
-            {
-              "expression": "period",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": "range_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gist",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "fk_dim_rule_rule_merchant_dim_merchant_merchant_key": {
-          "name": "fk_dim_rule_rule_merchant_dim_merchant_merchant_key",
+        "dim_rule_rule_merchant_dim_merchant_merchant_key_fk": {
+          "name": "dim_rule_rule_merchant_dim_merchant_merchant_key_fk",
           "tableFrom": "dim_rule",
           "tableTo": "dim_merchant",
           "columnsFrom": [
@@ -609,16 +972,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "ck_dim_rule_period_valid": {
-          "name": "ck_dim_rule_period_valid",
-          "value": "not isempty(period)"
-        },
-        "ck_dim_rule_point_positive": {
-          "name": "ck_dim_rule_point_positive",
-          "value": "point_redeem >= 0"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.fact_cluster_point": {
@@ -664,15 +1018,13 @@
               "expression": "month_year",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "date_ops"
+              "nulls": "last"
             },
             {
               "expression": "cluster_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "date_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -682,8 +1034,8 @@
         }
       },
       "foreignKeys": {
-        "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id": {
-          "name": "fk_fact_cluster_point_cluster_id_dim_cluster_cluster_id",
+        "fact_cluster_point_cluster_id_dim_cluster_cluster_id_fk": {
+          "name": "fact_cluster_point_cluster_id_dim_cluster_cluster_id_fk",
           "tableFrom": "fact_cluster_point",
           "tableTo": "dim_cluster",
           "columnsFrom": [
@@ -771,22 +1123,19 @@
               "expression": "merchant_key",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "timestamp_ops"
+              "nulls": "last"
             },
             {
               "expression": "status",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "timestamp_ops"
+              "nulls": "last"
             },
             {
               "expression": "transaction_at",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -801,8 +1150,7 @@
               "expression": "msisdn",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "text_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -817,8 +1165,7 @@
               "expression": "rule_key",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -828,21 +1175,8 @@
         }
       },
       "foreignKeys": {
-        "fk_fact_transaction_merchant_key_dim_merchant_merchant_key": {
-          "name": "fk_fact_transaction_merchant_key_dim_merchant_merchant_key",
-          "tableFrom": "fact_transaction",
-          "tableTo": "dim_merchant",
-          "columnsFrom": [
-            "merchant_key"
-          ],
-          "columnsTo": [
-            "merchant_key"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "fk_fact_transaction_rule_key_dim_rule_rule_key": {
-          "name": "fk_fact_transaction_rule_key_dim_rule_rule_key",
+        "fact_transaction_rule_key_dim_rule_rule_key_fk": {
+          "name": "fact_transaction_rule_key_dim_rule_rule_key_fk",
           "tableFrom": "fact_transaction",
           "tableTo": "dim_rule",
           "columnsFrom": [
@@ -853,25 +1187,25 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "fact_transaction_merchant_key_dim_merchant_merchant_key_fk": {
+          "name": "fact_transaction_merchant_key_dim_merchant_merchant_key_fk",
+          "tableFrom": "fact_transaction",
+          "tableTo": "dim_merchant",
+          "columnsFrom": [
+            "merchant_key"
+          ],
+          "columnsTo": [
+            "merchant_key"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "ck_fact_transaction_qty_valid": {
-          "name": "ck_fact_transaction_qty_valid",
-          "value": "qty >= 1"
-        },
-        "ck_fact_transaction_point_positive": {
-          "name": "ck_fact_transaction_point_positive",
-          "value": "point_redeem >= 0"
-        },
-        "ck_fact_transaction_msisdn_digits": {
-          "name": "ck_fact_transaction_msisdn_digits",
-          "value": "(msisdn)::text ~ '^[0-9]{8,20}$'::text"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.merchant_canonical_map": {
@@ -928,7 +1262,7 @@
             "increment": "1",
             "startWith": "1",
             "minValue": "1",
-            "maxValue": "9223372036854776000",
+            "maxValue": "9223372036854775807",
             "cache": "1",
             "cycle": false
           }
@@ -1001,6 +1335,30 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "attachment_key": {
+          "name": "attachment_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attachment_file_name": {
+          "name": "attachment_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attachment_mime_type": {
+          "name": "attachment_mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attachment_size": {
+          "name": "attachment_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1011,8 +1369,7 @@
               "expression": "merchant_key",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1027,8 +1384,7 @@
               "expression": "status",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "text_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1043,8 +1399,7 @@
               "expression": "user_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "int8_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1071,16 +1426,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "merchant_feedback_type_check": {
-          "name": "merchant_feedback_type_check",
-          "value": "type = ANY (ARRAY['report'::text, 'critic'::text, 'suggestion'::text])"
-        },
-        "merchant_feedback_status_check": {
-          "name": "merchant_feedback_status_check",
-          "value": "status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text])"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.merchant_users": {
@@ -1137,8 +1483,7 @@
               "expression": "merchant_key",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "uuid_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1177,6 +1522,176 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.program_banner_assets": {
+      "name": "program_banner_assets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "program_banner_assets_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "rule_key": {
+          "name": "rule_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "keyword_code": {
+          "name": "keyword_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_program_banner_assets_active": {
+          "name": "idx_program_banner_assets_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_program_banner_assets_keyword_code": {
+          "name": "idx_program_banner_assets_keyword_code",
+          "columns": [
+            {
+              "expression": "keyword_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_program_banner_assets_rule_key": {
+          "name": "idx_program_banner_assets_rule_key",
+          "columns": [
+            {
+              "expression": "rule_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "program_banner_assets_rule_key_unique": {
+          "name": "program_banner_assets_rule_key_unique",
+          "columns": [
+            {
+              "expression": "rule_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "program_banner_assets_keyword_code_unique": {
+          "name": "program_banner_assets_keyword_code_unique",
+          "columns": [
+            {
+              "expression": "keyword_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "program_banner_assets_rule_key_dim_rule_rule_key_fk": {
+          "name": "program_banner_assets_rule_key_dim_rule_rule_key_fk",
+          "tableFrom": "program_banner_assets",
+          "tableTo": "dim_rule",
+          "columnsFrom": [
+            "rule_key"
+          ],
+          "columnsTo": [
+            "rule_key"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "program_banner_assets_keyword_code_dim_merchant_keyword_code_fk": {
+          "name": "program_banner_assets_keyword_code_dim_merchant_keyword_code_fk",
+          "tableFrom": "program_banner_assets",
+          "tableTo": "dim_merchant",
+          "columnsFrom": [
+            "keyword_code"
+          ],
+          "columnsTo": [
+            "keyword_code"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "program_banner_assets_target_check": {
+          "name": "program_banner_assets_target_check",
+          "value": "num_nonnulls(rule_key, keyword_code) = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.provider_banners": {
       "name": "provider_banners",
       "schema": "",
@@ -1193,13 +1708,13 @@
             "increment": "1",
             "startWith": "1",
             "minValue": "1",
-            "maxValue": "9223372036854776000",
+            "maxValue": "9223372036854775807",
             "cache": "1",
             "cycle": false
           }
         },
-        "image_key": {
-          "name": "image_key",
+        "image_url": {
+          "name": "image_url",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1271,8 +1786,7 @@
               "expression": "is_active",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "bool_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1287,8 +1801,7 @@
               "expression": "sort_order",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "int4_ops"
+              "nulls": "last"
             }
           ],
           "isUnique": false,
@@ -1649,90 +2162,6 @@
       "indexes": {
         "idx_master_raw_batch": {
           "name": "idx_master_raw_batch",
-          "columns": [
-            {
-              "expression": "batch_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "row_num",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "stg.rejected_rows": {
-      "name": "rejected_rows",
-      "schema": "stg",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigserial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "batch_id": {
-          "name": "batch_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dataset": {
-          "name": "dataset",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "row_num": {
-          "name": "row_num",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "error_type": {
-          "name": "error_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "raw_payload": {
-          "name": "raw_payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_rejected_batch": {
-          "name": "idx_rejected_batch",
           "columns": [
             {
               "expression": "batch_id",
@@ -2139,7 +2568,7 @@
             "increment": "1",
             "startWith": "1",
             "minValue": "1",
-            "maxValue": "9223372036854776000",
+            "maxValue": "9223372036854775807",
             "cache": "1",
             "cycle": false
           }
@@ -2211,12 +2640,7 @@
         }
       },
       "policies": {},
-      "checkConstraints": {
-        "users_role_check": {
-          "name": "users_role_check",
-          "value": "role = ANY (ARRAY['merchant'::text, 'admin'::text])"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
@@ -2238,7 +2662,10 @@
       ]
     }
   },
-  "schemas": {},
+  "schemas": {
+    "audit": "audit",
+    "stg": "stg"
+  },
   "sequences": {},
   "roles": {},
   "policies": {},
@@ -2259,25 +2686,25 @@
         },
         "category": {
           "name": "category",
-          "type": "varchar(500)",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
         "branch": {
           "name": "branch",
-          "type": "varchar(500)",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
         "cluster": {
           "name": "cluster",
-          "type": "varchar(500)",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
         "uniq_merchant": {
           "name": "uniq_merchant",
-          "type": "varchar(500)",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2318,10 +2745,9 @@
           "notNull": false
         }
       },
-      "definition": "SELECT date_trunc('month'::text, transaction_at)::date AS month_year, merchant_key, category, branch, cluster, uniq_merchant, count(*)::integer AS tx_count, count(*) FILTER (WHERE status = 'success'::transaction_status)::integer AS success_tx_count, count(*) FILTER (WHERE status = 'failed'::transaction_status)::integer AS failed_tx_count, count(DISTINCT msisdn)::integer AS unique_redeemer, count(DISTINCT msisdn) FILTER (WHERE status = 'success'::transaction_status)::integer AS unique_redeemer_success, COALESCE(sum(total_point) FILTER (WHERE status = 'success'::transaction_status), 0::numeric)::bigint AS total_point_success FROM vw_overview_transaction vt GROUP BY (date_trunc('month'::text, transaction_at)::date), merchant_key, category, branch, cluster, uniq_merchant",
       "name": "vw_merchant_tx_monthly_agg",
       "schema": "public",
-      "isExisting": false,
+      "isExisting": true,
       "materialized": false
     },
     "public.vw_overview_transaction": {
@@ -2430,10 +2856,9 @@
           "notNull": false
         }
       },
-      "definition": "SELECT ft.transaction_key, ft.transaction_at, ft.status, ft.merchant_key, ft.qty, ft.point_redeem, (ft.qty * ft.point_redeem)::bigint AS total_point, ft.msisdn, dm.keyword_code, dm.merchant_name, dm.uniq_merchant, dcat.category_id, dcat.category, dcl.cluster_id, dcl.cluster, dcl.branch, dcl.region FROM fact_transaction ft JOIN dim_merchant dm ON dm.merchant_key = ft.merchant_key JOIN dim_category dcat ON dcat.category_id = dm.category_id JOIN dim_cluster dcl ON dcl.cluster_id = dm.cluster_id",
       "name": "vw_overview_transaction",
       "schema": "public",
-      "isExisting": false,
+      "isExisting": true,
       "materialized": false
     },
     "public.vw_rule_merchant_dim": {
@@ -2529,10 +2954,9 @@
           "notNull": false
         }
       },
-      "definition": "SELECT dr.rule_key, dr.rule_merchant AS merchant_key, dr.point_redeem, dr.period, lower(dr.period) AS start_period, (upper(dr.period) - '1 day'::interval)::date AS end_period, dm.merchant_name, dm.keyword_code, dm.uniq_merchant, dm.cluster_id, dm.category_id, dcat.category, dcl.branch, dcl.cluster, dcl.region FROM dim_rule dr JOIN dim_merchant dm ON dm.merchant_key = dr.rule_merchant JOIN dim_category dcat ON dcat.category_id = dm.category_id JOIN dim_cluster dcl ON dcl.cluster_id = dm.cluster_id",
       "name": "vw_rule_merchant_dim",
       "schema": "public",
-      "isExisting": false,
+      "isExisting": true,
       "materialized": false
     }
   },

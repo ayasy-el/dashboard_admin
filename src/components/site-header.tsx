@@ -11,6 +11,8 @@ import { IconHome } from "@tabler/icons-react";
 const routeTitles: Record<string, string> = {
   "/": "Overview",
   "/operational": "Operational",
+  "/merchant": "Merchant",
+  "/feedback": "Feedback Center",
   "/ingestion": "Ingestion",
   "/program-promotions": "Program & Promotions",
 };
@@ -19,6 +21,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const title = useMemo(() => {
     if (!pathname) return "Overview";
+    if (pathname.startsWith("/merchant/")) return "Merchant Detail";
+    if (pathname.startsWith("/operational/merchant/")) return "Merchant Detail";
     return routeTitles[pathname] ?? "Overview";
   }, [pathname]);
 

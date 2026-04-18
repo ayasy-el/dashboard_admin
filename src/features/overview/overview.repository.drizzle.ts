@@ -155,6 +155,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
 
     const topMerchantsRaw = await db.execute(sql`
       select
+        vt.keyword_code as keyword,
         vt.merchant_name as merchant,
         vt.category as category,
         vt.branch as branch,
@@ -165,7 +166,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         and vt.transaction_at < ${endTs}
         ${hasCategoryFilter ? sql`and vt.category in (${inClause(selectedCategories)})` : sql``}
         ${hasBranchFilter ? sql`and vt.branch in (${inClause(selectedBranches)})` : sql``}
-      group by vt.merchant_name, vt.category, vt.branch
+      group by vt.keyword_code, vt.merchant_name, vt.category, vt.branch
       order by redeem desc, vt.merchant_name
       limit 10
     `);
@@ -391,6 +392,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         value: toNumber(row.value),
       })),
       topMerchantsRaw: (topMerchantsRaw.rows as Array<Record<string, unknown>>).map((row) => ({
+        keyword: String(row.keyword ?? ""),
         merchant: String(row.merchant ?? ""),
         category: String(row.category ?? ""),
         branch: String(row.branch ?? ""),

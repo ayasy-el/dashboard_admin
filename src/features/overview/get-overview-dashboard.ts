@@ -88,6 +88,7 @@ export async function getOverviewDashboard(
     percent: totalCategory ? (row.value / totalCategory) * 100 : 0,
   }));
   const topMerchants = raw.topMerchantsRaw.map((row) => ({
+    keyword: row.keyword,
     merchant: row.merchant,
     category: row.category,
     branch: row.branch,
