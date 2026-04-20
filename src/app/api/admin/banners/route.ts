@@ -25,9 +25,9 @@ export async function POST(request: Request) {
   try {
     const payload = normalizeBannerRequest(await request.json());
     const banner = await createBanner({
+      ...payload,
       sortOrder: await getNextBannerSortOrder(),
       isActive: true,
-      ...payload,
     });
 
     return NextResponse.json(serializeBanner(banner), { status: 201 });

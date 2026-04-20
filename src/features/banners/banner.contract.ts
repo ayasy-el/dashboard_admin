@@ -14,7 +14,6 @@ type BannerRecord = {
 
 type ProgramAssetRecord = {
   id: number;
-  ruleKey: string | null;
   keywordCode: string | null;
   imageUrl: string;
   isActive: boolean;
@@ -38,7 +37,6 @@ export const normalizeBannerRequest = (payload: Record<string, unknown>) => ({
 });
 
 export const normalizeProgramAssetRequest = (payload: Record<string, unknown>) => ({
-  ruleKey: pick(payload, "ruleKey", "rule_key"),
   keywordCode: pick(payload, "keywordCode", "keyword_code"),
   imageUrl: pick(payload, "imageUrl", "image_url"),
   isActive: pick(payload, "isActive", "is_active"),
@@ -60,7 +58,6 @@ export const serializeBanner = (banner: BannerRecord) => ({
 
 export const serializeProgramAsset = (asset: ProgramAssetRecord) => ({
   id: asset.id,
-  rule_key: asset.ruleKey,
   keyword_code: asset.keywordCode,
   image_url: asset.imageUrl,
   is_active: asset.isActive,

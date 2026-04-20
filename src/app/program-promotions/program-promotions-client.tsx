@@ -48,7 +48,6 @@ type BannerApiRecord = {
 
 type ProgramAssetRecord = {
   id: number;
-  ruleKey: string | null;
   keywordCode: string | null;
   imageUrl: string;
   isActive: boolean;
@@ -57,7 +56,6 @@ type ProgramAssetRecord = {
 
 type ProgramAssetApiRecord = {
   id: number;
-  rule_key: string | null;
   keyword_code: string | null;
   image_url: string;
   is_active: boolean;
@@ -76,7 +74,6 @@ type BannerFormState = {
 };
 
 type ProgramAssetFormState = {
-  ruleKey: string;
   keywordCode: string;
   imageUrl: string;
   isActive: boolean;
@@ -100,7 +97,6 @@ const emptyBannerForm = (sortOrder = "0"): BannerFormState => ({
 });
 
 const emptyAssetForm = (): ProgramAssetFormState => ({
-  ruleKey: "",
   keywordCode: "",
   imageUrl: "",
   isActive: true,
@@ -115,7 +111,7 @@ const toLocalDateTimeInput = (value: string | null) => {
   const pad = (input: number) => String(input).padStart(2, "0");
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
-    date.getMinutes()
+    date.getMinutes(),
   )}`;
 };
 
@@ -145,7 +141,6 @@ const bannerToForm = (banner: BannerRecord): BannerFormState => ({
 });
 
 const assetToForm = (asset: ProgramAssetRecord): ProgramAssetFormState => ({
-  ruleKey: asset.ruleKey ?? "",
   keywordCode: asset.keywordCode ?? "",
   imageUrl: asset.imageUrl,
   isActive: asset.isActive,
@@ -167,7 +162,6 @@ const fromBannerApi = (banner: BannerApiRecord): BannerRecord => ({
 
 const fromProgramAssetApi = (asset: ProgramAssetApiRecord): ProgramAssetRecord => ({
   id: asset.id,
-  ruleKey: asset.rule_key,
   keywordCode: asset.keyword_code,
   imageUrl: asset.image_url,
   isActive: asset.is_active,
@@ -218,7 +212,7 @@ export default function BannerManagementClient({
   const [banners, setBanners] = useState(initialBanners);
   const [programAssets, setProgramAssets] = useState(initialProgramAssets);
   const [bannerForm, setBannerForm] = useState<BannerFormState>(() =>
-    emptyBannerForm(String(initialBanners.length))
+    emptyBannerForm(String(initialBanners.length)),
   );
   const [assetForm, setAssetForm] = useState<ProgramAssetFormState>(emptyAssetForm);
   const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
@@ -275,7 +269,9 @@ export default function BannerManagementClient({
           ? current.map((item) => (item.id === banner.id ? banner : item))
           : [...current, banner];
 
-        return [...next].sort((a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt));
+        return [...next].sort(
+          (a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt),
+        );
       });
       setBannerMessage(editingBannerId ? "Banner berhasil diperbarui." : "Banner berhasil dibuat.");
       resetBannerForm();
@@ -293,17 +289,19 @@ export default function BannerManagementClient({
 
     try {
       const payload = {
-        rule_key: assetForm.ruleKey || null,
         keyword_code: assetForm.keywordCode || null,
         image_url: assetForm.imageUrl,
         is_active: assetForm.isActive,
       };
 
       const assetResponse = editingAssetId
-        ? await readJson<ProgramAssetApiRecord>(`/api/admin/program-banner-assets/${editingAssetId}`, {
-            method: "PATCH",
-            body: JSON.stringify(payload),
-          })
+        ? await readJson<ProgramAssetApiRecord>(
+            `/api/admin/program-banner-assets/${editingAssetId}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify(payload),
+            },
+          )
         : await readJson<ProgramAssetApiRecord>("/api/admin/program-banner-assets", {
             method: "POST",
             body: JSON.stringify(payload),
@@ -345,7 +343,9 @@ export default function BannerManagementClient({
     setAssetMessage(null);
 
     try {
-      await readJson<{ success: boolean }>(`/api/admin/program-banner-assets/${id}`, { method: "DELETE" });
+      await readJson<{ success: boolean }>(`/api/admin/program-banner-assets/${id}`, {
+        method: "DELETE",
+      });
       setProgramAssets((current) => current.filter((item) => item.id !== id));
       if (editingAssetId === id) resetAssetForm();
       setAssetMessage("Asset berhasil dihapus.");
@@ -396,8 +396,8 @@ export default function BannerManagementClient({
             <CardHeader>
               <CardTitle>Provider Promotion Banners</CardTitle>
               <CardDescription>
-                Source of truth untuk banner merchant. Merchant akan membaca banner aktif yang sudah lolos
-                jadwal publikasi.
+                Source of truth untuk banner merchant. Merchant akan membaca banner aktif yang sudah
+                lolos jadwal publikasi.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -407,7 +407,9 @@ export default function BannerManagementClient({
                   <Input
                     id="banner-title"
                     value={bannerForm.title}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, title: event.target.value }))}
+                    onChange={(event) =>
+                      setBannerForm((current) => ({ ...current, title: event.target.value }))
+                    }
                     placeholder="Promo Ramadan"
                   />
                 </div>
@@ -416,7 +418,9 @@ export default function BannerManagementClient({
                   <Input
                     id="banner-cta"
                     value={bannerForm.cta}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, cta: event.target.value }))}
+                    onChange={(event) =>
+                      setBannerForm((current) => ({ ...current, cta: event.target.value }))
+                    }
                     placeholder="Lihat Promo"
                   />
                 </div>
@@ -427,33 +431,31 @@ export default function BannerManagementClient({
                 <textarea
                   id="banner-subtitle"
                   value={bannerForm.subtitle}
-                  onChange={(event) => setBannerForm((current) => ({ ...current, subtitle: event.target.value }))}
+                  onChange={(event) =>
+                    setBannerForm((current) => ({ ...current, subtitle: event.target.value }))
+                  }
                   className="border-input min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   placeholder="Deskripsi singkat promo untuk merchant"
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-                <div className="space-y-2">
-                  <Label htmlFor="banner-image-url">Image URL</Label>
-                  <Input
-                    id="banner-image-url"
-                    value={bannerForm.imageUrl}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, imageUrl: event.target.value }))}
-                    placeholder="/uploads/banner-assets/example.png"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="banner-image-file">Upload Image</Label>
-                  <Input
-                    id="banner-image-file"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                    disabled={uploadingBannerImage}
-                    onChange={(event) => void onBannerFileChange(event.target.files?.[0] ?? null)}
-                    className="max-w-72"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="banner-image-file">Upload Image</Label>
+                <Input
+                  id="banner-image-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  disabled={uploadingBannerImage}
+                  onChange={(event) => void onBannerFileChange(event.target.files?.[0] ?? null)}
+                  className="max-w-72"
+                />
+                {bannerForm.imageUrl ? (
+                  <p className="text-xs text-muted-foreground break-all">{bannerForm.imageUrl}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Upload image untuk mengisi banner image.
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
@@ -464,7 +466,9 @@ export default function BannerManagementClient({
                     type="number"
                     min="0"
                     value={bannerForm.sortOrder}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, sortOrder: event.target.value }))}
+                    onChange={(event) =>
+                      setBannerForm((current) => ({ ...current, sortOrder: event.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -473,7 +477,9 @@ export default function BannerManagementClient({
                     id="banner-starts-at"
                     type="datetime-local"
                     value={bannerForm.startsAt}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, startsAt: event.target.value }))}
+                    onChange={(event) =>
+                      setBannerForm((current) => ({ ...current, startsAt: event.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -482,7 +488,9 @@ export default function BannerManagementClient({
                     id="banner-ends-at"
                     type="datetime-local"
                     value={bannerForm.endsAt}
-                    onChange={(event) => setBannerForm((current) => ({ ...current, endsAt: event.target.value }))}
+                    onChange={(event) =>
+                      setBannerForm((current) => ({ ...current, endsAt: event.target.value }))
+                    }
                   />
                 </div>
               </div>
@@ -491,7 +499,9 @@ export default function BannerManagementClient({
                 <input
                   type="checkbox"
                   checked={bannerForm.isActive}
-                  onChange={(event) => setBannerForm((current) => ({ ...current, isActive: event.target.checked }))}
+                  onChange={(event) =>
+                    setBannerForm((current) => ({ ...current, isActive: event.target.checked }))
+                  }
                 />
                 Aktifkan banner ini
               </label>
@@ -511,7 +521,10 @@ export default function BannerManagementClient({
               {bannerMessage ? <p className="text-sm text-emerald-600">{bannerMessage}</p> : null}
 
               <div className="flex flex-wrap gap-3">
-                <Button disabled={submittingBanner || uploadingBannerImage} onClick={() => void submitBanner()}>
+                <Button
+                  disabled={submittingBanner || uploadingBannerImage}
+                  onClick={() => void submitBanner()}
+                >
                   {editingBannerId ? "Update Banner" : "Create Banner"}
                 </Button>
                 <Button variant="outline" onClick={resetBannerForm}>
@@ -525,62 +538,48 @@ export default function BannerManagementClient({
             <CardHeader>
               <CardTitle>Program Banner Assets</CardTitle>
               <CardDescription>
-                Opsional untuk kartu active program di merchant. Set satu target saja: `rule_key` atau
-                `keyword_code`.
+                Referensi image untuk kartu active program di merchant berdasarkan `keyword_code`.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="asset-rule-key">Rule Key</Label>
-                  <Input
-                    id="asset-rule-key"
-                    value={assetForm.ruleKey}
-                    onChange={(event) => setAssetForm((current) => ({ ...current, ruleKey: event.target.value }))}
-                    placeholder="UUID rule"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="asset-keyword-code">Keyword Code</Label>
-                  <Input
-                    id="asset-keyword-code"
-                    value={assetForm.keywordCode}
-                    onChange={(event) =>
-                      setAssetForm((current) => ({ ...current, keywordCode: event.target.value }))
-                    }
-                    placeholder="merchant_keyword"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="asset-keyword-code">Keyword Code</Label>
+                <Input
+                  id="asset-keyword-code"
+                  value={assetForm.keywordCode}
+                  onChange={(event) =>
+                    setAssetForm((current) => ({ ...current, keywordCode: event.target.value }))
+                  }
+                  placeholder="merchant_keyword"
+                />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-                <div className="space-y-2">
-                  <Label htmlFor="asset-image-url">Image URL</Label>
-                  <Input
-                    id="asset-image-url"
-                    value={assetForm.imageUrl}
-                    onChange={(event) => setAssetForm((current) => ({ ...current, imageUrl: event.target.value }))}
-                    placeholder="/uploads/banner-assets/program.png"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="asset-image-file">Upload Image</Label>
-                  <Input
-                    id="asset-image-file"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                    disabled={uploadingAssetImage}
-                    onChange={(event) => void onAssetFileChange(event.target.files?.[0] ?? null)}
-                    className="max-w-72"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="asset-image-file">Upload Image</Label>
+                <Input
+                  id="asset-image-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  disabled={uploadingAssetImage}
+                  onChange={(event) => void onAssetFileChange(event.target.files?.[0] ?? null)}
+                  className="max-w-72"
+                />
+                {assetForm.imageUrl ? (
+                  <p className="text-xs text-muted-foreground break-all">{assetForm.imageUrl}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Upload image untuk mengisi asset image.
+                  </p>
+                )}
               </div>
 
               <label className="flex items-center gap-3 text-sm font-medium">
                 <input
                   type="checkbox"
                   checked={assetForm.isActive}
-                  onChange={(event) => setAssetForm((current) => ({ ...current, isActive: event.target.checked }))}
+                  onChange={(event) =>
+                    setAssetForm((current) => ({ ...current, isActive: event.target.checked }))
+                  }
                 />
                 Aktifkan asset ini
               </label>
@@ -600,7 +599,10 @@ export default function BannerManagementClient({
               {assetMessage ? <p className="text-sm text-emerald-600">{assetMessage}</p> : null}
 
               <div className="flex flex-wrap gap-3">
-                <Button disabled={submittingAsset || uploadingAssetImage} onClick={() => void submitProgramAsset()}>
+                <Button
+                  disabled={submittingAsset || uploadingAssetImage}
+                  onClick={() => void submitProgramAsset()}
+                >
                   {editingAssetId ? "Update Asset" : "Create Asset"}
                 </Button>
                 <Button variant="outline" onClick={resetAssetForm}>
@@ -616,7 +618,8 @@ export default function BannerManagementClient({
             <CardHeader>
               <CardTitle>Banner Inventory</CardTitle>
               <CardDescription>
-                Banner merchant akan dibaca dari endpoint aktif dengan urutan `sort_order` dan filter schedule.
+                Banner merchant akan dibaca dari endpoint aktif dengan urutan `sort_order` dan
+                filter schedule.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -652,7 +655,12 @@ export default function BannerManagementClient({
                         <div>End: {formatDateTime(banner.endsAt)}</div>
                       </TableCell>
                       <TableCell className="align-top">
-                        <a href={banner.imageUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+                        <a
+                          href={banner.imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary underline"
+                        >
                           Open image
                         </a>
                       </TableCell>
@@ -670,7 +678,7 @@ export default function BannerManagementClient({
                           >
                             Edit
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => void removeBanner(banner.id)}>
+                          <Button size="sm" onClick={() => void removeBanner(banner.id)}>
                             Delete
                           </Button>
                         </div>
@@ -692,7 +700,9 @@ export default function BannerManagementClient({
           <Card>
             <CardHeader>
               <CardTitle>Program Asset Inventory</CardTitle>
-              <CardDescription>Referensi image untuk active program card di merchant.</CardDescription>
+              <CardDescription>
+                Referensi image untuk active program card di merchant.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -709,9 +719,8 @@ export default function BannerManagementClient({
                   {programAssets.map((asset) => (
                     <TableRow key={asset.id}>
                       <TableCell className="align-top whitespace-normal">
-                        <div className="font-medium">{asset.keywordCode ? `keyword_code: ${asset.keywordCode}` : "-"}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {asset.ruleKey ? `rule_key: ${asset.ruleKey}` : "-"}
+                        <div className="font-medium">
+                          {asset.keywordCode ? `keyword_code: ${asset.keywordCode}` : "-"}
                         </div>
                       </TableCell>
                       <TableCell className="align-top">
@@ -720,7 +729,12 @@ export default function BannerManagementClient({
                         </Badge>
                       </TableCell>
                       <TableCell className="align-top">
-                        <a href={asset.imageUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+                        <a
+                          href={asset.imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary underline"
+                        >
                           Open image
                         </a>
                       </TableCell>
@@ -741,7 +755,7 @@ export default function BannerManagementClient({
                           >
                             Edit
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => void removeAsset(asset.id)}>
+                          <Button size="sm" onClick={() => void removeAsset(asset.id)}>
                             Delete
                           </Button>
                         </div>

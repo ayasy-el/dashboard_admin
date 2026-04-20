@@ -21,27 +21,11 @@ const bannerPayloadSchema = z.object({
 const bannerPatchSchema = bannerPayloadSchema.partial();
 
 const programAssetBaseSchema = z.object({
-  ruleKey: z.string().trim().uuid("ruleKey tidak valid").optional().nullable().or(z.literal("")),
-  keywordCode: z.string().trim().min(1, "keywordCode tidak boleh kosong").max(500).optional().nullable().or(z.literal("")),
+  keywordCode: z.string().trim().min(1, "keywordCode tidak boleh kosong").max(500),
   imageUrl: z.string().trim().min(1, "Image URL wajib diisi").max(500, "Image URL terlalu panjang"),
   isActive: z.boolean().default(true),
 });
-
-const withProgramAssetTargetValidation = (schema: typeof programAssetBaseSchema) =>
-  schema.superRefine((value, ctx) => {
-    const hasRuleKey = Boolean(value.ruleKey && value.ruleKey.trim());
-    const hasKeywordCode = Boolean(value.keywordCode && value.keywordCode.trim());
-
-    if (hasRuleKey === hasKeywordCode) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ruleKey"],
-        message: "Isi tepat satu dari ruleKey atau keywordCode",
-      });
-    }
-  });
-
-const programAssetPayloadSchema = withProgramAssetTargetValidation(programAssetBaseSchema);
+const programAssetPayloadSchema = programAssetBaseSchema;
 const programAssetPatchSchema = programAssetBaseSchema.partial();
 
 const imageMimeToExt: Record<string, string> = {
@@ -104,8 +88,8 @@ const normalizeBannerPatchPayload = (payload: z.infer<typeof bannerPatchSchema>)
 };
 
 const normalizeProgramAssetPayload = (payload: z.infer<typeof programAssetPayloadSchema>) => ({
-  ruleKey: toNullableString(payload.ruleKey ?? null),
-  keywordCode: toNullableString(payload.keywordCode ?? null),
+  ruleKey: null,
+  keywordCode: payload.keywordCode.trim(),
   imageUrl: payload.imageUrl.trim(),
   isActive: payload.isActive,
 });
@@ -113,8 +97,7 @@ const normalizeProgramAssetPayload = (payload: z.infer<typeof programAssetPayloa
 const normalizeProgramAssetPatchPayload = (payload: z.infer<typeof programAssetPatchSchema>) => {
   const values: Record<string, string | boolean | null> = {};
 
-  if (payload.ruleKey !== undefined) values.ruleKey = toNullableString(payload.ruleKey ?? null);
-  if (payload.keywordCode !== undefined) values.keywordCode = toNullableString(payload.keywordCode ?? null);
+  if (payload.keywordCode !== undefined) values.keywordCode = payload.keywordCode.trim();
   if (payload.imageUrl !== undefined) values.imageUrl = payload.imageUrl.trim();
   if (payload.isActive !== undefined) values.isActive = payload.isActive;
 
@@ -258,11 +241,10 @@ export async function updateProgramBannerAsset(id: number, payload: unknown) {
   const [existing] = await db.select().from(programBannerAssets).where(eq(programBannerAssets.id, id)).limit(1);
   if (!existing) return null;
 
-  const resolvedRuleKey = ("ruleKey" in values ? values.ruleKey : existing.ruleKey) ?? null;
   const resolvedKeywordCode = ("keywordCode" in values ? values.keywordCode : existing.keywordCode) ?? null;
 
-  if ((resolvedRuleKey ? 1 : 0) + (resolvedKeywordCode ? 1 : 0) !== 1) {
-    throw new Error("Isi tepat satu dari rule_key atau keyword_code");
+  if (!resolvedKeywordCode) {
+    throw new Error("keyword_code wajib diisi");
   }
 
   const [asset] = await db
