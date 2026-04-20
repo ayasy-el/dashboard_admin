@@ -177,7 +177,7 @@ export function MerchantBannerAssetCard({
 
   return (
     <Card className="gap-0 overflow-hidden border border-border/70 py-0 shadow-sm">
-      <CardHeader className="border-b bg-gradient-to-r from-background via-background to-primary/5 px-6 py-5">
+      <CardHeader className="border-b px-6 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-3">

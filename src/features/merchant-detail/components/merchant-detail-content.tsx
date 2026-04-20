@@ -294,7 +294,7 @@ export function MerchantDetailContent({
 
   return (
     <div className="space-y-6 px-4 pb-8 lg:px-6">
-      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-background via-background to-primary/5 px-6 py-5 shadow-sm">
+      <div className="rounded-3xl border border-border/70 px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
             <Breadcrumb>

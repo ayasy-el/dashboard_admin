@@ -1,11 +1,20 @@
 "use client";
 
-import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   getBatches,
@@ -26,15 +35,23 @@ type IngestionClientProps = {
   user: AuthenticatedAdmin;
 };
 
-const DATASETS: Dataset[] = ["master", "transactions", "total_point", "list_kota"];
-const RERUN_ALLOWED_STATUSES = new Set(["FAILED_STAGE", "FAILED_LOAD", "FAILED_QUALITY", "SUCCESS"]);
+const DATASETS: Array<{ value: Dataset; label: string }> = [
+  { value: "list_kota", label: "List Kota" },
+  { value: "master", label: "Master" },
+  { value: "transactions", label: "Transaction" },
+  { value: "total_point", label: "Total Point" },
+];
+const RERUN_ALLOWED_STATUSES = new Set([
+  "FAILED_STAGE",
+  "FAILED_LOAD",
+  "FAILED_QUALITY",
+  "SUCCESS",
+]);
 const CONFLICT_INFO_FIELDS = ["keyword", "merchant_name", "category", "cluster"];
 const CONFLICT_CHANGE_FIELDS = ["uniq_merchant", "start_period", "end_period", "point_redeem"];
 
 const prettyLabel = (key: string) =>
-  key
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  key.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 const toText = (value: unknown) => {
   if (value === null || value === undefined || value === "") return "-";
@@ -51,17 +68,23 @@ const conflictSearchBlob = (row: RejectedRow) => {
 const COMPACT_CONFLICT_FIELDS = [...CONFLICT_INFO_FIELDS, ...CONFLICT_CHANGE_FIELDS];
 const REJECTED_PAGE_SIZE = 100;
 const normalized = (value: unknown) => toText(value).trim().toLowerCase();
-const fieldChanged = (incoming: Record<string, unknown>, existing: Record<string, unknown>, field: string) =>
-  normalized(incoming[field]) !== normalized(existing[field]);
+const fieldChanged = (
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown>,
+  field: string,
+) => normalized(incoming[field]) !== normalized(existing[field]);
 
 const resolveSuggestion = (row: RejectedRow) => {
   if (row.resolution?.help) return row.resolution.help;
   const msg = row.error_message.toLowerCase();
-  if (msg.includes("cluster tidak ditemukan")) return "Upload/refresh list_kota dulu, lalu Solve & Apply.";
+  if (msg.includes("cluster tidak ditemukan"))
+    return "Upload/refresh list_kota dulu, lalu Solve & Apply.";
   if (msg.includes("cluster ambigu")) return "Pastikan nama cluster unik di list_kota.";
-  if (msg.includes("merchant tidak ditemukan")) return "Upload master terlebih dahulu agar keyword tersedia.";
+  if (msg.includes("merchant tidak ditemukan"))
+    return "Upload master terlebih dahulu agar keyword tersedia.";
   if (msg.includes("rule tidak ditemukan")) return "Periksa period/rule di master lalu rerun.";
-  if (msg.includes("end_period lebih pendek")) return "Perpanjang end_period atau Ignore jika data lama valid.";
+  if (msg.includes("end_period lebih pendek"))
+    return "Perpanjang end_period atau Ignore jika data lama valid.";
   return "Perbaiki data sumber lalu klik Solve & Apply.";
 };
 
@@ -73,9 +96,6 @@ const base64ToBlob = (base64: string, contentType?: string | null) => {
   }
   return new Blob([bytes], { type: contentType ?? "application/octet-stream" });
 };
-
-const selectClassName =
-  "h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] dark:[color-scheme:dark] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50";
 
 const tallSelectClassName =
   "h-11 w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] dark:[color-scheme:dark] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50";
@@ -277,7 +297,9 @@ export default function IngestionClient({
       setSelectedRejectedIds((prev) => prev.filter((id) => !filteredIds.has(id)));
       return;
     }
-    setSelectedRejectedIds((prev) => [...new Set([...prev, ...filteredRejected.map((row) => row.id)])]);
+    setSelectedRejectedIds((prev) => [
+      ...new Set([...prev, ...filteredRejected.map((row) => row.id)]),
+    ]);
   };
 
   const onToggleComparison = (rejectedId: number) => {
@@ -339,10 +361,6 @@ export default function IngestionClient({
     });
   };
 
-  const selectedBatchLabel = selectedBatchId
-    ? `Selected batch: ${selectedBatchId}`
-    : "Pilih batch dari tabel di bawah";
-
   const issueTypes = useMemo(
     () => ["ALL", ...Array.from(new Set(rejected.map((row) => row.error_type))).sort()],
     [rejected],
@@ -369,7 +387,8 @@ export default function IngestionClient({
 
   const totalRejectedPages = Math.max(1, Math.ceil(rejectedCount / REJECTED_PAGE_SIZE));
   const rejectedPageStart = rejectedCount === 0 ? 0 : (rejectedPage - 1) * REJECTED_PAGE_SIZE + 1;
-  const rejectedPageEnd = rejectedCount === 0 ? 0 : Math.min(rejectedPage * REJECTED_PAGE_SIZE, rejectedCount);
+  const rejectedPageEnd =
+    rejectedCount === 0 ? 0 : Math.min(rejectedPage * REJECTED_PAGE_SIZE, rejectedCount);
 
   return (
     <DashboardPageShell sidebarWidth="16rem" user={user}>
@@ -377,27 +396,38 @@ export default function IngestionClient({
         <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <CardTitle>CSV Ingestion Admin</CardTitle>
-            <CardDescription>
-              Upload CSV, monitor status batch, lihat conflict/error/rejected, lalu pilih Ignore atau Solve & Apply.
-            </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 px-6 py-5">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto_auto] lg:items-center">
-              <div className="relative">
-                <select
-                  className={selectClassName}
-                  value={dataset}
-                  onChange={(e) => setDataset(e.target.value as Dataset)}
-                  disabled={busy}
-                >
-                  {DATASETS.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-                <SelectChevron />
+          <CardContent className="grid gap-4 px-6 py-5">
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                    Pilih Dataset
+                  </p>
+                  <p className="text-sm text-foreground/75">
+                    Pilih tipe CSV yang ingin di-upload sebelum memilih file.
+                  </p>
+                </div>
               </div>
+              <Tabs value={dataset} onValueChange={(value) => setDataset(value as Dataset)}>
+                <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted/60 p-1">
+                  {DATASETS.map((item) => (
+                    <TabsTrigger
+                      key={item.value}
+                      value={item.value}
+                      disabled={busy}
+                      className="h-10 flex-none rounded-md px-4 text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                    >
+                      {item.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:items-center">
+              <span className="inline-flex h-10 items-center rounded-md border border-border/70 bg-muted/40 px-3 text-xs font-medium text-foreground">
+                {DATASETS.find((item) => item.value === dataset)?.label}
+              </span>
               <Input
                 type="file"
                 accept=".csv"
@@ -405,7 +435,11 @@ export default function IngestionClient({
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 disabled={busy}
               />
-              <Button className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed" onClick={onUpload} disabled={busy || !file}>
+              <Button
+                className="h-10 w-full cursor-pointer sm:w-auto disabled:cursor-not-allowed"
+                onClick={onUpload}
+                disabled={busy || !file}
+              >
                 {busy ? "Processing..." : "Upload & Run"}
               </Button>
               <Button
@@ -417,15 +451,20 @@ export default function IngestionClient({
                 Refresh
               </Button>
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <p className="text-sm text-foreground/75">{selectedBatchLabel}</p>
+            {error ? (
+              <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
         <Card className="min-w-0 gap-0 overflow-hidden border border-border/80 bg-card/95 py-0 shadow-sm">
           <CardHeader className="border-b px-6 py-5">
             <CardTitle>Batch Monitoring</CardTitle>
-            <CardDescription>Klik baris untuk memilih batch dan melihat detail issue di bawah.</CardDescription>
+            <CardDescription>
+              Klik baris untuk memilih batch dan melihat detail issue di bawah.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -463,10 +502,14 @@ export default function IngestionClient({
                         <td className="p-2">
                           <span
                             className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
-                              isSelected ? "border-primary/40 bg-primary/10" : "border-border bg-background"
+                              isSelected
+                                ? "border-primary/40 bg-primary/10"
+                                : "border-border bg-background"
                             }`}
                           >
-                            <span className={`h-2 w-2 rounded-full ${isSelected ? "bg-primary" : "bg-transparent"}`} />
+                            <span
+                              className={`h-2 w-2 rounded-full ${isSelected ? "bg-primary" : "bg-transparent"}`}
+                            />
                           </span>
                         </td>
                         <td className="p-2 font-mono text-xs">{batch.batch_id}</td>
@@ -474,7 +517,9 @@ export default function IngestionClient({
                         <td className="p-2">{batch.status}</td>
                         <td className="p-2">{batch.loaded_rows}</td>
                         <td className="p-2">{batch.rejected_rows}</td>
-                        <td className="p-2">{(Number(batch.reject_rate || 0) * 100).toFixed(2)}%</td>
+                        <td className="p-2">
+                          {(Number(batch.reject_rate || 0) * 100).toFixed(2)}%
+                        </td>
                         <td className="p-2">
                           <div className="flex items-center gap-2">
                             <Button
@@ -557,9 +602,13 @@ export default function IngestionClient({
                       <span className="text-muted-foreground">|</span>
                       <span>total={batchDetail.metrics.total}</span>
                       <span className="text-muted-foreground">|</span>
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">loaded={batchDetail.metrics.loaded}</span>
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                        loaded={batchDetail.metrics.loaded}
+                      </span>
                       <span className="text-muted-foreground">|</span>
-                      <span className="font-semibold text-rose-700 dark:text-rose-300">rejected={batchDetail.metrics.rejected}</span>
+                      <span className="font-semibold text-rose-700 dark:text-rose-300">
+                        rejected={batchDetail.metrics.rejected}
+                      </span>
                       <span className="text-muted-foreground">|</span>
                       <span>created_at={formatBatchTime(batchDetail.created_at)}</span>
                       <span className="text-muted-foreground">|</span>
@@ -646,7 +695,8 @@ export default function IngestionClient({
             {batchDetail ? (
               <div className="mb-3 flex flex-col gap-2 text-sm text-foreground/75 sm:flex-row sm:items-center sm:justify-between">
                 <p>
-                  Rejected rows besar dimuat per halaman agar dashboard tidak hang. Menampilkan {rejectedPageStart}-{rejectedPageEnd} dari {rejectedCount}.
+                  Rejected rows besar dimuat per halaman agar dashboard tidak hang. Menampilkan{" "}
+                  {rejectedPageStart}-{rejectedPageEnd} dari {rejectedCount}.
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -654,7 +704,9 @@ export default function IngestionClient({
                     className="h-9 cursor-pointer disabled:cursor-not-allowed"
                     variant="outline"
                     disabled={busy || loadingIssueResolution || rejectedPage <= 1}
-                    onClick={() => selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage - 1)}
+                    onClick={() =>
+                      selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage - 1)
+                    }
                   >
                     Prev
                   </Button>
@@ -666,7 +718,9 @@ export default function IngestionClient({
                     className="h-9 cursor-pointer disabled:cursor-not-allowed"
                     variant="outline"
                     disabled={busy || loadingIssueResolution || !hasMoreRejected}
-                    onClick={() => selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage + 1)}
+                    onClick={() =>
+                      selectedBatchId && void loadBatchDetail(selectedBatchId, rejectedPage + 1)
+                    }
                   >
                     Next
                   </Button>
@@ -677,7 +731,10 @@ export default function IngestionClient({
               <label className="inline-flex items-center gap-2 text-sm text-foreground/80">
                 <input
                   type="checkbox"
-                  checked={filteredRejected.length > 0 && filteredRejected.every((row) => selectedRejectedIds.includes(row.id))}
+                  checked={
+                    filteredRejected.length > 0 &&
+                    filteredRejected.every((row) => selectedRejectedIds.includes(row.id))
+                  }
                   onChange={(e) => onToggleAllRejected(e.target.checked)}
                   disabled={busy || loadingIssueResolution || filteredRejected.length === 0}
                 />
@@ -729,7 +786,9 @@ export default function IngestionClient({
                       });
                       const changedFields =
                         incoming && existing
-                          ? visibleConflictFields.filter((field) => fieldChanged(incoming, existing, field))
+                          ? visibleConflictFields.filter((field) =>
+                              fieldChanged(incoming, existing, field),
+                            )
                           : [];
                       const hasValueChanges = changedFields.length > 0;
                       const changedValuePairs =
@@ -740,7 +799,11 @@ export default function IngestionClient({
                               after: toText(incoming[field]),
                             }))
                           : [];
-                      const comparisonKeyword = incoming ? toText(incoming.keyword) : existing ? toText(existing.keyword) : "-";
+                      const comparisonKeyword = incoming
+                        ? toText(incoming.keyword)
+                        : existing
+                          ? toText(existing.keyword)
+                          : "-";
 
                       return (
                         <Fragment key={`issue-${row.id}`}>
@@ -759,8 +822,12 @@ export default function IngestionClient({
                                 {row.error_type}
                               </span>
                             </td>
-                            <td className="p-3 max-w-[28rem] break-words text-foreground/90">{row.error_message}</td>
-                            <td className="p-3 max-w-[22rem] break-words text-foreground/80">{resolveSuggestion(row)}</td>
+                            <td className="p-3 max-w-[28rem] break-words text-foreground/90">
+                              {row.error_message}
+                            </td>
+                            <td className="p-3 max-w-[22rem] break-words text-foreground/80">
+                              {resolveSuggestion(row)}
+                            </td>
                             <td className="p-3">
                               <div className="flex flex-col gap-2">
                                 <Button
@@ -777,7 +844,11 @@ export default function IngestionClient({
                                   className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
                                   disabled={busy || !row.resolution?.can_solve}
                                   onClick={() => void onSolve(row.id)}
-                                  title={row.resolution?.can_solve ? "Apply solve ke database" : row.resolution?.help ?? "Tidak bisa auto-solve"}
+                                  title={
+                                    row.resolution?.can_solve
+                                      ? "Apply solve ke database"
+                                      : (row.resolution?.help ?? "Tidak bisa auto-solve")
+                                  }
                                 >
                                   Solve & Apply
                                 </Button>
@@ -813,7 +884,9 @@ export default function IngestionClient({
                                         <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                                           Keyword
                                         </span>
-                                        <span className="truncate font-mono text-sm font-semibold text-foreground">{comparisonKeyword}</span>
+                                        <span className="truncate font-mono text-sm font-semibold text-foreground">
+                                          {comparisonKeyword}
+                                        </span>
                                       </div>
                                       <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8">
                                         {changedValuePairs.length > 0 ? (
@@ -822,7 +895,9 @@ export default function IngestionClient({
                                               key={`diff-summary-${row.id}-${item.field}`}
                                               className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-1 text-xs"
                                             >
-                                              <span className="font-medium text-muted-foreground">{item.field}</span>
+                                              <span className="font-medium text-muted-foreground">
+                                                {item.field}
+                                              </span>
                                               <span className="max-w-[8rem] truncate rounded bg-primary/10 px-1 py-0.5 font-mono text-primary">
                                                 {item.before}
                                               </span>
@@ -833,7 +908,9 @@ export default function IngestionClient({
                                             </span>
                                           ))
                                         ) : (
-                                          <span className="text-xs text-muted-foreground">Tidak ada perubahan nilai.</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            Tidak ada perubahan nilai.
+                                          </span>
                                         )}
                                       </div>
                                     </div>
@@ -848,21 +925,35 @@ export default function IngestionClient({
                                       <thead>
                                         <tr className="border-b bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                                           <th className="p-2.5 text-left">Field Name</th>
-                                          <th className="p-2.5 text-left text-emerald-700 dark:text-emerald-300">Incoming Data</th>
-                                          <th className="p-2.5 text-left text-amber-700 dark:text-amber-300">Existing Data</th>
+                                          <th className="p-2.5 text-left text-emerald-700 dark:text-emerald-300">
+                                            Incoming Data
+                                          </th>
+                                          <th className="p-2.5 text-left text-amber-700 dark:text-amber-300">
+                                            Existing Data
+                                          </th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {visibleConflictFields.map((field) => {
-                                          const changed = incoming && existing ? fieldChanged(incoming, existing, field) : false;
+                                          const changed =
+                                            incoming && existing
+                                              ? fieldChanged(incoming, existing, field)
+                                              : false;
                                           return (
-                                            <tr key={`compare-row-${row.id}-${field}`} className={`border-b ${changed ? "bg-primary/5" : ""}`}>
-                                              <td className={`p-2.5 text-sm font-medium ${changed ? "text-primary" : "text-muted-foreground"}`}>
+                                            <tr
+                                              key={`compare-row-${row.id}-${field}`}
+                                              className={`border-b ${changed ? "bg-primary/5" : ""}`}
+                                            >
+                                              <td
+                                                className={`p-2.5 text-sm font-medium ${changed ? "text-primary" : "text-muted-foreground"}`}
+                                              >
                                                 {prettyLabel(field)}
                                               </td>
                                               <td className="p-2.5 text-sm text-foreground">
                                                 <div className="flex items-center gap-2">
-                                                  <span className="break-words">{incoming ? toText(incoming[field]) : "-"}</span>
+                                                  <span className="break-words">
+                                                    {incoming ? toText(incoming[field]) : "-"}
+                                                  </span>
                                                   {changed ? (
                                                     <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground uppercase">
                                                       Changed
@@ -870,7 +961,9 @@ export default function IngestionClient({
                                                   ) : null}
                                                 </div>
                                               </td>
-                                              <td className={`p-2.5 text-sm ${changed ? "text-muted-foreground line-through" : "text-muted-foreground"}`}>
+                                              <td
+                                                className={`p-2.5 text-sm ${changed ? "text-muted-foreground line-through" : "text-muted-foreground"}`}
+                                              >
                                                 {existing ? toText(existing[field]) : "-"}
                                               </td>
                                             </tr>
