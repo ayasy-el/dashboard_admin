@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { authenticateAdmin, getSafeRedirectPath } from "@/lib/auth";
+import { createRequestUrl } from "@/lib/request-url";
 
 const toLoginUrl = (request: Request, nextPath: string, error: string) => {
-  const url = new URL("/login", request.url);
+  const url = createRequestUrl("/login", request.headers, request.url);
   url.searchParams.set("next", nextPath);
   url.searchParams.set("error", error);
   return url;
@@ -34,5 +35,5 @@ export async function POST(request: Request) {
     return NextResponse.redirect(toLoginUrl(request, nextPath, "invalid_credentials"), 303);
   }
 
-  return NextResponse.redirect(new URL(nextPath, request.url), 303);
+  return NextResponse.redirect(createRequestUrl(nextPath, request.headers, request.url), 303);
 }
