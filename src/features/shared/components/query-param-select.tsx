@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import {
   Select,
   SelectContent,
@@ -40,6 +41,8 @@ export function QueryParamSelect({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
+  useBindGlobalLoading(isPending);
 
   const selectedValue = value ?? ALL_VALUE;
 
@@ -52,7 +55,9 @@ export function QueryParamSelect({
       params.set(paramKey, next);
     }
 
-    router.push(`${pathname}?${params.toString()}`);
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (

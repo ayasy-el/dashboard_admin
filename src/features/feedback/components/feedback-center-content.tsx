@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 
+import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,6 +174,7 @@ function FeedbackTicketCard({
   const [reply, setReply] = React.useState(item.reply ?? "");
   const [isPending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
+  useBindGlobalLoading(isPending);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

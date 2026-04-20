@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGlobalLoading } from "@/components/global-loading-provider";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { QueryParamSelect } from "@/features/shared/components/query-param-select";
 import { Input } from "@/components/ui/input";
@@ -153,6 +154,7 @@ function SummaryCard({
 
 export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirectoryOverviewProps) {
   const router = useRouter();
+  const { startNavigation } = useGlobalLoading();
   const [query, setQuery] = React.useState("");
   const deferredQuery = React.useDeferredValue(query);
   const [sortState, setSortState] = React.useState<{ key: SortKey; direction: SortDirection }>({
@@ -341,7 +343,10 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                     <TableRow
                       key={merchant.keyword}
                       className="cursor-pointer transition-colors hover:bg-muted/60"
-                      onClick={() => router.push(href)}
+                      onClick={() => {
+                        startNavigation();
+                        router.push(href);
+                      }}
                     >
                       <TableCell className="font-semibold text-foreground">{merchant.keyword}</TableCell>
                       <TableCell>

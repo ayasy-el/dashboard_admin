@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import {
   Select,
   SelectContent,
@@ -21,11 +22,15 @@ export function MonthSelect({ value, options }: MonthSelectProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
+  useBindGlobalLoading(isPending);
 
   const onValueChange = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", next);
-    router.push(`${pathname}?${params.toString()}`);
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (

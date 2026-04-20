@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { GlobalLoadingProvider } from "@/components/global-loading-provider";
+import { PageTopLoader } from "@/components/page-top-loader";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
@@ -34,7 +36,10 @@ export default function RootLayout({
           storageKey="dashboard-theme"
           themes={["light", "dark"]}
         >
-          {children}
+          <GlobalLoadingProvider>
+            <PageTopLoader />
+            {children}
+          </GlobalLoadingProvider>
         </ThemeProvider>
       </body>
     </html>

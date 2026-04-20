@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import { Input } from "@/components/ui/input";
 import {
   DASHBOARD_FILTER_COOKIE_MAX_AGE,
@@ -74,6 +75,7 @@ export function MultiFilterDropdown({
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
   const [query, setQuery] = React.useState("");
+  useBindGlobalLoading(isPending);
 
   const selectedSet = React.useMemo(() => new Set(selectedValues), [selectedValues]);
   const allSelected = options.length > 0 && selectedValues.length === options.length;
@@ -208,6 +210,7 @@ export function SingleFilterDropdown({
   const [isPending, startTransition] = React.useTransition();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  useBindGlobalLoading(isPending);
 
   const selectedLabel = options.find((option) => option.value === selectedValue)?.label ?? title;
   const filteredOptions = React.useMemo(() => {
