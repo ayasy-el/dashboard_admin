@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
+import { useTransition, type MouseEvent } from "react";
 
-import { useGlobalLoading } from "@/components/global-loading-provider";
+import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import {
   DASHBOARD_FILTER_COOKIE_MAX_AGE,
   DASHBOARD_FILTER_COOKIE_NAME,
@@ -37,7 +37,8 @@ export function DashboardFilterLink({
   className,
 }: DashboardFilterLinkProps) {
   const router = useRouter();
-  const { startNavigation } = useGlobalLoading();
+  const [isPending, startTransition] = useTransition();
+  useBindGlobalLoading(isPending);
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -54,9 +55,10 @@ export function DashboardFilterLink({
     };
 
     document.cookie = `${DASHBOARD_FILTER_COOKIE_NAME}=${serializeDashboardFilterCookie(nextFilters)}; path=/; max-age=${DASHBOARD_FILTER_COOKIE_MAX_AGE}; samesite=lax`;
-    startNavigation();
-    router.push("/");
-    router.refresh();
+    startTransition(() => {
+      router.push("/");
+      router.refresh();
+    });
   };
 
   return (

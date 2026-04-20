@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 type GlobalLoadingContextValue = {
   active: boolean;
@@ -24,8 +24,6 @@ const GlobalLoadingContext = createContext<GlobalLoadingContextValue | null>(nul
 
 export function GlobalLoadingProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
   const initialRenderRef = useRef(true);
   const [navigationActive, setNavigationActive] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -119,7 +117,7 @@ export function GlobalLoadingProvider({ children }: { children: ReactNode }) {
     return () => {
       window.clearTimeout(stopTimer);
     };
-  }, [pathname, search, stopNavigation]);
+  }, [pathname, stopNavigation]);
 
   const value = useMemo<GlobalLoadingContextValue>(
     () => ({
