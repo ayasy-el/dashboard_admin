@@ -2,14 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis } from "recharts";
-import {
-  IconChartBar,
-  IconChartDonut3,
-  IconClockHour4,
-  IconReceipt2,
-  IconSearch,
-} from "@tabler/icons-react";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { IconChartBar, IconClockHour4, IconReceipt2, IconSearch } from "@tabler/icons-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,10 +33,19 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MerchantBannerAssetCard } from "@/features/merchant-detail/components/merchant-banner-asset-card";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { QueryParamSelect } from "@/features/shared/components/query-param-select";
 import { formatNumber } from "@/lib/dashboard-metrics";
 import { cn } from "@/lib/utils";
+
+type ProgramBannerAssetRecord = {
+  id: number;
+  keywordCode: string | null;
+  imageUrl: string;
+  isActive: boolean;
+  updatedAt: string;
+};
 
 type MerchantDetailContentProps = {
   data: {
@@ -95,11 +98,10 @@ type MerchantDetailContentProps = {
     }[];
   };
   monthOptions: MonthOption[];
+  programBannerAsset: ProgramBannerAssetRecord | null;
 };
 
 type TrendMode = "monthly" | "daily";
-
-const CHART_COLORS = ["#a1122f", "#cb183a", "#e32b4f", "#fb5b3d", "#ff8a00", "#ffb31a"];
 
 const trendConfig = {
   redeem: { label: "Redeem", color: "var(--chart-1)" },
@@ -250,7 +252,11 @@ function SectionHeader({
   );
 }
 
-export function MerchantDetailContent({ data, monthOptions }: MerchantDetailContentProps) {
+export function MerchantDetailContent({
+  data,
+  monthOptions,
+  programBannerAsset,
+}: MerchantDetailContentProps) {
   const [trendMode, setTrendMode] = React.useState<TrendMode>("monthly");
   const [searchQuery, setSearchQuery] = React.useState("");
   const deferredSearchQuery = React.useDeferredValue(searchQuery);
@@ -285,8 +291,6 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
-
-  const compositionTotal = data.keywordComposition.reduce((total, item) => total + item.value, 0);
 
   return (
     <div className="space-y-6 px-4 pb-8 lg:px-6">
@@ -394,6 +398,11 @@ export function MerchantDetailContent({ data, monthOptions }: MerchantDetailCont
           </div>
         </div>
       </div>
+
+      <MerchantBannerAssetCard
+        keywordCode={data.identity.keyword}
+        initialAsset={programBannerAsset}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <MetricCard

@@ -216,6 +216,16 @@ export async function listProgramBannerAssetsAdmin() {
     .orderBy(desc(programBannerAssets.updatedAt), asc(programBannerAssets.id));
 }
 
+export async function getProgramBannerAssetByKeyword(keywordCode: string) {
+  const [asset] = await db
+    .select()
+    .from(programBannerAssets)
+    .where(eq(programBannerAssets.keywordCode, keywordCode))
+    .limit(1);
+
+  return asset ?? null;
+}
+
 export async function listProgramBannerAssetsActive() {
   return db
     .select()

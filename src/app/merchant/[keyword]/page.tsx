@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { getProgramBannerAssetByKeyword } from "@/features/banners/banner.service";
 import { MerchantDetailContent } from "@/features/merchant-detail/components/merchant-detail-content";
 import { getMerchantDetailDashboard } from "@/features/merchant-detail/get-merchant-detail-dashboard";
 import { MerchantDetailRepositoryDrizzle } from "@/features/merchant-detail/merchant-detail.repository.drizzle";
@@ -29,11 +30,11 @@ export default async function MerchantDetailPage({ params, searchParams }: Merch
 
   const monthOptions = await getMonthOptions();
   const selectedMonth = query.month ?? monthOptions[0]?.value ?? null;
-  const detailData = await getMerchantDetailDashboard(
-    new MerchantDetailRepositoryDrizzle(),
-    decodeURIComponent(keyword),
-    selectedMonth,
-  );
+  const decodedKeyword = decodeURIComponent(keyword);
+  const [detailData, programBannerAsset] = await Promise.all([
+    getMerchantDetailDashboard(new MerchantDetailRepositoryDrizzle(), decodedKeyword, selectedMonth),
+    getProgramBannerAssetByKeyword(decodedKeyword),
+  ]);
 
   if (!detailData) {
     notFound();
@@ -41,7 +42,11 @@ export default async function MerchantDetailPage({ params, searchParams }: Merch
 
   return (
     <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
-      <MerchantDetailContent data={detailData} monthOptions={monthOptions} />
+      <MerchantDetailContent
+        data={detailData}
+        monthOptions={monthOptions}
+        programBannerAsset={programBannerAsset}
+      />
     </DashboardPageShell>
   );
 }

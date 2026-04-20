@@ -5,7 +5,7 @@ import { useState } from "react";
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -46,22 +46,6 @@ type BannerApiRecord = {
   updated_at: string | null;
 };
 
-type ProgramAssetRecord = {
-  id: number;
-  keywordCode: string | null;
-  imageUrl: string;
-  isActive: boolean;
-  updatedAt: string;
-};
-
-type ProgramAssetApiRecord = {
-  id: number;
-  keyword_code: string | null;
-  image_url: string;
-  is_active: boolean;
-  updated_at: string;
-};
-
 type BannerFormState = {
   title: string;
   subtitle: string;
@@ -73,15 +57,8 @@ type BannerFormState = {
   endsAt: string;
 };
 
-type ProgramAssetFormState = {
-  keywordCode: string;
-  imageUrl: string;
-  isActive: boolean;
-};
-
 type BannerManagementClientProps = {
   initialBanners: BannerRecord[];
-  initialProgramAssets: ProgramAssetRecord[];
   user: AuthenticatedAdmin;
 };
 
@@ -94,12 +71,6 @@ const emptyBannerForm = (sortOrder = "0"): BannerFormState => ({
   sortOrder,
   startsAt: "",
   endsAt: "",
-});
-
-const emptyAssetForm = (): ProgramAssetFormState => ({
-  keywordCode: "",
-  imageUrl: "",
-  isActive: true,
 });
 
 const toLocalDateTimeInput = (value: string | null) => {
@@ -140,12 +111,6 @@ const bannerToForm = (banner: BannerRecord): BannerFormState => ({
   endsAt: toLocalDateTimeInput(banner.endsAt),
 });
 
-const assetToForm = (asset: ProgramAssetRecord): ProgramAssetFormState => ({
-  keywordCode: asset.keywordCode ?? "",
-  imageUrl: asset.imageUrl,
-  isActive: asset.isActive,
-});
-
 const fromBannerApi = (banner: BannerApiRecord): BannerRecord => ({
   id: banner.id,
   title: banner.title,
@@ -158,14 +123,6 @@ const fromBannerApi = (banner: BannerApiRecord): BannerRecord => ({
   endsAt: banner.ends_at,
   createdAt: banner.created_at ?? "",
   updatedAt: banner.updated_at ?? "",
-});
-
-const fromProgramAssetApi = (asset: ProgramAssetApiRecord): ProgramAssetRecord => ({
-  id: asset.id,
-  keywordCode: asset.keyword_code,
-  imageUrl: asset.image_url,
-  isActive: asset.is_active,
-  updatedAt: asset.updated_at,
 });
 
 async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -206,34 +163,21 @@ async function uploadImage(file: File) {
 
 export default function BannerManagementClient({
   initialBanners,
-  initialProgramAssets,
   user,
 }: BannerManagementClientProps) {
   const [banners, setBanners] = useState(initialBanners);
-  const [programAssets, setProgramAssets] = useState(initialProgramAssets);
   const [bannerForm, setBannerForm] = useState<BannerFormState>(() =>
     emptyBannerForm(String(initialBanners.length)),
   );
-  const [assetForm, setAssetForm] = useState<ProgramAssetFormState>(emptyAssetForm);
   const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
-  const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
-  const [assetMessage, setAssetMessage] = useState<string | null>(null);
   const [bannerError, setBannerError] = useState<string | null>(null);
-  const [assetError, setAssetError] = useState<string | null>(null);
   const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
-  const [uploadingAssetImage, setUploadingAssetImage] = useState(false);
   const [submittingBanner, setSubmittingBanner] = useState(false);
-  const [submittingAsset, setSubmittingAsset] = useState(false);
 
   const resetBannerForm = () => {
     setEditingBannerId(null);
     setBannerForm(emptyBannerForm(String(banners.length)));
-  };
-
-  const resetAssetForm = () => {
-    setEditingAssetId(null);
-    setAssetForm(emptyAssetForm());
   };
 
   const submitBanner = async () => {
@@ -282,48 +226,6 @@ export default function BannerManagementClient({
     }
   };
 
-  const submitProgramAsset = async () => {
-    setSubmittingAsset(true);
-    setAssetError(null);
-    setAssetMessage(null);
-
-    try {
-      const payload = {
-        keyword_code: assetForm.keywordCode || null,
-        image_url: assetForm.imageUrl,
-        is_active: assetForm.isActive,
-      };
-
-      const assetResponse = editingAssetId
-        ? await readJson<ProgramAssetApiRecord>(
-            `/api/admin/program-banner-assets/${editingAssetId}`,
-            {
-              method: "PATCH",
-              body: JSON.stringify(payload),
-            },
-          )
-        : await readJson<ProgramAssetApiRecord>("/api/admin/program-banner-assets", {
-            method: "POST",
-            body: JSON.stringify(payload),
-          });
-      const asset = fromProgramAssetApi(assetResponse);
-
-      setProgramAssets((current) => {
-        const next = editingAssetId
-          ? current.map((item) => (item.id === asset.id ? asset : item))
-          : [asset, ...current];
-
-        return [...next].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-      });
-      setAssetMessage(editingAssetId ? "Asset berhasil diperbarui." : "Asset berhasil dibuat.");
-      resetAssetForm();
-    } catch (error) {
-      setAssetError(error instanceof Error ? error.message : "Gagal menyimpan asset");
-    } finally {
-      setSubmittingAsset(false);
-    }
-  };
-
   const removeBanner = async (id: number) => {
     setBannerError(null);
     setBannerMessage(null);
@@ -335,22 +237,6 @@ export default function BannerManagementClient({
       setBannerMessage("Banner berhasil dihapus.");
     } catch (error) {
       setBannerError(error instanceof Error ? error.message : "Gagal menghapus banner");
-    }
-  };
-
-  const removeAsset = async (id: number) => {
-    setAssetError(null);
-    setAssetMessage(null);
-
-    try {
-      await readJson<{ success: boolean }>(`/api/admin/program-banner-assets/${id}`, {
-        method: "DELETE",
-      });
-      setProgramAssets((current) => current.filter((item) => item.id !== id));
-      if (editingAssetId === id) resetAssetForm();
-      setAssetMessage("Asset berhasil dihapus.");
-    } catch (error) {
-      setAssetError(error instanceof Error ? error.message : "Gagal menghapus asset");
     }
   };
 
@@ -371,34 +257,13 @@ export default function BannerManagementClient({
     }
   };
 
-  const onAssetFileChange = async (file: File | null) => {
-    if (!file) return;
-
-    setUploadingAssetImage(true);
-    setAssetError(null);
-    setAssetMessage(null);
-    try {
-      const result = await uploadImage(file);
-      setAssetForm((current) => ({ ...current, imageUrl: result.image_url }));
-      setAssetMessage("Image asset berhasil diupload.");
-    } catch (error) {
-      setAssetError(error instanceof Error ? error.message : "Upload image gagal");
-    } finally {
-      setUploadingAssetImage(false);
-    }
-  };
-
   return (
     <DashboardPageShell sidebarWidth="16rem" user={user}>
       <div className="px-4 lg:px-6">
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Provider Promotion Banners</CardTitle>
-              <CardDescription>
-                Source of truth untuk banner merchant. Merchant akan membaca banner aktif yang sudah
-                lolos jadwal publikasi.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -533,94 +398,12 @@ export default function BannerManagementClient({
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Program Banner Assets</CardTitle>
-              <CardDescription>
-                Referensi image untuk kartu active program di merchant berdasarkan `keyword_code`.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="asset-keyword-code">Keyword Code</Label>
-                <Input
-                  id="asset-keyword-code"
-                  value={assetForm.keywordCode}
-                  onChange={(event) =>
-                    setAssetForm((current) => ({ ...current, keywordCode: event.target.value }))
-                  }
-                  placeholder="merchant_keyword"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="asset-image-file">Upload Image</Label>
-                <Input
-                  id="asset-image-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                  disabled={uploadingAssetImage}
-                  onChange={(event) => void onAssetFileChange(event.target.files?.[0] ?? null)}
-                  className="max-w-72"
-                />
-                {assetForm.imageUrl ? (
-                  <p className="text-xs text-muted-foreground break-all">{assetForm.imageUrl}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Upload image untuk mengisi asset image.
-                  </p>
-                )}
-              </div>
-
-              <label className="flex items-center gap-3 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  checked={assetForm.isActive}
-                  onChange={(event) =>
-                    setAssetForm((current) => ({ ...current, isActive: event.target.checked }))
-                  }
-                />
-                Aktifkan asset ini
-              </label>
-
-              {assetForm.imageUrl ? (
-                <div className="overflow-hidden rounded-xl border bg-muted/20">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={assetForm.imageUrl}
-                    alt="Program asset preview"
-                    className="h-32 w-full object-cover"
-                  />
-                </div>
-              ) : null}
-
-              {assetError ? <p className="text-sm text-destructive">{assetError}</p> : null}
-              {assetMessage ? <p className="text-sm text-emerald-600">{assetMessage}</p> : null}
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  disabled={submittingAsset || uploadingAssetImage}
-                  onClick={() => void submitProgramAsset()}
-                >
-                  {editingAssetId ? "Update Asset" : "Create Asset"}
-                </Button>
-                <Button variant="outline" onClick={resetAssetForm}>
-                  Reset
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="mt-6 grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Banner Inventory</CardTitle>
-              <CardDescription>
-                Banner merchant akan dibaca dari endpoint aktif dengan urutan `sort_order` dan
-                filter schedule.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -689,83 +472,6 @@ export default function BannerManagementClient({
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground">
                         Belum ada banner.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Program Asset Inventory</CardTitle>
-              <CardDescription>
-                Referensi image untuk active program card di merchant.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Target</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {programAssets.map((asset) => (
-                    <TableRow key={asset.id}>
-                      <TableCell className="align-top whitespace-normal">
-                        <div className="font-medium">
-                          {asset.keywordCode ? `keyword_code: ${asset.keywordCode}` : "-"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <Badge variant={asset.isActive ? "default" : "outline"}>
-                          {asset.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <a
-                          href={asset.imageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary underline"
-                        >
-                          Open image
-                        </a>
-                      </TableCell>
-                      <TableCell className="align-top text-sm text-muted-foreground">
-                        {formatDateTime(asset.updatedAt)}
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingAssetId(asset.id);
-                              setAssetForm(assetToForm(asset));
-                              setAssetError(null);
-                              setAssetMessage(null);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button size="sm" onClick={() => void removeAsset(asset.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {programAssets.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        Belum ada program asset.
                       </TableCell>
                     </TableRow>
                   ) : null}

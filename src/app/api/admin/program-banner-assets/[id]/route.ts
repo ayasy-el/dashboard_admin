@@ -22,7 +22,7 @@ const toMessage = (error: unknown) => {
 };
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  await requireAdminUser("/program-promotions");
+  await requireAdminUser("/merchant");
 
   try {
     const { id } = await context.params;
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
-  await requireAdminUser("/program-promotions");
+  await requireAdminUser("/merchant");
 
   try {
     const { id } = await context.params;

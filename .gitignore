@@ -49,3 +49,4 @@ __pycache__/
 
 # uploads
 ingestion_service/uploads
+public/uploads

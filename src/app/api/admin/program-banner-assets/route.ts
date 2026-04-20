@@ -14,13 +14,13 @@ const toMessage = (error: unknown) => {
 };
 
 export async function GET() {
-  await requireAdminUser("/program-promotions");
+  await requireAdminUser("/merchant");
   const assets = await listProgramBannerAssetsAdmin();
   return NextResponse.json({ items: assets.map(serializeProgramAsset) });
 }
 
 export async function POST(request: Request) {
-  await requireAdminUser("/program-promotions");
+  await requireAdminUser("/merchant");
 
   try {
     const payload = normalizeProgramAssetRequest(await request.json());
