@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
 import {
   IconLayoutBoard,
   IconPhoto,
@@ -33,6 +33,7 @@ type ProgramAssetApiRecord = {
 
 type ProgramAssetFormState = {
   imageUrl: string;
+  pendingImageFile: File | null;
   isActive: boolean;
 };
 
@@ -43,6 +44,7 @@ type MerchantBannerAssetCardProps = {
 
 const emptyAssetForm = (): ProgramAssetFormState => ({
   imageUrl: "",
+  pendingImageFile: null,
   isActive: true,
 });
 
@@ -50,6 +52,7 @@ const assetToForm = (asset: ProgramBannerAssetRecord | null): ProgramAssetFormSt
   asset
     ? {
         imageUrl: asset.imageUrl,
+        pendingImageFile: null,
         isActive: asset.isActive,
       }
     : emptyAssetForm();
@@ -111,12 +114,29 @@ export function MerchantBannerAssetCard({
   keywordCode,
   initialAsset,
 }: MerchantBannerAssetCardProps) {
-  const [asset, setAsset] = useState(initialAsset);
-  const [form, setForm] = useState<ProgramAssetFormState>(() => assetToForm(initialAsset));
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [asset, setAsset] = React.useState(initialAsset);
+  const [form, setForm] = React.useState<ProgramAssetFormState>(() => assetToForm(initialAsset));
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const previewUrl = React.useMemo(() => {
+    if (!form.pendingImageFile) {
+      return form.imageUrl;
+    }
+
+    return URL.createObjectURL(form.pendingImageFile);
+  }, [form.imageUrl, form.pendingImageFile]);
+
+  React.useEffect(() => {
+    if (!form.pendingImageFile || !previewUrl.startsWith("blob:")) {
+      return;
+    }
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [form.pendingImageFile, previewUrl]);
 
   const resetForm = () => {
     setForm(assetToForm(asset));
@@ -130,9 +150,17 @@ export function MerchantBannerAssetCard({
     setMessage(null);
 
     try {
+      let imageUrl = form.imageUrl;
+
+      if (form.pendingImageFile) {
+        setUploadingImage(true);
+        const uploaded = await uploadImage(form.pendingImageFile);
+        imageUrl = uploaded.image_url;
+      }
+
       const payload = {
         keyword_code: keywordCode,
-        image_url: form.imageUrl,
+        image_url: imageUrl,
         is_active: form.isActive,
       };
 
@@ -153,26 +181,18 @@ export function MerchantBannerAssetCard({
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Gagal menyimpan banner image");
     } finally {
+      setUploadingImage(false);
       setSubmitting(false);
     }
   };
 
-  const onFileChange = async (file: File | null) => {
+  const onFileChange = (file: File | null) => {
     if (!file) return;
 
-    setUploadingImage(true);
     setError(null);
     setMessage(null);
-
-    try {
-      const result = await uploadImage(file);
-      setForm((current) => ({ ...current, imageUrl: result.image_url }));
-      setMessage("Image banner berhasil diupload.");
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Upload image gagal");
-    } finally {
-      setUploadingImage(false);
-    }
+    setForm((current) => ({ ...current, pendingImageFile: file }));
+    setMessage("Gambar siap diupload. Simpan banner untuk mengunggah gambar.");
   };
 
   return (
@@ -223,7 +243,7 @@ export function MerchantBannerAssetCard({
         <div className="grid gap-5 xl:grid-cols-[1.35fr_0.9fr]">
           <div className="space-y-4">
             <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
-              {form.imageUrl ? (
+              {previewUrl ? (
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/55 via-black/20 to-transparent px-4 py-4 text-white">
                     <div>
@@ -238,7 +258,7 @@ export function MerchantBannerAssetCard({
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={form.imageUrl}
+                    src={previewUrl}
                     alt={`Banner preview ${keywordCode}`}
                     className="h-64 w-full object-cover"
                   />
@@ -292,7 +312,11 @@ export function MerchantBannerAssetCard({
                       disabled={uploadingImage}
                       onChange={(event) => void onFileChange(event.target.files?.[0] ?? null)}
                     />
-                    {form.imageUrl ? (
+                    {form.pendingImageFile ? (
+                      <p className="mt-3 break-all text-xs text-muted-foreground">
+                        Pending upload: {form.pendingImageFile.name}
+                      </p>
+                    ) : form.imageUrl ? (
                       <p className="mt-3 break-all text-xs text-muted-foreground">{form.imageUrl}</p>
                     ) : (
                       <p className="mt-3 text-xs text-muted-foreground">
@@ -334,7 +358,7 @@ export function MerchantBannerAssetCard({
                 <div className="flex flex-wrap gap-3">
                   <Button
                     className="min-w-44"
-                    disabled={submitting || uploadingImage || !form.imageUrl}
+                    disabled={submitting || uploadingImage || (!form.imageUrl && !form.pendingImageFile)}
                     onClick={() => void submitAsset()}
                   >
                     {asset ? "Update Banner Image" : "Create Banner Image"}

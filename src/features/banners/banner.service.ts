@@ -1,6 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { deleteManagedBannerAssetByUrl, saveBannerAsset } from "@/lib/banner-assets";
 
 import { and, asc, desc, eq, isNull, lte, gte, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -8,17 +6,21 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { programBannerAssets, providerBanners } from "@/lib/db/schema";
 
-const bannerPayloadSchema = z.object({
+const bannerBaseSchema = z.object({
   title: z.string().trim().min(1, "Title wajib diisi").max(160, "Title terlalu panjang"),
   subtitle: z.string().trim().min(1, "Subtitle wajib diisi").max(240, "Subtitle terlalu panjang"),
   cta: z.string().trim().min(1, "CTA wajib diisi").max(80, "CTA terlalu panjang"),
   imageUrl: z.string().trim().min(1, "Image URL wajib diisi").max(500, "Image URL terlalu panjang"),
-  isActive: z.boolean().default(true),
-  sortOrder: z.coerce.number().int().min(0).default(0),
+  isActive: z.boolean(),
+  sortOrder: z.coerce.number().int().min(0),
   startsAt: z.string().trim().datetime({ offset: true }).optional().nullable().or(z.literal("")),
   endsAt: z.string().trim().datetime({ offset: true }).optional().nullable().or(z.literal("")),
 });
-const bannerPatchSchema = bannerPayloadSchema.partial();
+const bannerPayloadSchema = bannerBaseSchema.extend({
+  isActive: bannerBaseSchema.shape.isActive.default(true),
+  sortOrder: bannerBaseSchema.shape.sortOrder.default(0),
+});
+const bannerPatchSchema = bannerBaseSchema.partial();
 
 const programAssetBaseSchema = z.object({
   keywordCode: z.string().trim().min(1, "keywordCode tidak boleh kosong").max(500),
@@ -27,17 +29,6 @@ const programAssetBaseSchema = z.object({
 });
 const programAssetPayloadSchema = programAssetBaseSchema;
 const programAssetPatchSchema = programAssetBaseSchema.partial();
-
-const imageMimeToExt: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-  "image/svg+xml": ".svg",
-};
-
-const uploadDir = path.join(process.cwd(), "public", "uploads", "banner-assets");
-const publicUploadPrefix = "/uploads/banner-assets";
 
 const toNullableString = (value: string | null | undefined) => {
   const normalized = value?.trim();
@@ -192,6 +183,9 @@ export async function updateBanner(id: number, payload: unknown) {
     }
   }
 
+  const [currentBanner] = await db.select().from(providerBanners).where(eq(providerBanners.id, id)).limit(1);
+  if (!currentBanner) return null;
+
   const [banner] = await db
     .update(providerBanners)
     .set({
@@ -201,11 +195,16 @@ export async function updateBanner(id: number, payload: unknown) {
     .where(eq(providerBanners.id, id))
     .returning();
 
+  if (banner && currentBanner.imageUrl !== banner.imageUrl) {
+    await deleteManagedBannerAssetByUrl(currentBanner.imageUrl);
+  }
+
   return banner ?? null;
 }
 
 export async function deleteBanner(id: number) {
   const [banner] = await db.delete(providerBanners).where(eq(providerBanners.id, id)).returning();
+  await deleteManagedBannerAssetByUrl(banner?.imageUrl);
   return banner ?? null;
 }
 
@@ -266,11 +265,16 @@ export async function updateProgramBannerAsset(id: number, payload: unknown) {
     .where(eq(programBannerAssets.id, id))
     .returning();
 
+  if (asset && existing.imageUrl !== asset.imageUrl) {
+    await deleteManagedBannerAssetByUrl(existing.imageUrl);
+  }
+
   return asset ?? null;
 }
 
 export async function deleteProgramBannerAsset(id: number) {
   const [asset] = await db.delete(programBannerAssets).where(eq(programBannerAssets.id, id)).returning();
+  await deleteManagedBannerAssetByUrl(asset?.imageUrl);
   return asset ?? null;
 }
 
@@ -285,33 +289,5 @@ export async function getNextBannerSortOrder() {
 }
 
 export async function saveBannerImage(file: File) {
-  if (!(file instanceof File)) {
-    throw new Error("File upload tidak valid");
-  }
-
-  if (!imageMimeToExt[file.type]) {
-    throw new Error("Format file belum didukung. Gunakan JPG, PNG, WEBP, GIF, atau SVG.");
-  }
-
-  if (file.size === 0) {
-    throw new Error("File kosong tidak bisa diupload");
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Ukuran file maksimal 5 MB");
-  }
-
-  await mkdir(uploadDir, { recursive: true });
-
-  const extension = imageMimeToExt[file.type];
-  const fileName = `${Date.now()}-${randomUUID()}${extension}`;
-  const absolutePath = path.join(uploadDir, fileName);
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  await writeFile(absolutePath, bytes);
-
-  return {
-    imageUrl: `${publicUploadPrefix}/${fileName}`,
-    fileName,
-  };
+  return saveBannerAsset(file);
 }

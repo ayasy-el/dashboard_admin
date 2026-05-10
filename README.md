@@ -17,7 +17,7 @@ Dashboard admin berbasis Next.js untuk memantau data Telkomsel Poin Merchant, op
 - Panel ingestion CSV
 - Login admin dengan session berbasis cookie `httpOnly`
 - Manajemen banner promosi merchant berbasis database
-- Upload image banner ke filesystem lokal (`public/uploads/banner-assets`)
+- Upload image banner ke filesystem runtime di luar `public` lewat route asset terproteksi
 - Seed admin awal lewat script
 
 ## Setup
@@ -33,6 +33,7 @@ pnpm install
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/DB_NAME
 NEXT_PUBLIC_INGESTION_API_URL=http://localhost:8001
+ADMIN_ASSET_SHARED_SECRET=replace-with-random-long-secret
 ```
 
 3. Jalankan migrasi database:
@@ -93,6 +94,7 @@ Gunakan email dan password admin yang dibuat saat menjalankan `db:seed-admin`.
 - Route dashboard utama dilindungi middleware dan verifikasi session server-side.
 - Server ingestion perlu berjalan terpisah jika fitur upload/monitor batch ingin dipakai.
 - Endpoint publik untuk merchant:
+  - Route asset image terproteksi ada di `GET /api/admin/banner-assets/:key` dan menerima admin session atau signed URL valid.
   - `GET /api/banners` mengembalikan banner aktif terurut `sort_order` dan tersaring window jadwal.
   - `GET /api/program-banner-assets` mengembalikan asset program aktif bila dipakai oleh merchant.
 - Endpoint admin untuk banner:

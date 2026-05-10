@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
-import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import type { AuthenticatedAdmin } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 type BannerRecord = {
   id: number;
@@ -51,8 +56,8 @@ type BannerFormState = {
   subtitle: string;
   cta: string;
   imageUrl: string;
+  pendingImageFile: File | null;
   isActive: boolean;
-  sortOrder: string;
   startsAt: string;
   endsAt: string;
 };
@@ -62,16 +67,31 @@ type BannerManagementClientProps = {
   user: AuthenticatedAdmin;
 };
 
-const emptyBannerForm = (sortOrder = "0"): BannerFormState => ({
+type SortableBannerRowProps = {
+  banner: BannerRecord;
+  onEdit: (banner: BannerRecord) => void;
+  onDelete: (id: number) => void;
+};
+
+const emptyBannerForm = (): BannerFormState => ({
   title: "",
   subtitle: "",
   cta: "",
   imageUrl: "",
+  pendingImageFile: null,
   isActive: true,
-  sortOrder,
   startsAt: "",
   endsAt: "",
 });
+
+const sortBanners = (items: BannerRecord[]) =>
+  [...items].sort((a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt));
+
+const withSequentialSortOrders = (items: BannerRecord[]) =>
+  items.map((banner, index) => ({
+    ...banner,
+    sortOrder: index,
+  }));
 
 const toLocalDateTimeInput = (value: string | null) => {
   if (!value) return "";
@@ -105,8 +125,8 @@ const bannerToForm = (banner: BannerRecord): BannerFormState => ({
   subtitle: banner.subtitle,
   cta: banner.cta,
   imageUrl: banner.imageUrl,
+  pendingImageFile: null,
   isActive: banner.isActive,
-  sortOrder: String(banner.sortOrder),
   startsAt: toLocalDateTimeInput(banner.startsAt),
   endsAt: toLocalDateTimeInput(banner.endsAt),
 });
@@ -161,23 +181,110 @@ async function uploadImage(file: File) {
   return body as { image_url: string };
 }
 
+function SortableBannerRow({ banner, onEdit, onDelete }: SortableBannerRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: banner.id,
+  });
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn(
+        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
+        isDragging && "bg-muted/70",
+      )}
+    >
+      <TableCell className="align-top">
+        <button
+          type="button"
+          aria-label={`Geser urutan banner ${banner.title}`}
+          className="text-muted-foreground hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md border"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      </TableCell>
+      <TableCell className="align-top">
+        <div className="space-y-1 whitespace-normal">
+          <div className="font-medium">{banner.title}</div>
+          <div className="text-muted-foreground text-sm">{banner.subtitle}</div>
+          <div className="text-xs text-muted-foreground">CTA: {banner.cta}</div>
+        </div>
+      </TableCell>
+      <TableCell className="align-top">
+        <Badge variant={banner.isActive ? "default" : "outline"}>
+          {banner.isActive ? "Active" : "Inactive"}
+        </Badge>
+      </TableCell>
+      <TableCell className="align-top whitespace-normal text-sm text-muted-foreground">
+        <div>Start: {formatDateTime(banner.startsAt)}</div>
+        <div>End: {formatDateTime(banner.endsAt)}</div>
+      </TableCell>
+      <TableCell className="align-top">
+        <a href={banner.imageUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+          Open image
+        </a>
+      </TableCell>
+      <TableCell className="align-top">
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => onEdit(banner)}>
+            Edit
+          </Button>
+          <Button size="sm" onClick={() => void onDelete(banner.id)}>
+            Delete
+          </Button>
+        </div>
+      </TableCell>
+    </tr>
+  );
+}
+
 export default function BannerManagementClient({
   initialBanners,
   user,
 }: BannerManagementClientProps) {
-  const [banners, setBanners] = useState(initialBanners);
-  const [bannerForm, setBannerForm] = useState<BannerFormState>(() =>
-    emptyBannerForm(String(initialBanners.length)),
+  const [banners, setBanners] = React.useState(() => sortBanners(initialBanners));
+  const [savedOrderIds, setSavedOrderIds] = React.useState(() =>
+    sortBanners(initialBanners).map((banner) => banner.id),
   );
-  const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
-  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
-  const [bannerError, setBannerError] = useState<string | null>(null);
-  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
-  const [submittingBanner, setSubmittingBanner] = useState(false);
+  const [bannerForm, setBannerForm] = React.useState<BannerFormState>(() => emptyBannerForm());
+  const [editingBannerId, setEditingBannerId] = React.useState<number | null>(null);
+  const [bannerMessage, setBannerMessage] = React.useState<string | null>(null);
+  const [bannerError, setBannerError] = React.useState<string | null>(null);
+  const [uploadingBannerImage, setUploadingBannerImage] = React.useState(false);
+  const [submittingBanner, setSubmittingBanner] = React.useState(false);
+  const [savingOrder, setSavingOrder] = React.useState(false);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const hasPendingOrderChanges = React.useMemo(
+    () => banners.some((banner, index) => savedOrderIds[index] !== banner.id),
+    [banners, savedOrderIds],
+  );
+  const bannerPreviewUrl = React.useMemo(() => {
+    if (!bannerForm.pendingImageFile) {
+      return bannerForm.imageUrl;
+    }
+
+    return URL.createObjectURL(bannerForm.pendingImageFile);
+  }, [bannerForm.imageUrl, bannerForm.pendingImageFile]);
+
+  React.useEffect(() => {
+    if (!bannerForm.pendingImageFile || !bannerPreviewUrl.startsWith("blob:")) {
+      return;
+    }
+
+    return () => {
+      URL.revokeObjectURL(bannerPreviewUrl);
+    };
+  }, [bannerForm.pendingImageFile, bannerPreviewUrl]);
 
   const resetBannerForm = () => {
     setEditingBannerId(null);
-    setBannerForm(emptyBannerForm(String(banners.length)));
+    setBannerForm(emptyBannerForm());
   };
 
   const submitBanner = async () => {
@@ -186,15 +293,25 @@ export default function BannerManagementClient({
     setBannerMessage(null);
 
     try {
+      const editingBanner =
+        editingBannerId === null ? null : banners.find((banner) => banner.id === editingBannerId) ?? null;
+      let imageUrl = bannerForm.imageUrl;
+
+      if (bannerForm.pendingImageFile) {
+        setUploadingBannerImage(true);
+        const uploaded = await uploadImage(bannerForm.pendingImageFile);
+        imageUrl = uploaded.image_url;
+      }
+
       const payload = {
         title: bannerForm.title,
         subtitle: bannerForm.subtitle,
         cta: bannerForm.cta,
-        image_url: bannerForm.imageUrl,
+        image_url: imageUrl,
         is_active: bannerForm.isActive,
-        sort_order: Number(bannerForm.sortOrder),
         starts_at: toIsoDateTime(bannerForm.startsAt),
         ends_at: toIsoDateTime(bannerForm.endsAt),
+        ...(editingBanner ? { sort_order: editingBanner.sortOrder } : {}),
       };
 
       const bannerResponse = editingBannerId
@@ -206,22 +323,27 @@ export default function BannerManagementClient({
             method: "POST",
             body: JSON.stringify(payload),
           });
+
       const banner = fromBannerApi(bannerResponse);
+      let nextSorted: BannerRecord[] = [];
 
       setBanners((current) => {
         const next = editingBannerId
           ? current.map((item) => (item.id === banner.id ? banner : item))
           : [...current, banner];
 
-        return [...next].sort(
-          (a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt),
-        );
+        nextSorted = sortBanners(next);
+        return nextSorted;
       });
+      if (!editingBannerId) {
+        setSavedOrderIds((current) => [...current, banner.id]);
+      }
       setBannerMessage(editingBannerId ? "Banner berhasil diperbarui." : "Banner berhasil dibuat.");
       resetBannerForm();
     } catch (error) {
       setBannerError(error instanceof Error ? error.message : "Gagal menyimpan banner");
     } finally {
+      setUploadingBannerImage(false);
       setSubmittingBanner(false);
     }
   };
@@ -233,6 +355,7 @@ export default function BannerManagementClient({
     try {
       await readJson<{ success: boolean }>(`/api/admin/banners/${id}`, { method: "DELETE" });
       setBanners((current) => current.filter((item) => item.id !== id));
+      setSavedOrderIds((saved) => saved.filter((savedId) => savedId !== id));
       if (editingBannerId === id) resetBannerForm();
       setBannerMessage("Banner berhasil dihapus.");
     } catch (error) {
@@ -243,17 +366,71 @@ export default function BannerManagementClient({
   const onBannerFileChange = async (file: File | null) => {
     if (!file) return;
 
-    setUploadingBannerImage(true);
     setBannerError(null);
     setBannerMessage(null);
+    setBannerForm((current) => ({ ...current, pendingImageFile: file }));
+    setBannerMessage("Gambar siap diupload. Simpan banner untuk mengunggah gambar.");
+  };
+
+  const onEditBanner = (banner: BannerRecord) => {
+    setEditingBannerId(banner.id);
+    setBannerForm(bannerToForm(banner));
+    setBannerError(null);
+    setBannerMessage(null);
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setBannerError(null);
+    setBannerMessage(null);
+    setBanners((current) => {
+      const oldIndex = current.findIndex((banner) => banner.id === active.id);
+      const newIndex = current.findIndex((banner) => banner.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return current;
+      }
+
+      return withSequentialSortOrders(arrayMove(current, oldIndex, newIndex));
+    });
+  };
+
+  const saveBannerOrder = async () => {
+    setSavingOrder(true);
+    setBannerError(null);
+    setBannerMessage(null);
+
     try {
-      const result = await uploadImage(file);
-      setBannerForm((current) => ({ ...current, imageUrl: result.image_url }));
-      setBannerMessage("Image banner berhasil diupload.");
+      await Promise.all(
+        banners.map((banner, index) =>
+          readJson<BannerApiRecord>(`/api/admin/banners/${banner.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              title: banner.title,
+              subtitle: banner.subtitle,
+              cta: banner.cta,
+              image_url: banner.imageUrl,
+              is_active: banner.isActive,
+              sort_order: index,
+              starts_at: banner.startsAt,
+              ends_at: banner.endsAt,
+            }),
+          }),
+        ),
+      );
+
+      setSavedOrderIds(banners.map((banner) => banner.id));
+      setBanners((current) => withSequentialSortOrders([...current]));
+      setBannerMessage("Urutan banner berhasil diperbarui.");
     } catch (error) {
-      setBannerError(error instanceof Error ? error.message : "Upload image gagal");
+      setBannerError(error instanceof Error ? error.message : "Gagal memperbarui urutan banner");
     } finally {
-      setUploadingBannerImage(false);
+      setSavingOrder(false);
     }
   };
 
@@ -314,8 +491,12 @@ export default function BannerManagementClient({
                   onChange={(event) => void onBannerFileChange(event.target.files?.[0] ?? null)}
                   className="max-w-72"
                 />
-                {bannerForm.imageUrl ? (
-                  <p className="text-xs text-muted-foreground break-all">{bannerForm.imageUrl}</p>
+                {bannerForm.pendingImageFile ? (
+                  <p className="break-all text-xs text-muted-foreground">
+                    Pending upload: {bannerForm.pendingImageFile.name}
+                  </p>
+                ) : bannerForm.imageUrl ? (
+                  <p className="break-all text-xs text-muted-foreground">{bannerForm.imageUrl}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Upload image untuk mengisi banner image.
@@ -323,19 +504,7 @@ export default function BannerManagementClient({
                 )}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="banner-sort-order">Sort Order</Label>
-                  <Input
-                    id="banner-sort-order"
-                    type="number"
-                    min="0"
-                    value={bannerForm.sortOrder}
-                    onChange={(event) =>
-                      setBannerForm((current) => ({ ...current, sortOrder: event.target.value }))
-                    }
-                  />
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="banner-starts-at">Starts At</Label>
                   <Input
@@ -371,11 +540,11 @@ export default function BannerManagementClient({
                 Aktifkan banner ini
               </label>
 
-              {bannerForm.imageUrl ? (
+              {bannerPreviewUrl ? (
                 <div className="overflow-hidden rounded-xl border bg-muted/20">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={bannerForm.imageUrl}
+                    src={bannerPreviewUrl}
                     alt={bannerForm.title || "Banner preview"}
                     className="h-44 w-full object-cover"
                   />
@@ -403,80 +572,57 @@ export default function BannerManagementClient({
         <div className="mt-6 grid gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Banner Inventory</CardTitle>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>Banner Inventory</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Geser row untuk ubah urutan banner, lalu simpan dengan tombol update.
+                  </p>
+                </div>
+                {hasPendingOrderChanges ? (
+                  <Button disabled={savingOrder} onClick={() => void saveBannerOrder()}>
+                    Update Order
+                  </Button>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Banner</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Schedule</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {banners.map((banner) => (
-                    <TableRow key={banner.id}>
-                      <TableCell className="align-top">
-                        <div className="space-y-1 whitespace-normal">
-                          <div className="font-medium">{banner.title}</div>
-                          <div className="text-muted-foreground text-sm">{banner.subtitle}</div>
-                          <div className="text-xs text-muted-foreground">CTA: {banner.cta}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <Badge variant={banner.isActive ? "default" : "outline"}>
-                          {banner.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="align-top">{banner.sortOrder}</TableCell>
-                      <TableCell className="align-top whitespace-normal text-sm text-muted-foreground">
-                        <div>Start: {formatDateTime(banner.startsAt)}</div>
-                        <div>End: {formatDateTime(banner.endsAt)}</div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <a
-                          href={banner.imageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary underline"
-                        >
-                          Open image
-                        </a>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingBannerId(banner.id);
-                              setBannerForm(bannerToForm(banner));
-                              setBannerError(null);
-                              setBannerMessage(null);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button size="sm" onClick={() => void removeBanner(banner.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {banners.length === 0 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        Belum ada banner.
-                      </TableCell>
+                      <TableHead className="w-12">Move</TableHead>
+                      <TableHead>Banner</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Schedule</TableHead>
+                      <TableHead>Image</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <SortableContext
+                    items={banners.map((banner) => banner.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TableBody>
+                      {banners.map((banner) => (
+                        <SortableBannerRow
+                          key={banner.id}
+                          banner={banner}
+                          onEdit={onEditBanner}
+                          onDelete={removeBanner}
+                        />
+                      ))}
+                      {banners.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            Belum ada banner.
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </SortableContext>
+                </Table>
+              </DndContext>
             </CardContent>
           </Card>
         </div>
