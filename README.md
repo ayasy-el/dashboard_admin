@@ -1,6 +1,6 @@
 # Dashboard Admin
 
-Dashboard admin berbasis Next.js untuk memantau data Telkomsel Poin Merchant, operasional, dan proses ingestion CSV.
+Next.js admin dashboard for monitoring Telkomsel Poin Merchant data, operations, and CSV ingestion workflows.
 
 ## Stack
 
@@ -10,25 +10,25 @@ Dashboard admin berbasis Next.js untuk memantau data Telkomsel Poin Merchant, op
 - Drizzle ORM
 - PostgreSQL
 
-## Fitur
+## Features
 
 - Dashboard overview
-- Dashboard operational
-- Panel ingestion CSV
-- Login admin dengan session berbasis cookie `httpOnly`
-- Manajemen banner promosi merchant berbasis database
-- Upload image banner ke filesystem runtime di luar `public` lewat route asset terproteksi
-- Seed admin awal lewat script
+- Operational dashboard
+- CSV ingestion panel
+- Admin login with `httpOnly` cookie sessions
+- Database-backed merchant promo banner management
+- Banner image uploads stored outside `public` through a protected asset route
+- Admin bootstrap via script
 
-## Setup
+## Local Setup
 
-1. Install dependency:
+1. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-2. Buat file `.env`:
+2. Create `.env`:
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/DB_NAME
@@ -36,13 +36,13 @@ NEXT_PUBLIC_INGESTION_API_URL=http://localhost:8001
 ADMIN_ASSET_SHARED_SECRET=replace-with-random-long-secret
 ```
 
-3. Jalankan migrasi database:
+3. Run database migrations:
 
 ```bash
 pnpm db:migrate
 ```
 
-4. Seed akun admin pertama:
+4. Seed the first admin account:
 
 ```bash
 ADMIN_EMAIL=admin@example.com \
@@ -51,60 +51,121 @@ ADMIN_NAME="Admin Dashboard" \
 pnpm db:seed-admin
 ```
 
-5. Jalankan aplikasi:
+5. Start the app:
 
 ```bash
 pnpm dev
 ```
 
-App default berjalan di `http://localhost:3000`.
+The app runs at `http://localhost:3000`.
+
+## Docker Setup
+
+Use `../docker-compose.yaml` from the root workspace.
+
+Docker files used by this app:
+
+- [`docker/Dockerfile`](./docker/Dockerfile)
+- [`docker/ingestion_service/Dockerfile`](./docker/ingestion_service/Dockerfile)
+- [`docker/postgres/Dockerfile`](./docker/postgres/Dockerfile)
+
+Runtime secrets are read from `/.secrets/` at the root of the project:
+
+- `postgres_user`
+- `postgres_db`
+- `postgres_password`
+- `database_url`
+- `auth_session_secret`
+- `admin_asset_shared_secret`
+
+Example secret layout:
+
+```text
+.secrets/
+  postgres_user
+  postgres_db
+  postgres_password
+  database_url
+  auth_session_secret
+  admin_asset_shared_secret
+```
+
+### Docker Commands
+
+Run from the root workspace `../`:
+
+```bash
+docker compose -f docker-compose.yaml up --build
+docker compose -f docker-compose.yaml up --build dashboard-admin
+docker compose -f docker-compose.yaml up --build dashboard-merchant
+docker compose -f docker-compose.yaml run --rm schema-migrate
+docker compose -f docker-compose.yaml down
+docker compose -f docker-compose.yaml logs -f
+```
+
+If Postgres was started before and the data directory is dirty, reset the volume first:
+
+```bash
+docker compose -f docker-compose.yaml down -v
+```
+
+If you need to build a specific image directly:
+
+```bash
+docker build -f docker/Dockerfile .
+docker build -f docker/ingestion_service/Dockerfile .
+```
+
+The `schema-migrate` service runs automatically before the apps start, so the database schema is applied before `admin_users` or other tables are queried.
 
 ## Login
 
-Setelah seed berhasil, buka:
+After seeding succeeds, open:
 
 - `http://localhost:3000/login`
 
-Gunakan email dan password admin yang dibuat saat menjalankan `db:seed-admin`.
+Use the admin email and password created by `db:seed-admin`.
 
 ## Scripts
 
-- `pnpm dev` menjalankan development server
-- `pnpm build` build production
-- `pnpm start` menjalankan hasil build
-- `pnpm lint` menjalankan ESLint
-- `pnpm db:generate` generate perubahan schema Drizzle
-- `pnpm db:migrate` menjalankan migration
-- `pnpm db:push` push schema langsung ke database
-- `pnpm db:push:force` push schema dengan force
-- `pnpm db:studio` buka Drizzle Studio
-- `pnpm db:seed-admin` membuat atau update akun admin
+- `pnpm dev` starts the development server
+- `pnpm build` builds production assets
+- `pnpm start` runs the production build
+- `pnpm lint` runs ESLint
+- `pnpm db:generate` generates Drizzle schema changes
+- `pnpm db:migrate` runs migrations
+- `pnpm db:push` pushes the schema directly to the database
+- `pnpm db:push:force` pushes the schema with force
+- `pnpm db:studio` opens Drizzle Studio
+- `pnpm db:seed-admin` creates or updates the admin account
 
-## Struktur Singkat
+## Project Structure
 
-- [`src/app`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/app) route App Router
-- [`src/lib/db`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/db) koneksi dan schema database
-- [`src/lib/auth.ts`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/auth.ts) logic autentikasi dan session
-- [`src/features`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/features) fitur dashboard per domain
-- [`src/lib/db/migration`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/src/lib/db/migration) migration SQL
-- [`ingestion_service`](/home/ayasy/Documents/Magang/Projek/dashboard_admin/ingestion_service) service ingestion terpisah (python)
+- [`src/app`](./src/app) App Router routes
+- [`src/lib/db`](./src/lib/db) database connection and schema
+- [`src/lib/auth.ts`](./src/lib/auth.ts) authentication and session logic
+- [`src/features`](./src/features) feature modules by domain
+- [`src/lib/db/migration`](./src/lib/db/migration) SQL migrations
+- [`ingestion_service`](./ingestion_service) separate ingestion service in Python
+- [`docker`](./docker) Dockerfiles, entrypoints, and runtime helpers
 
-## Catatan
+## Notes
 
-- Route dashboard utama dilindungi middleware dan verifikasi session server-side.
-- Server ingestion perlu berjalan terpisah jika fitur upload/monitor batch ingin dipakai.
-- Endpoint publik untuk merchant:
-  - Route asset image terproteksi ada di `GET /api/admin/banner-assets/:key` dan menerima admin session atau signed URL valid.
-  - `GET /api/banners` mengembalikan banner aktif terurut `sort_order` dan tersaring window jadwal.
-  - `GET /api/program-banner-assets` mengembalikan asset program aktif bila dipakai oleh merchant.
-- Endpoint admin untuk banner:
+- The main dashboard route is protected by middleware and server-side session checks.
+- The ingestion server must run separately if you want CSV upload and batch monitoring.
+- The app Dockerfile is in [`docker/Dockerfile`](./docker/Dockerfile) and the ingestion Dockerfile is in [`docker/ingestion_service/Dockerfile`](./docker/ingestion_service/Dockerfile).
+- Public merchant-facing endpoints:
+  - Protected asset route: `GET /api/admin/banner-assets/:key`, accepts an admin session or a valid signed URL
+  - `GET /api/banners` returns active banners ordered by `sort_order` and filtered by schedule window
+  - `GET /api/program-banner-assets` returns active program assets if used by the merchant
+- Admin banner endpoints:
   - `GET /api/admin/banners`
   - `POST /api/admin/banners`
   - `PATCH /api/admin/banners/:id`
   - `DELETE /api/admin/banners/:id`
-- Endpoint admin untuk asset program:
+- Admin program asset endpoints:
   - `GET /api/admin/program-banner-assets`
   - `POST /api/admin/program-banner-assets`
   - `PATCH /api/admin/program-banner-assets/:id`
   - `DELETE /api/admin/program-banner-assets/:id`
-- Jangan commit kredensial database atau admin ke repository.
+- Do not commit database or admin credentials to the repository.

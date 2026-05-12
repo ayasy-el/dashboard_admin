@@ -49,6 +49,8 @@
 :root {
   --radius: 0.625rem;
   color-scheme: only light;
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --background: #ffffff;
   --foreground: #111827;
   --card: #ffffff;
@@ -130,7 +132,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: Inter, var(--font-geist-sans), sans-serif;
+    font-family: var(--font-geist-sans), sans-serif;
   }
 }
 
