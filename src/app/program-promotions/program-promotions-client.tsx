@@ -443,127 +443,146 @@ export default function BannerManagementClient({
               <CardTitle>Provider Promotion Banners</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="banner-title">Title</Label>
-                  <Input
-                    id="banner-title"
-                    value={bannerForm.title}
-                    onChange={(event) =>
-                      setBannerForm((current) => ({ ...current, title: event.target.value }))
-                    }
-                    placeholder="Promo Ramadan"
-                  />
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-stretch">
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="banner-title">Title</Label>
+                      <Input
+                        id="banner-title"
+                        value={bannerForm.title}
+                        onChange={(event) =>
+                          setBannerForm((current) => ({ ...current, title: event.target.value }))
+                        }
+                        placeholder="Promo Ramadan"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="banner-cta">CTA</Label>
+                      <Input
+                        id="banner-cta"
+                        value={bannerForm.cta}
+                        onChange={(event) =>
+                          setBannerForm((current) => ({ ...current, cta: event.target.value }))
+                        }
+                        placeholder="Lihat Promo"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="banner-subtitle">Subtitle</Label>
+                    <textarea
+                      id="banner-subtitle"
+                      value={bannerForm.subtitle}
+                      onChange={(event) =>
+                        setBannerForm((current) => ({ ...current, subtitle: event.target.value }))
+                      }
+                      className="border-input min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                      placeholder="Deskripsi singkat promo untuk merchant"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="banner-image-file">Upload Image</Label>
+                    <Input
+                      id="banner-image-file"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      disabled={uploadingBannerImage}
+                      onChange={(event) => void onBannerFileChange(event.target.files?.[0] ?? null)}
+                      className="max-w-72"
+                    />
+                    {bannerForm.pendingImageFile ? (
+                      <p className="break-all text-xs text-muted-foreground">
+                        Pending upload: {bannerForm.pendingImageFile.name}
+                      </p>
+                    ) : bannerForm.imageUrl ? (
+                      <p className="break-all text-xs text-muted-foreground">
+                        {bannerForm.imageUrl}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Upload image untuk mengisi banner image.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="banner-starts-at">Starts At</Label>
+                      <Input
+                        id="banner-starts-at"
+                        type="datetime-local"
+                        value={bannerForm.startsAt}
+                        onChange={(event) =>
+                          setBannerForm((current) => ({ ...current, startsAt: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="banner-ends-at">Ends At</Label>
+                      <Input
+                        id="banner-ends-at"
+                        type="datetime-local"
+                        value={bannerForm.endsAt}
+                        onChange={(event) =>
+                          setBannerForm((current) => ({ ...current, endsAt: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-3 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={bannerForm.isActive}
+                      onChange={(event) =>
+                        setBannerForm((current) => ({ ...current, isActive: event.target.checked }))
+                      }
+                    />
+                    Aktifkan banner ini
+                  </label>
+
+                  {bannerError ? <p className="text-sm text-destructive">{bannerError}</p> : null}
+                  {bannerMessage ? (
+                    <p className="text-sm text-emerald-600">{bannerMessage}</p>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      disabled={submittingBanner || uploadingBannerImage}
+                      onClick={() => void submitBanner()}
+                    >
+                      {editingBannerId ? "Update Banner" : "Create Banner"}
+                    </Button>
+                    <Button variant="outline" onClick={resetBannerForm}>
+                      Reset
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="banner-cta">CTA</Label>
-                  <Input
-                    id="banner-cta"
-                    value={bannerForm.cta}
-                    onChange={(event) =>
-                      setBannerForm((current) => ({ ...current, cta: event.target.value }))
-                    }
-                    placeholder="Lihat Promo"
-                  />
+                <div className="flex h-full min-h-0 flex-col space-y-3">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-foreground">Preview Image</h3>
+                  </div>
+
+                  {bannerPreviewUrl ? (
+                    <div className="flex min-h-64 flex-1 items-center justify-center overflow-hidden rounded-xl border bg-muted/20 p-4 lg:h-full lg:max-h-[32rem]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={bannerPreviewUrl}
+                        alt={bannerForm.title || "Banner preview"}
+                        className="h-auto max-h-[28rem] w-auto max-w-full object-contain lg:max-h-[32rem]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-center lg:h-full">
+                      <p className="text-sm text-muted-foreground">
+                        Preview akan muncul setelah image dipilih atau URL tersedia.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="banner-subtitle">Subtitle</Label>
-                <textarea
-                  id="banner-subtitle"
-                  value={bannerForm.subtitle}
-                  onChange={(event) =>
-                    setBannerForm((current) => ({ ...current, subtitle: event.target.value }))
-                  }
-                  className="border-input min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  placeholder="Deskripsi singkat promo untuk merchant"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="banner-image-file">Upload Image</Label>
-                <Input
-                  id="banner-image-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                  disabled={uploadingBannerImage}
-                  onChange={(event) => void onBannerFileChange(event.target.files?.[0] ?? null)}
-                  className="max-w-72"
-                />
-                {bannerForm.pendingImageFile ? (
-                  <p className="break-all text-xs text-muted-foreground">
-                    Pending upload: {bannerForm.pendingImageFile.name}
-                  </p>
-                ) : bannerForm.imageUrl ? (
-                  <p className="break-all text-xs text-muted-foreground">{bannerForm.imageUrl}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Upload image untuk mengisi banner image.
-                  </p>
-                )}
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="banner-starts-at">Starts At</Label>
-                  <Input
-                    id="banner-starts-at"
-                    type="datetime-local"
-                    value={bannerForm.startsAt}
-                    onChange={(event) =>
-                      setBannerForm((current) => ({ ...current, startsAt: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="banner-ends-at">Ends At</Label>
-                  <Input
-                    id="banner-ends-at"
-                    type="datetime-local"
-                    value={bannerForm.endsAt}
-                    onChange={(event) =>
-                      setBannerForm((current) => ({ ...current, endsAt: event.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <label className="flex items-center gap-3 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  checked={bannerForm.isActive}
-                  onChange={(event) =>
-                    setBannerForm((current) => ({ ...current, isActive: event.target.checked }))
-                  }
-                />
-                Aktifkan banner ini
-              </label>
-
-              {bannerPreviewUrl ? (
-                <div className="overflow-hidden rounded-xl border bg-muted/20">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bannerPreviewUrl}
-                    alt={bannerForm.title || "Banner preview"}
-                    className="h-44 w-full object-cover"
-                  />
-                </div>
-              ) : null}
-
-              {bannerError ? <p className="text-sm text-destructive">{bannerError}</p> : null}
-              {bannerMessage ? <p className="text-sm text-emerald-600">{bannerMessage}</p> : null}
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  disabled={submittingBanner || uploadingBannerImage}
-                  onClick={() => void submitBanner()}
-                >
-                  {editingBannerId ? "Update Banner" : "Create Banner"}
-                </Button>
-                <Button variant="outline" onClick={resetBannerForm}>
-                  Reset
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -587,7 +606,11 @@ export default function BannerManagementClient({
               </div>
             </CardHeader>
             <CardContent>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+              >
                 <Table>
                   <TableHeader>
                     <TableRow>
