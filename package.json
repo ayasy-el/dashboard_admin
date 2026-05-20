@@ -7,12 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:generate": "bash -lc \"set -a; source .env; set +a; drizzle-kit generate\"",
-    "db:migrate": "bash -lc \"set -a; source .env; set +a; drizzle-kit migrate\"",
-    "db:push": "bash -lc \"set -a; source .env; set +a; drizzle-kit push\"",
-    "db:pull": "bash -lc \"set -a; source .env; set +a; drizzle-kit pull\"",
-    "db:push:force": "bash -lc \"set -a; source .env; set +a; drizzle-kit push --force\"",
-    "db:studio": "bash -lc \"set -a; source .env; set +a; drizzle-kit studio\"",
+    "db:generate": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit generate\"",
+    "db:migrate": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit migrate\"",
+    "db:push": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit push\"",
+    "db:pull": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit pull\"",
+    "db:push:force": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit push --force\"",
+    "db:studio": "bash -lc \"if [ -z \\\"$DATABASE_URL\\\" ]; then set -a; source .env; set +a; fi; drizzle-kit studio\"",
     "db:seed-admin": "node --env-file=.env scripts/seed-admin.mjs"
   },
   "dependencies": {

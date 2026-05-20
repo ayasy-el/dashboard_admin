@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 
 import { GlobalLoadingProvider } from "@/components/global-loading-provider";
 import { PageTopLoader } from "@/components/page-top-loader";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
@@ -25,10 +27,13 @@ export default function RootLayout({
           storageKey="dashboard-theme"
           themes={["light", "dark"]}
         >
-          <GlobalLoadingProvider>
-            <PageTopLoader />
-            {children}
-          </GlobalLoadingProvider>
+          <Suspense fallback={null}>
+            <GlobalLoadingProvider>
+              <PageTopLoader />
+              <Toaster richColors position="top-right" />
+              {children}
+            </GlobalLoadingProvider>
+          </Suspense>
         </ThemeProvider>
       </body>
     </html>

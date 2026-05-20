@@ -34,7 +34,7 @@ export class FeedbackRepositoryDrizzle implements FeedbackRepository {
         mf.updated_at::text as updated_at
       from merchant_feedback mf
       inner join dim_merchant dm on dm.merchant_key = mf.merchant_key
-      inner join users u on u.id = mf.user_id
+      inner join user_accounts u on u.id = mf.user_id
       order by mf.created_at desc, mf.id desc
     `);
 

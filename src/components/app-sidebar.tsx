@@ -7,6 +7,7 @@ import {
   IconBuildingStore,
   IconMessageCircle,
   IconSettings,
+  IconUsers,
   IconTicket,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -47,6 +48,11 @@ const systemItems = [
     title: "Upload Data",
     url: "/ingestion",
     icon: IconSettings,
+  },
+  {
+    title: "Account Management",
+    url: "/account-management",
+    icon: IconUsers,
   },
   {
     title: "Program & Promotions",
@@ -92,7 +98,12 @@ export function AppSidebar({
         </div>
         <SidebarMenu>
           {navItems.map((item) => {
-            const isActive = item.url === "/" ? pathname === "/" : pathname.startsWith(item.url);
+            const isActive =
+              item.url === "/"
+                ? pathname === "/"
+                : item.url === "/merchant"
+                  ? pathname === "/merchant" || pathname.startsWith("/merchant/")
+                  : pathname.startsWith(item.url);
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton

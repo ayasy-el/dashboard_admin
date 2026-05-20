@@ -8,9 +8,8 @@ import {
   factTransaction,
   adminUsers,
   adminSessions,
-  users,
+  userAccounts,
   merchantFeedback,
-  merchantUsers,
 } from "./schema";
 
 export const dimCategoryRelations = relations(dimCategory, ({ many }) => ({
@@ -33,6 +32,10 @@ export const dimMerchantRelations = relations(dimMerchant, ({ one, many }) => ({
   }),
   dimRules: many(dimRule),
   factTransactions: many(factTransaction),
+  userAccount: one(userAccounts, {
+    fields: [dimMerchant.userAccountId],
+    references: [userAccounts.id],
+  }),
 }));
 
 export const dimRuleRelations = relations(dimRule, ({ one, many }) => ({
@@ -72,21 +75,14 @@ export const adminSessionsRelations = relations(adminSessions, ({ one }) => ({
   }),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const userAccountsRelations = relations(userAccounts, ({ many }) => ({
   merchantFeedbacks: many(merchantFeedback),
-  merchantUsers: many(merchantUsers),
+  dimMerchants: many(dimMerchant),
 }));
 
 export const merchantFeedbackRelations = relations(merchantFeedback, ({ one }) => ({
-  user: one(users, {
+  userAccount: one(userAccounts, {
     fields: [merchantFeedback.userId],
-    references: [users.id],
-  }),
-}));
-
-export const merchantUsersRelations = relations(merchantUsers, ({ one }) => ({
-  user: one(users, {
-    fields: [merchantUsers.userId],
-    references: [users.id],
+    references: [userAccounts.id],
   }),
 }));

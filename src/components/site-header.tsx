@@ -12,6 +12,7 @@ const routeTitles: Record<string, string> = {
   "/": "Overview",
   "/operational": "Operational",
   "/merchant": "Merchant",
+  "/account-management": "Account Management",
   "/feedback": "Feedback Center",
   "/ingestion": "Ingestion",
   "/program-promotions": "Program & Promotions",
@@ -21,6 +22,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const title = useMemo(() => {
     if (!pathname) return "Overview";
+    if (pathname.startsWith("/account-management")) return "Account Management";
     if (pathname.startsWith("/merchant/")) return "Merchant Detail";
     if (pathname.startsWith("/operational/merchant/")) return "Merchant Detail";
     return routeTitles[pathname] ?? "Overview";

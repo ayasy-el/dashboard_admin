@@ -19,15 +19,8 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1775779200000,
-      "tag": "0002_banner_management",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776422032834,
-      "tag": "0003_dry_gauntlet",
+      "when": 1779176628000,
+      "tag": "0002_user_accounts_direct_merchant",
       "breakpoints": true
     }
   ]

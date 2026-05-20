@@ -411,14 +411,7 @@ export default function BannerManagementClient({
           readJson<BannerApiRecord>(`/api/admin/banners/${banner.id}`, {
             method: "PATCH",
             body: JSON.stringify({
-              title: banner.title,
-              subtitle: banner.subtitle,
-              cta: banner.cta,
-              image_url: banner.imageUrl,
-              is_active: banner.isActive,
               sort_order: index,
-              starts_at: banner.startsAt,
-              ends_at: banner.endsAt,
             }),
           }),
         ),
