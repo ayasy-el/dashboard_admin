@@ -46,21 +46,37 @@ const resolveSelectedAccountId = (
 
 export class MerchantAccountsRepositoryDrizzle implements MerchantAccountsRepository {
   async getDashboardData(selectedAccountId?: number | null): Promise<MerchantAccountsDashboardData> {
-    const [accountsResult, selectedMerchantsResult, merchantPoolResult] = await Promise.all([
-      db.execute(sql`
-        select
-          ua.id as user_id,
-          ua.email as email,
-          ua.username as username,
-          ua.is_active as is_active,
-          coalesce(count(distinct dm.merchant_key), 0)::int as merchant_count,
-          min(dm.merchant_name) as sample_merchant_name
-        from user_accounts ua
-        left join dim_merchant dm on dm.user_account_id = ua.id
-        group by ua.id, ua.email, ua.username, ua.is_active
-        order by ua.is_active desc, ua.email asc, ua.id asc
-      `),
-      selectedAccountId
+    const accountsResult = await db.execute(sql`
+      select
+        ua.id as user_id,
+        ua.email as email,
+        ua.username as username,
+        ua.is_active as is_active,
+        coalesce(count(distinct dm.merchant_key), 0)::int as merchant_count,
+        min(dm.merchant_name) as sample_merchant_name
+      from user_accounts ua
+      left join dim_merchant dm on dm.user_account_id = ua.id
+      group by ua.id, ua.email, ua.username, ua.is_active
+      order by ua.is_active desc, ua.email asc, ua.id asc
+    `);
+
+    const baseAccounts = accountsResult.rows.map((row) => ({
+      id: Number(row.user_id),
+      email: String(row.email ?? ""),
+      username: row.username ? String(row.username) : null,
+      isActive: toBool(row.is_active),
+      merchantCount: toInt(row.merchant_count),
+      sampleMerchantName: row.sample_merchant_name ? String(row.sample_merchant_name) : null,
+    }));
+
+    const enrichedAccounts = baseAccounts.map((account) => ({
+      ...account,
+    })) satisfies MerchantAccountSummary[];
+
+    const selectedId = resolveSelectedAccountId(enrichedAccounts, selectedAccountId);
+
+    const [selectedMerchantsResult, merchantPoolResult] = await Promise.all([
+      selectedId != null
         ? db.execute(sql`
             select
               dm.merchant_key as merchant_key,
@@ -79,11 +95,11 @@ export class MerchantAccountsRepositoryDrizzle implements MerchantAccountsReposi
             left join dim_cluster dc on dc.cluster_id = dm.cluster_id
             left join dim_category dcat on dcat.category_id = dm.category_id
             left join user_accounts ou on ou.id = dm.user_account_id
-            where dm.user_account_id = ${selectedAccountId}
+            where dm.user_account_id = ${selectedId}
             order by dm.merchant_name asc, dm.keyword_code asc
           `)
         : Promise.resolve({ rows: [] as Record<string, unknown>[] }),
-      selectedAccountId != null
+      selectedId != null
         ? db.execute(sql`
             select
               dm.merchant_key as merchant_key,
@@ -102,7 +118,7 @@ export class MerchantAccountsRepositoryDrizzle implements MerchantAccountsReposi
             left join user_accounts ou on ou.id = dm.user_account_id
             left join dim_cluster dc on dc.cluster_id = dm.cluster_id
             left join dim_category dcat on dcat.category_id = dm.category_id
-            where dm.user_account_id is null or dm.user_account_id <> ${selectedAccountId}
+            where dm.user_account_id is null or dm.user_account_id <> ${selectedId}
             order by coalesce(ou.email, '') asc, dm.merchant_name asc, dm.keyword_code asc
           `)
         : db.execute(sql`
@@ -126,21 +142,6 @@ export class MerchantAccountsRepositoryDrizzle implements MerchantAccountsReposi
             order by coalesce(ou.email, '') asc, dm.merchant_name asc, dm.keyword_code asc
           `),
     ]);
-
-    const baseAccounts = accountsResult.rows.map((row) => ({
-      id: Number(row.user_id),
-      email: String(row.email ?? ""),
-      username: row.username ? String(row.username) : null,
-      isActive: toBool(row.is_active),
-      merchantCount: toInt(row.merchant_count),
-      sampleMerchantName: row.sample_merchant_name ? String(row.sample_merchant_name) : null,
-    }));
-
-    const enrichedAccounts = baseAccounts.map((account) => ({
-      ...account,
-    })) satisfies MerchantAccountSummary[];
-
-    const selectedId = resolveSelectedAccountId(enrichedAccounts, selectedAccountId);
 
     const selectedMerchants = selectedMerchantsResult.rows.map((row) => mapMerchant(row)) satisfies MerchantAccountMerchant[];
     const merchantPool = merchantPoolResult.rows
