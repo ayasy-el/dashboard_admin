@@ -1,5 +1,4 @@
 import { randomBytes, scryptSync } from "node:crypto";
-import readline from "node:readline";
 import process from "node:process";
 
 import pg from "pg";
@@ -13,18 +12,7 @@ if (!connectionString) {
 }
 
 function createPrompt() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  function ask(question) {
-    return new Promise((resolve) => {
-      rl.question(question, resolve);
-    });
-  }
-
-  async function askSecret(question) {
+  function prompt(question, { mask = false } = {}) {
     if (!process.stdin.isTTY) {
       throw new Error("Password prompt requires an interactive terminal");
     }
@@ -62,21 +50,37 @@ function createPrompt() {
         }
 
         if (key === "\u007f" || key === "\b") {
-          value = value.slice(0, -1);
+          if (value.length > 0) {
+            value = value.slice(0, -1);
+            stdout.write("\b \b");
+          }
+          return;
+        }
+
+        if (key === "\u001b") {
           return;
         }
 
         value += key;
+        stdout.write(mask ? "*" : key);
       }
 
       stdin.on("data", onData);
     });
   }
 
-  return { rl, ask, askSecret };
+  function ask(question) {
+    return prompt(question);
+  }
+
+  function askSecret(question) {
+    return prompt(question, { mask: true });
+  }
+
+  return { ask, askSecret };
 }
 
-const { rl, ask, askSecret } = createPrompt();
+const { ask, askSecret } = createPrompt();
 
 try {
   const email = (await ask("Admin email: ")).trim().toLowerCase();
@@ -127,5 +131,5 @@ try {
     await pool.end();
   }
 } finally {
-  rl.close();
+  process.stdin.setRawMode?.(false);
 }
