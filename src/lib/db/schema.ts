@@ -31,20 +31,10 @@ import {
   jsonb,
   index,
   uniqueIndex,
-  customType,
   check,
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-
-// ─────────────────────────────────────────────
-// Custom type: daterange  (PostgreSQL built-in, not in Drizzle)
-// ─────────────────────────────────────────────
-const daterange = customType<{ data: string; driverData: string }>({
-  dataType() {
-    return "daterange";
-  },
-});
 
 // ─────────────────────────────────────────────
 // Schemas
@@ -115,7 +105,8 @@ export const userAccounts = pgTable("user_accounts", {
 export const dimCategory = pgTable("dim_category", {
   categoryId: integer("category_id").primaryKey().notNull(),
   category: varchar("category", { length: 500 }).notNull(),
-});
+  sourceBatchId: uuid("source_batch_id").notNull(),
+}, (t) => [index("dim_category_source_batch_id_idx").on(t.sourceBatchId)]);
 
 // ── dim_cluster ───────────────────────────────
 export const dimCluster = pgTable("dim_cluster", {
@@ -123,7 +114,8 @@ export const dimCluster = pgTable("dim_cluster", {
   cluster: varchar("cluster", { length: 500 }).notNull(),
   branch: varchar("branch", { length: 500 }).notNull(),
   region: varchar("region", { length: 500 }).notNull(),
-});
+  sourceBatchId: uuid("source_batch_id").notNull(),
+}, (t) => [index("dim_cluster_source_batch_id_idx").on(t.sourceBatchId)]);
 
 // ── dim_date ──────────────────────────────────
 export const dimDate = pgTable("dim_date", {
@@ -150,6 +142,7 @@ export const dimMerchant = pgTable(
     pointRedeem: integer("point_redeem").notNull(),
     startPeriod: date("start_period").notNull(),
     endPeriod: date("end_period").notNull(),
+    sourceBatchId: uuid("source_batch_id").notNull(),
     clusterId: bigint("cluster_id", { mode: "number" })
       .notNull()
       .references(() => dimCluster.clusterId),
@@ -165,6 +158,7 @@ export const dimMerchant = pgTable(
     index("dim_merchant_idx_dim_merchant_category_id").on(t.categoryId),
     index("dim_merchant_idx_dim_merchant_cluster_id").on(t.clusterId),
     index("dim_merchant_idx_rule_key").on(t.ruleKey),
+    index("dim_merchant_source_batch_id_idx").on(t.sourceBatchId),
     index("dim_merchant_idx_user_account_id").on(t.userAccountId),
   ],
 );
@@ -180,8 +174,12 @@ export const factClusterBalance = pgTable(
       .references(() => dimCluster.clusterId),
     totalPoint: bigint("total_point", { mode: "number" }).notNull(),
     pointOwner: bigint("point_owner", { mode: "number" }).notNull(),
+    sourceBatchId: uuid("source_batch_id").notNull(),
   },
-  (t) => [index("fact_cluster_balance_idx_fcp_month_cluster").on(t.monthYear, t.clusterId)],
+  (t) => [
+    index("fact_cluster_balance_idx_fcp_month_cluster").on(t.monthYear, t.clusterId),
+    index("fact_cluster_balance_source_batch_id_idx").on(t.sourceBatchId),
+  ],
 );
 
 // ── fact_transaction ──────────────────────────
@@ -205,6 +203,7 @@ export const factTransaction = pgTable(
     pointRedeem: integer("point_redeem").notNull(),
     msisdn: varchar("msisdn", { length: 20 }).notNull(),
     createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+    sourceBatchId: uuid("source_batch_id").notNull(),
   },
   (t) => [
     index("fact_transaction_idx_ft_merchant_status_time").on(
@@ -215,6 +214,7 @@ export const factTransaction = pgTable(
     index("fact_transaction_date_key_idx").on(t.dateKey),
     index("fact_transaction_index_6").on(t.msisdn),
     index("fact_transaction_rule").on(t.ruleKey),
+    index("fact_transaction_source_batch_id_idx").on(t.sourceBatchId),
   ],
 );
 
@@ -587,7 +587,6 @@ export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {
   ruleKey: uuid("rule_key"),
   merchantKey: uuid("merchant_key"),
   pointRedeem: integer("point_redeem"),
-  period: daterange("period"),
   startPeriod: date("start_period", { mode: "string" }),
   endPeriod: date("end_period", { mode: "string" }),
   merchantName: varchar("merchant_name", { length: 500 }),

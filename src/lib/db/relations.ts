@@ -3,8 +3,6 @@ import {
   dimCategory,
   dimMerchant,
   dimCluster,
-  dimRule,
-  factClusterPoint,
   factTransaction,
   adminUsers,
   adminSessions,
@@ -18,7 +16,6 @@ export const dimCategoryRelations = relations(dimCategory, ({ many }) => ({
 
 export const dimClusterRelations = relations(dimCluster, ({ many }) => ({
   dimMerchants: many(dimMerchant),
-  factClusterPoints: many(factClusterPoint),
 }));
 
 export const dimMerchantRelations = relations(dimMerchant, ({ one, many }) => ({
@@ -30,26 +27,10 @@ export const dimMerchantRelations = relations(dimMerchant, ({ one, many }) => ({
     fields: [dimMerchant.clusterId],
     references: [dimCluster.clusterId],
   }),
-  dimRules: many(dimRule),
   factTransactions: many(factTransaction),
   userAccount: one(userAccounts, {
     fields: [dimMerchant.userAccountId],
     references: [userAccounts.id],
-  }),
-}));
-
-export const dimRuleRelations = relations(dimRule, ({ one, many }) => ({
-  dimMerchant: one(dimMerchant, {
-    fields: [dimRule.ruleMerchant],
-    references: [dimMerchant.merchantKey],
-  }),
-  factTransactions: many(factTransaction),
-}));
-
-export const factClusterPointRelations = relations(factClusterPoint, ({ one }) => ({
-  dimCluster: one(dimCluster, {
-    fields: [factClusterPoint.clusterId],
-    references: [dimCluster.clusterId],
   }),
 }));
 
@@ -58,9 +39,9 @@ export const factTransactionRelations = relations(factTransaction, ({ one }) => 
     fields: [factTransaction.merchantKey],
     references: [dimMerchant.merchantKey],
   }),
-  dimRule: one(dimRule, {
+  dimMerchantRule: one(dimMerchant, {
     fields: [factTransaction.ruleKey],
-    references: [dimRule.ruleKey],
+    references: [dimMerchant.ruleKey],
   }),
 }));
 

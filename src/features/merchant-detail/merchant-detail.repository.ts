@@ -20,6 +20,7 @@ export type MerchantDetailRawData = {
     branch: string;
     cluster: string;
     region: string;
+    pointRedeem: number;
   } | null;
   currentSummary: MerchantDetailSummary;
   previousSummary: MerchantDetailSummary;
@@ -41,6 +42,7 @@ export type MerchantDetailRawData = {
   ruleStatuses: {
     keyword: string;
     status: string;
+    activityStatus: string;
     startPeriod: string;
     endPeriod: string;
     daysLeft: number;

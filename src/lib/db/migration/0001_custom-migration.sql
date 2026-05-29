@@ -155,7 +155,6 @@ SELECT
   dm.rule_key,
   dm.merchant_key,
   dm.point_redeem,
-  daterange(dm.start_period, (dm.end_period + 1), '[)') AS period,
   dm.start_period,
   dm.end_period,
   dm.merchant_name,
@@ -166,13 +165,7 @@ SELECT
   dcat.category,
   dcl.branch,
   dcl.cluster,
-  dcl.region,
-  CASE
-    WHEN dm.end_period < current_date THEN 'expired'
-    WHEN dm.start_period > current_date THEN 'scheduled'
-    ELSE 'active'
-  END AS status,
-  GREATEST((dm.end_period - current_date), 0)::int AS days_left
+  dcl.region
 FROM public.dim_merchant dm
 JOIN public.dim_category dcat ON dcat.category_id = dm.category_id
 JOIN public.dim_cluster dcl ON dcl.cluster_id = dm.cluster_id;

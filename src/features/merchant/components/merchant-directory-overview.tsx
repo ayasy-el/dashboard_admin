@@ -11,7 +11,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
-  IconCoins,
+  IconClockHour4,
   IconSearch,
   IconStars,
 } from "@tabler/icons-react";
@@ -34,7 +34,9 @@ type MerchantDirectoryOverviewProps = {
     summary: {
       totalKeywords: number;
       totalUniqueMerchants: number;
-      activeKeywords: number;
+      aliveKeywords: number;
+      expiredKeywords: number;
+      scheduledKeywords: number;
       productiveKeywords: number;
       totalTransactions: number;
       totalPoint: number;
@@ -48,6 +50,7 @@ type MerchantDirectoryOverviewProps = {
       region: string;
       pointRedeem: number;
       ruleStatus: string;
+      activityStatus: string;
       startPeriod: string | null;
       endPeriod: string | null;
       redeem: number;
@@ -60,10 +63,16 @@ type MerchantDirectoryOverviewProps = {
 };
 
 const statusTone: Record<string, string> = {
-  active: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  alive: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   scheduled: "border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   expired: "border-transparent bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200",
-  inactive: "border-transparent bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300",
+  no_rule: "border-transparent bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300",
+};
+const activityTone: Record<string, string> = {
+  productive: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  active: "border-transparent bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  "not-active": "border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  expired: "border-transparent bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200",
 };
 type SortKey =
   | "keyword"
@@ -71,6 +80,7 @@ type SortKey =
   | "category"
   | "branch"
   | "ruleStatus"
+  | "activityStatus"
   | "pointRedeem"
   | "redeem"
   | "uniqueRedeemer";
@@ -82,6 +92,7 @@ const sortColumns: { key: SortKey; label: string }[] = [
   { key: "category", label: "CATEGORY" },
   { key: "branch", label: "BRANCH" },
   { key: "ruleStatus", label: "PERIOD" },
+  { key: "activityStatus", label: "ACTIVITY" },
   { key: "pointRedeem", label: "POINT" },
   { key: "redeem", label: "REDEEM" },
   { key: "uniqueRedeemer", label: "UNIQUE REDEEMER" },
@@ -178,6 +189,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
         merchant.cluster,
         merchant.region,
         merchant.ruleStatus,
+        merchant.activityStatus,
         merchant.startPeriod ?? "",
         merchant.endPeriod ?? "",
       ]
@@ -201,6 +213,8 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
           return compareText(left.branch, right.branch, sortState.direction);
         case "ruleStatus":
           return compareText(left.ruleStatus, right.ruleStatus, sortState.direction);
+        case "activityStatus":
+          return compareText(left.activityStatus, right.activityStatus, sortState.direction);
         case "pointRedeem":
           return compareNumber(left.pointRedeem, right.pointRedeem, sortState.direction);
         case "redeem":
@@ -268,7 +282,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-4">
+      <div className="grid gap-4 xl:grid-cols-5">
         <SummaryCard
           title="TOTAL KEYWORDS"
           value={data.summary.totalKeywords}
@@ -282,16 +296,22 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
           icon={<IconChecklist className="size-5" />}
         />
         <SummaryCard
-          title="ACTIVE KEYWORDS"
-          value={data.summary.activeKeywords}
-          description="Keyword dengan rule aktif pada periode terpilih."
+          title="ALIVE KEYWORDS"
+          value={data.summary.aliveKeywords}
+          description="Keyword dengan status alive pada periode terpilih."
           icon={<IconStars className="size-5" />}
         />
         <SummaryCard
-          title="BURNING POIN"
-          value={data.summary.totalPoint}
-          description={`Total poin terbakar dari ${formatNumber(data.summary.totalTransactions)} transaksi sukses.`}
-          icon={<IconCoins className="size-5" />}
+          title="EXPIRED KEYWORDS"
+          value={data.summary.expiredKeywords}
+          description="Keyword dengan periode yang sudah berakhir."
+          icon={<IconClockHour4 className="size-5" />}
+        />
+        <SummaryCard
+          title="SCHEDULED KEYWORDS"
+          value={data.summary.scheduledKeywords}
+          description="Keyword dengan periode yang belum dimulai."
+          icon={<IconChevronRight className="size-5" />}
         />
       </div>
 
@@ -332,7 +352,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
               <TableBody>
                 {paginatedMerchants.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                       Merchant tidak ditemukan.
                     </TableCell>
                   </TableRow>
@@ -359,15 +379,25 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                       <TableCell>{merchant.branch}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge className={cn("hover:bg-inherit", statusTone[merchant.ruleStatus] ?? statusTone.inactive)}>
+                          <Badge className={cn("hover:bg-inherit", statusTone[merchant.ruleStatus] ?? statusTone.no_rule)}>
                             {merchant.ruleStatus}
                           </Badge>
                           <div className="text-xs text-muted-foreground">
                             {merchant.startPeriod && merchant.endPeriod
                               ? `${merchant.startPeriod} - ${merchant.endPeriod}`
-                              : "No active rule"}
+                              : "No alive rule"}
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={cn(
+                            "hover:bg-inherit",
+                            activityTone[merchant.activityStatus] ?? activityTone["not-active"],
+                          )}
+                        >
+                          {merchant.activityStatus}
+                        </Badge>
                       </TableCell>
                       <TableCell>{formatNumber(merchant.pointRedeem)}</TableCell>
                       <TableCell>{formatNumber(merchant.redeem)}</TableCell>

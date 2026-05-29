@@ -19,6 +19,7 @@ from ingestion_service.config import (
 )
 from ingestion_service.db import (
     count_rejected_rows,
+    count_source_file_references,
     create_batch,
     create_rerun_batch,
     delete_rejected_row,
@@ -27,6 +28,7 @@ from ingestion_service.db import (
     get_rejected_row,
     get_rejected_rows,
     list_batches,
+    rollback_batch,
     refresh_materialized_views_background,
     resolve_issue_and_delete_links,
     touch_batch,
@@ -654,6 +656,50 @@ def rerun_batch(batch_id: str, background_tasks: BackgroundTasks):
         "new_batch_id": new_batch["batch_id"],
         "source_status": batch["status"],
         "rerun": "queued",
+    }
+
+
+@app.post("/ingest/{batch_id}/rollback")
+def rollback_ingestion_batch(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    if batch["status"] != "SUCCESS":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Batch status {batch['status']} tidak bisa di-rollback",
+        )
+
+    try:
+        result = rollback_batch(batch_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    source_file = str(result.get("source_file") or "")
+    source_file_deleted = False
+    if source_file and count_source_file_references(source_file) == 0:
+        source_path = Path(source_file)
+        try:
+            if source_path.exists() and source_path.is_file():
+                source_path.unlink()
+                source_file_deleted = True
+        except OSError:
+            source_file_deleted = False
+
+    refresh_materialized_views_background()
+
+    return {
+        "batch_id": batch_id,
+        "dataset": result["dataset"],
+        "status": "ROLLED_BACK",
+        "deleted_rows": result["deleted_rows"],
+        "deleted_links": result["deleted_links"],
+        "deleted_issues": result["deleted_issues"],
+        "source_file": source_file,
+        "source_file_deleted": source_file_deleted,
     }
 
 

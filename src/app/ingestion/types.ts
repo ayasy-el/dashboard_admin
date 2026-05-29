@@ -31,6 +31,17 @@ export type BatchDetail = {
   updated_at: string;
 };
 
+export type RollbackBatchResponse = {
+  batch_id: string;
+  dataset: string;
+  status: "ROLLED_BACK";
+  deleted_rows: Record<string, number>;
+  deleted_links: number;
+  deleted_issues: number;
+  source_file: string;
+  source_file_deleted: boolean;
+};
+
 export type RejectedRow = {
   id: number;
   batch_id: string;

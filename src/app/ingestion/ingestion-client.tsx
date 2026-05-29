@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 import {
   getBatches,
@@ -22,6 +23,7 @@ import {
   getRejected,
   uploadBatch,
   rerunBatch,
+  rollbackBatch,
   ignoreRejected,
   solveRejected,
   downloadSource,
@@ -258,6 +260,48 @@ export default function IngestionClient({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal rerun batch");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRollback = async (batchId: string) => {
+    const target = batches.find((batch) => batch.batch_id === batchId);
+    if (!target || target.status !== "SUCCESS") return;
+
+    const confirmed = window.confirm(
+      `Rollback batch ${batchId}? Data hasil ingestion batch ini akan dihapus, tetapi rerun turunan tetap dipertahankan.`,
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await rollbackBatch(batchId);
+      const deletedSummary = Object.entries(result.deleted_rows)
+        .map(([key, value]) => `${key}=${value}`)
+        .join(", ");
+
+      toast.success(
+        `Batch ${batchId} di-rollback${deletedSummary ? ` (${deletedSummary})` : ""}.`,
+      );
+
+      await loadBatches();
+
+      if (selectedBatchId === batchId) {
+        setSelectedBatchId(null);
+        setBatchDetail(null);
+        setRejected([]);
+        setRejectedCount(0);
+        setRejectedPage(1);
+        setHasMoreRejected(false);
+        setSelectedRejectedIds([]);
+        setExpandedComparisonIds([]);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Gagal rollback batch";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -559,8 +603,8 @@ export default function IngestionClient({
                                 e.stopPropagation();
                                 void onRerun(batch.batch_id);
                               }}
-                            >
-                              <svg
+                              >
+                                <svg
                                 viewBox="0 0 24 24"
                                 className="h-4 w-4"
                                 fill="none"
@@ -572,6 +616,35 @@ export default function IngestionClient({
                               >
                                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                                 <path d="M21 3v6h-6" />
+                                </svg>
+                              </Button>
+                            <Button
+                              size="sm"
+                              className="h-9 w-9 cursor-pointer p-0 disabled:cursor-not-allowed"
+                              variant="destructive"
+                              disabled={busy || batch.status !== "SUCCESS"}
+                              title={`Rollback batch ${batch.batch_id}`}
+                              aria-label={`Rollback batch ${batch.batch_id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void onRollback(batch.batch_id);
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4h8v2" />
+                                <path d="M6 6l1 14h10l1-14" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
                               </svg>
                             </Button>
                           </div>

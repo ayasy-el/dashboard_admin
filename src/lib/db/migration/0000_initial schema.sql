@@ -79,7 +79,8 @@ CREATE TABLE "audit"."ingestion_issues" (
 --> statement-breakpoint
 CREATE TABLE "dim_category" (
 	"category_id" integer PRIMARY KEY NOT NULL,
-	"category" varchar(500) NOT NULL
+	"category" varchar(500) NOT NULL,
+	"source_batch_id" uuid NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "dim_date" (
@@ -97,7 +98,8 @@ CREATE TABLE "dim_cluster" (
 	"cluster_id" bigint PRIMARY KEY NOT NULL,
 	"cluster" varchar(500) NOT NULL,
 	"branch" varchar(500) NOT NULL,
-	"region" varchar(500) NOT NULL
+	"region" varchar(500) NOT NULL,
+	"source_batch_id" uuid NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "dim_merchant" (
@@ -109,6 +111,7 @@ CREATE TABLE "dim_merchant" (
 	"point_redeem" integer NOT NULL,
 	"start_period" date NOT NULL,
 	"end_period" date NOT NULL,
+	"source_batch_id" uuid NOT NULL,
 	"cluster_id" bigint NOT NULL,
 	"category_id" integer NOT NULL,
 	CONSTRAINT "dim_merchant_keyword_code_key" UNIQUE("keyword_code"),
@@ -120,7 +123,8 @@ CREATE TABLE "fact_cluster_balance" (
 	"month_year" date NOT NULL,
 	"cluster_id" bigint NOT NULL,
 	"total_point" bigint NOT NULL,
-	"point_owner" bigint NOT NULL
+	"point_owner" bigint NOT NULL,
+	"source_batch_id" uuid NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "fact_transaction" (
@@ -133,7 +137,8 @@ CREATE TABLE "fact_transaction" (
 	"qty" integer DEFAULT 1 NOT NULL,
 	"point_redeem" integer NOT NULL,
 	"msisdn" varchar(20) NOT NULL,
-	"created_at" timestamp NOT NULL
+	"created_at" timestamp NOT NULL,
+	"source_batch_id" uuid NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "merchant_canonical_map" (
@@ -319,11 +324,16 @@ CREATE INDEX "idx_ingestion_issues_conflict_scope" ON "audit"."ingestion_issues"
 CREATE INDEX "dim_merchant_idx_dim_merchant_category_id" ON "dim_merchant" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "dim_merchant_idx_dim_merchant_cluster_id" ON "dim_merchant" USING btree ("cluster_id");--> statement-breakpoint
 CREATE INDEX "dim_merchant_idx_rule_key" ON "dim_merchant" USING btree ("rule_key");--> statement-breakpoint
+CREATE INDEX "dim_category_source_batch_id_idx" ON "dim_category" USING btree ("source_batch_id");--> statement-breakpoint
+CREATE INDEX "dim_cluster_source_batch_id_idx" ON "dim_cluster" USING btree ("source_batch_id");--> statement-breakpoint
+CREATE INDEX "dim_merchant_source_batch_id_idx" ON "dim_merchant" USING btree ("source_batch_id");--> statement-breakpoint
 CREATE INDEX "fact_cluster_balance_idx_fcp_month_cluster" ON "fact_cluster_balance" USING btree ("month_year","cluster_id");--> statement-breakpoint
+CREATE INDEX "fact_cluster_balance_source_batch_id_idx" ON "fact_cluster_balance" USING btree ("source_batch_id");--> statement-breakpoint
 CREATE INDEX "fact_transaction_idx_ft_merchant_status_time" ON "fact_transaction" USING btree ("merchant_key","status","transaction_at");--> statement-breakpoint
 CREATE INDEX "fact_transaction_date_key_idx" ON "fact_transaction" USING btree ("date_key");--> statement-breakpoint
 CREATE INDEX "fact_transaction_index_6" ON "fact_transaction" USING btree ("msisdn");--> statement-breakpoint
 CREATE INDEX "fact_transaction_rule" ON "fact_transaction" USING btree ("rule_key");--> statement-breakpoint
+CREATE INDEX "fact_transaction_source_batch_id_idx" ON "fact_transaction" USING btree ("source_batch_id");--> statement-breakpoint
 CREATE INDEX "idx_merchant_feedback_merchant" ON "merchant_feedback" USING btree ("merchant_key");--> statement-breakpoint
 CREATE INDEX "idx_merchant_feedback_status" ON "merchant_feedback" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "idx_merchant_feedback_user" ON "merchant_feedback" USING btree ("user_id");--> statement-breakpoint

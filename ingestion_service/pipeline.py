@@ -508,16 +508,17 @@ def load_data(batch_id: str) -> int:
                     from stg.list_kota_clean
                     where batch_id = %s::uuid
                 )
-                insert into public.dim_cluster (cluster_id, cluster, branch, region)
-                select cluster_id, cluster, branch, region
+                insert into public.dim_cluster (cluster_id, cluster, branch, region, source_batch_id)
+                select cluster_id, cluster, branch, region, %s::uuid
                 from dedup
                 where rn = 1
                 on conflict (cluster_id) do update
                 set cluster = excluded.cluster,
                     branch = excluded.branch,
-                    region = excluded.region
+                    region = excluded.region,
+                    source_batch_id = excluded.source_batch_id
                 """,
-                (batch_id,),
+                (batch_id, batch_id),
             )
             loaded = cur.rowcount
 
@@ -534,14 +535,15 @@ def load_data(batch_id: str) -> int:
                     from stg.master_clean
                     where batch_id = %s::uuid
                 )
-                insert into public.dim_category (category_id, category)
-                select category_id, category
+                insert into public.dim_category (category_id, category, source_batch_id)
+                select category_id, category, %s::uuid
                 from dedup
                 where rn = 1
                 on conflict (category_id) do update
-                set category = excluded.category
+                set category = excluded.category,
+                    source_batch_id = excluded.source_batch_id
                 """,
-                (batch_id,),
+                (batch_id, batch_id),
             )
 
             cur.execute(
@@ -612,7 +614,7 @@ def load_data(batch_id: str) -> int:
                   (
                     merchant_key, keyword_code, merchant_name, uniq_merchant,
                     rule_key, point_redeem, start_period, end_period,
-                    cluster_id, category_id
+                    cluster_id, category_id, source_batch_id
                   )
                 select
                     candidates.merchant_key,
@@ -624,7 +626,8 @@ def load_data(batch_id: str) -> int:
                     candidates.start_period,
                     candidates.end_period,
                     candidates.resolved_cluster_id,
-                    candidates.category_id
+                    candidates.category_id,
+                    %s::uuid
                 from candidates
                 where candidates.cluster_match_count = 1
                 on conflict (keyword_code) do update
@@ -636,9 +639,10 @@ def load_data(batch_id: str) -> int:
                     start_period = excluded.start_period,
                     end_period = excluded.end_period,
                     cluster_id = excluded.cluster_id,
-                    category_id = excluded.category_id
+                    category_id = excluded.category_id,
+                    source_batch_id = excluded.source_batch_id
                 """,
-                (batch_id,),
+                (batch_id, batch_id),
             )
             loaded = cur.rowcount
 
@@ -698,7 +702,7 @@ def load_data(batch_id: str) -> int:
             cur.execute(
                 """
                 insert into public.fact_transaction
-                  (transaction_key, transaction_at, date_key, rule_key, merchant_key, status, qty, point_redeem, msisdn, created_at)
+                  (transaction_key, transaction_at, date_key, rule_key, merchant_key, status, qty, point_redeem, msisdn, created_at, source_batch_id)
                 select
                   c.transaction_key,
                   c.transaction_at,
@@ -709,7 +713,8 @@ def load_data(batch_id: str) -> int:
                   c.qty,
                   m.point_redeem,
                   c.msisdn,
-                  now()
+                  now(),
+                  %s::uuid
                 from stg.transactions_clean c
                 join public.dim_merchant m on m.keyword_code = c.keyword
                 where c.batch_id = %s::uuid
@@ -722,9 +727,10 @@ def load_data(batch_id: str) -> int:
                     qty = excluded.qty,
                     point_redeem = excluded.point_redeem,
                     msisdn = excluded.msisdn,
-                    created_at = excluded.created_at
+                    created_at = excluded.created_at,
+                    source_batch_id = excluded.source_batch_id
                 """,
-                (batch_id,),
+                (batch_id, batch_id),
             )
             loaded = cur.rowcount
 
@@ -777,7 +783,7 @@ def load_data(batch_id: str) -> int:
             cur.execute(
                 """
                 insert into public.fact_cluster_balance
-                  (point_key, month_year, cluster_id, total_point, point_owner)
+                  (point_key, month_year, cluster_id, total_point, point_owner, source_batch_id)
                 with candidates as (
                     select
                         c.id as clean_id,
@@ -792,14 +798,15 @@ def load_data(batch_id: str) -> int:
                       on upper(trim(dcl.cluster)) = upper(trim(c.cluster))
                     where c.batch_id = %s::uuid
                 )
-                select point_key, month_year, cluster_id, total_point, point_owner
+                select point_key, month_year, cluster_id, total_point, point_owner, %s::uuid
                 from candidates
                 where cluster_match_count = 1
                 on conflict (point_key) do update
                 set total_point = excluded.total_point,
-                    point_owner = excluded.point_owner
+                    point_owner = excluded.point_owner,
+                    source_batch_id = excluded.source_batch_id
                 """,
-                (batch_id,),
+                (batch_id, batch_id),
             )
             loaded = cur.rowcount
 

@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { dimCategory, dimCluster, factClusterPoint, vwOverviewTransaction } from "@/lib/db/schema";
+import { dimCategory, dimCluster, factClusterBalance, vwOverviewTransaction } from "@/lib/db/schema";
 import type {
   MonthRange,
   OverviewFilterOptions,
@@ -265,7 +265,8 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         vr.keyword_code as keyword
       from vw_rule_merchant_dim vr
       left join tx on tx.merchant_key = vr.merchant_key
-      where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+      where vr.start_period < ${endDate}::date
+        and vr.end_period >= ${startDate}::date
         and coalesce(tx.trx_count, 0) = 0
         ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
         ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
@@ -296,7 +297,8 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
           min(vr.merchant_name) as merchant_name,
           min(vr.keyword_code) as keyword_code
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+        where vr.start_period < ${endDate}::date
+          and vr.end_period >= ${startDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
         group by vr.merchant_key
@@ -322,8 +324,8 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
         vr.merchant_name as merchant,
         vr.keyword_code as keyword
       from vw_rule_merchant_dim vr
-      where upper(vr.period) > ${startDate}::date
-        and upper(vr.period) <= ${endDate}::date
+      where vr.end_period >= ${startDate}::date
+        and vr.end_period < ${endDate}::date
         ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
         ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       order by vr.end_period, vr.branch, vr.merchant_name
@@ -331,25 +333,25 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
 
     const [clusterPointCurrent] = await db
       .select({
-        total: sql<number>`coalesce(sum(${factClusterPoint.totalPoint}), 0)`,
+        total: sql<number>`coalesce(sum(${factClusterBalance.totalPoint}), 0)`,
       })
-      .from(factClusterPoint)
+      .from(factClusterBalance)
       .where(
         and(
-          eq(factClusterPoint.monthYear, startDate),
-          hasBranchFilter ? inArray(factClusterPoint.clusterId, clusterScopeSubquery) : undefined,
+          eq(factClusterBalance.monthYear, startDate),
+          hasBranchFilter ? inArray(factClusterBalance.clusterId, clusterScopeSubquery) : undefined,
         ),
       );
 
     const [clusterPointPrevious] = await db
       .select({
-        total: sql<number>`coalesce(sum(${factClusterPoint.totalPoint}), 0)`,
+        total: sql<number>`coalesce(sum(${factClusterBalance.totalPoint}), 0)`,
       })
-      .from(factClusterPoint)
+      .from(factClusterBalance)
       .where(
         and(
-          eq(factClusterPoint.monthYear, previousStartDate),
-          hasBranchFilter ? inArray(factClusterPoint.clusterId, clusterScopeSubquery) : undefined,
+          eq(factClusterBalance.monthYear, previousStartDate),
+          hasBranchFilter ? inArray(factClusterBalance.clusterId, clusterScopeSubquery) : undefined,
         ),
       );
 

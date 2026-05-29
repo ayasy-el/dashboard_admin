@@ -1,6 +1,6 @@
 "use server";
 
-import { BatchDetail, BatchListItem, Dataset, RejectedListResponse } from "./types";
+import { BatchDetail, BatchListItem, Dataset, RejectedListResponse, RollbackBatchResponse } from "./types";
 import { requireAdminUser } from "@/lib/auth";
 
 const API_BASE =
@@ -53,6 +53,13 @@ export async function uploadBatch(dataset: Dataset, formData: FormData): Promise
 export async function rerunBatch(batchId: string): Promise<{ new_batch_id?: string }> {
   await requireAdminUser("/ingestion");
   return requestJson<{ new_batch_id?: string }>(`/ingest/${batchId}/rerun`, {
+    method: "POST",
+  });
+}
+
+export async function rollbackBatch(batchId: string): Promise<RollbackBatchResponse> {
+  await requireAdminUser("/ingestion");
+  return requestJson<RollbackBatchResponse>(`/ingest/${batchId}/rollback`, {
     method: "POST",
   });
 }

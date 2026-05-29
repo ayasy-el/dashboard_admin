@@ -13,6 +13,7 @@ export type MerchantDirectoryItem = {
   region: string;
   pointRedeem: number;
   ruleStatus: string;
+  activityStatus: string;
   startPeriod: string | null;
   endPeriod: string | null;
   redeem: number;
@@ -25,7 +26,9 @@ export type MerchantDirectoryRawData = {
   summary: {
     totalKeywords: number;
     totalUniqueMerchants: number;
-    activeKeywords: number;
+    aliveKeywords: number;
+    expiredKeywords: number;
+    scheduledKeywords: number;
     productiveKeywords: number;
     totalTransactions: number;
     totalPoint: number;

@@ -9,6 +9,13 @@ import { toSqlDate, toSqlTimestamp } from "@/features/shared/month";
 import { db } from "@/lib/db";
 
 const toInt = (value: unknown) => Number(value ?? 0);
+const PRODUCTIVE_THRESHOLD = 5;
+const resolveActivityStatus = (ruleStatus: string, redeem: number) => {
+  if (ruleStatus === "expired") return "expired";
+  if (redeem >= PRODUCTIVE_THRESHOLD) return "productive";
+  if (redeem >= 1) return "active";
+  return "not-active";
+};
 
 export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository {
   async getMerchantDetailRawData(
@@ -32,7 +39,8 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
         dcat.category as category,
         dcl.branch as branch,
         dcl.cluster as cluster,
-        dcl.region as region
+        dcl.region as region,
+        dm.point_redeem::int as point_redeem
       from dim_merchant dm
       join dim_category dcat on dcat.category_id = dm.category_id
       join dim_cluster dcl on dcl.cluster_id = dm.cluster_id
@@ -127,16 +135,15 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
         select distinct on (vr.keyword_code)
           vr.keyword_code as keyword,
           case
-            when vr.end_period < ${today}::date then 'expired'
-            when vr.start_period > ${today}::date then 'scheduled'
-            else 'active'
+            when vr.end_period < ${monthStartDate}::date then 'expired'
+            when vr.start_period >= ${monthEndDate}::date then 'scheduled'
+            else 'alive'
           end as status,
           vr.start_period::text as start_period,
           vr.end_period::text as end_period,
-          greatest((vr.end_period - ${today}::date), 0)::int as days_left
+          greatest((vr.end_period - ${monthEndDate}::date), 0)::int as days_left
         from vw_rule_merchant_dim vr
         where vr.uniq_merchant = ${uniqMerchant}
-          and vr.period && daterange(${monthStartDate}::date, ${monthEndDate}::date, '[)')
         order by vr.keyword_code, vr.end_period desc, vr.start_period desc
       `),
       db.execute(sql`
@@ -157,17 +164,21 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
 
     const currentRow = currentSummaryRows.rows[0];
     const previousRow = previousSummaryRows.rows[0];
+    const keywordRedeemMap = new Map(
+      keywordCompositionRows.rows.map((row) => [String(row.keyword ?? ""), toInt(row.redeem)]),
+    );
 
     return {
-      identity: {
-        keyword: String(identityRow.keyword ?? ""),
-        merchant: String(identityRow.merchant ?? ""),
-        uniqMerchant,
-        category: String(identityRow.category ?? ""),
-        branch: String(identityRow.branch ?? ""),
-        cluster: String(identityRow.cluster ?? ""),
-        region: String(identityRow.region ?? ""),
-      },
+        identity: {
+          keyword: String(identityRow.keyword ?? ""),
+          merchant: String(identityRow.merchant ?? ""),
+          uniqMerchant,
+          category: String(identityRow.category ?? ""),
+          branch: String(identityRow.branch ?? ""),
+          cluster: String(identityRow.cluster ?? ""),
+          region: String(identityRow.region ?? ""),
+          pointRedeem: toInt(identityRow.point_redeem),
+        },
       currentSummary: {
         totalTransactions: toInt(currentRow?.total_transactions),
         uniqueRedeemer: toInt(currentRow?.unique_redeemer),
@@ -196,6 +207,10 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
       ruleStatuses: ruleStatusesRows.rows.map((row) => ({
         keyword: String(row.keyword ?? ""),
         status: String(row.status ?? ""),
+        activityStatus: resolveActivityStatus(
+          String(row.status ?? ""),
+          keywordRedeemMap.get(String(row.keyword ?? "")) ?? 0,
+        ),
         startPeriod: String(row.start_period ?? ""),
         endPeriod: String(row.end_period ?? ""),
         daysLeft: toInt(row.days_left),

@@ -21,6 +21,20 @@ MATERIALIZED_VIEWS = (
     "public.vw_rule_merchant_dim",
 )
 
+RAW_TABLES = {
+    "list_kota": "list_kota_raw",
+    "master": "master_raw",
+    "transactions": "transactions_raw",
+    "total_point": "total_point_raw",
+}
+
+CLEAN_TABLES = {
+    "list_kota": "list_kota_clean",
+    "master": "master_clean",
+    "transactions": "transactions_clean",
+    "total_point": "total_point_clean",
+}
+
 
 @contextmanager
 def get_conn() -> Iterator[psycopg.Connection]:
@@ -357,6 +371,212 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
         )
         conn.commit()
         return affected_batches
+
+
+def count_source_file_references(source_file: str) -> int:
+    if not source_file:
+        return 0
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            select count(*) as total
+            from audit.batches
+            where source_file = %s
+            """,
+            (source_file,),
+        )
+        row = cur.fetchone()
+        return int(row["total"] or 0) if row else 0
+
+
+def rollback_batch(batch_id: str) -> dict[str, Any]:
+    internal_batch_id = resolve_batch_uuid(batch_id)
+    if not internal_batch_id:
+        raise ValueError(f"Batch not found: {batch_id}")
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            select
+                batch_public_id as batch_id,
+                batch_id::text as internal_batch_id,
+                dataset,
+                status,
+                source_file
+            from audit.batches
+            where batch_id = %s::uuid
+            for update
+            """,
+            (internal_batch_id,),
+        )
+        batch = cur.fetchone()
+        if not batch:
+            raise ValueError(f"Batch not found: {batch_id}")
+
+        if batch["status"] != "SUCCESS":
+            raise RuntimeError(f"Batch status {batch['status']} tidak bisa di-rollback")
+
+        dataset = str(batch["dataset"])
+        source_file = str(batch["source_file"] or "")
+        deleted_rows: dict[str, int] = {}
+
+        raw_table = RAW_TABLES.get(dataset)
+        clean_table = CLEAN_TABLES.get(dataset)
+        if raw_table and clean_table:
+            cur.execute(
+                f"delete from stg.{raw_table} where batch_id = %s::uuid",
+                (internal_batch_id,),
+            )
+            deleted_rows[raw_table] = cur.rowcount
+            cur.execute(
+                f"delete from stg.{clean_table} where batch_id = %s::uuid",
+                (internal_batch_id,),
+            )
+            deleted_rows[clean_table] = cur.rowcount
+
+        if dataset == "transactions":
+            cur.execute(
+                """
+                delete from public.fact_transaction
+                where source_batch_id = %s::uuid
+                """,
+                (internal_batch_id,),
+            )
+            deleted_rows["fact_transaction"] = cur.rowcount
+        elif dataset == "total_point":
+            cur.execute(
+                """
+                delete from public.fact_cluster_balance
+                where source_batch_id = %s::uuid
+                """,
+                (internal_batch_id,),
+            )
+            deleted_rows["fact_cluster_balance"] = cur.rowcount
+        elif dataset == "master":
+            cur.execute(
+                """
+                select count(*) as total
+                from public.fact_transaction ft
+                join public.dim_merchant dm on dm.merchant_key = ft.merchant_key
+                where dm.source_batch_id = %s::uuid
+                """,
+                (internal_batch_id,),
+            )
+            master_transaction_refs = int((cur.fetchone() or {}).get("total") or 0)
+            cur.execute(
+                """
+                select count(*) as total
+                from public.program_banner_assets pba
+                join public.dim_merchant dm
+                  on dm.rule_key = pba.rule_key
+                  or dm.keyword_code = pba.keyword_code
+                where dm.source_batch_id = %s::uuid
+                """,
+                (internal_batch_id,),
+            )
+            master_banner_refs = int((cur.fetchone() or {}).get("total") or 0)
+            if master_transaction_refs > 0 or master_banner_refs > 0:
+                reasons = []
+                if master_transaction_refs > 0:
+                    reasons.append(
+                        f"{master_transaction_refs} transaksi"
+                    )
+                if master_banner_refs > 0:
+                    reasons.append(
+                        f"{master_banner_refs} banner asset"
+                    )
+                raise RuntimeError(
+                    "Batch master tidak bisa di-rollback karena masih ada "
+                    f"{' dan '.join(reasons)} yang memakai merchant batch ini"
+                )
+
+            cur.execute(
+                """
+                delete from public.dim_merchant dm
+                where dm.source_batch_id = %s::uuid
+                  and not exists (
+                    select 1
+                    from public.program_banner_assets pba
+                    where pba.rule_key = dm.rule_key
+                       or pba.keyword_code = dm.keyword_code
+                  )
+                """,
+                (internal_batch_id,),
+            )
+            deleted_rows["dim_merchant"] = cur.rowcount
+
+            cur.execute(
+                """
+                delete from public.dim_category dc
+                where dc.source_batch_id = %s::uuid
+                  and not exists (
+                    select 1
+                    from public.dim_merchant dm
+                    where dm.category_id = dc.category_id
+                  )
+                """,
+                (internal_batch_id,),
+            )
+            deleted_rows["dim_category"] = cur.rowcount
+        elif dataset == "list_kota":
+            cur.execute(
+                """
+                delete from public.dim_cluster dcl
+                where dcl.source_batch_id = %s::uuid
+                  and not exists (
+                    select 1
+                    from public.dim_merchant dm
+                    where dm.cluster_id = dcl.cluster_id
+                  )
+                """,
+                (internal_batch_id,),
+            )
+            deleted_rows["dim_cluster"] = cur.rowcount
+        else:
+            raise RuntimeError(f"Unsupported dataset: {dataset}")
+
+        cur.execute(
+            """
+            with deleted_links as (
+              delete from audit.batch_issue_links
+              where batch_id = %s::uuid
+              returning issue_id
+            ),
+            orphan_issues as (
+              delete from audit.ingestion_issues ii
+              where ii.issue_id in (select distinct issue_id from deleted_links)
+                and not exists (
+                  select 1
+                  from audit.batch_issue_links bil
+                  where bil.issue_id = ii.issue_id
+                    and bil.state = 'ACTIVE'
+                )
+              returning issue_id
+            )
+            select
+              coalesce((select count(*) from deleted_links), 0) as deleted_links,
+              coalesce((select count(*) from orphan_issues), 0) as deleted_issues
+            """,
+            (internal_batch_id,),
+        )
+        cleanup = cur.fetchone() or {"deleted_links": 0, "deleted_issues": 0}
+
+        cur.execute("delete from audit.batches where batch_id = %s::uuid", (internal_batch_id,))
+        if cur.rowcount == 0:
+            raise RuntimeError(f"Failed to delete batch: {batch_id}")
+
+        conn.commit()
+
+    return {
+        "batch_id": batch["batch_id"],
+        "internal_batch_id": batch["internal_batch_id"],
+        "dataset": dataset,
+        "source_file": source_file,
+        "deleted_rows": deleted_rows,
+        "deleted_links": int(cleanup["deleted_links"] or 0),
+        "deleted_issues": int(cleanup["deleted_issues"] or 0),
+    }
 
 
 def refresh_materialized_views() -> None:

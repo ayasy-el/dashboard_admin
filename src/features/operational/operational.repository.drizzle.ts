@@ -88,7 +88,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       with active_merchants as (
         select distinct vr.merchant_key as merchant_key
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+        where vr.start_period < ${endDate}::date
+          and vr.end_period >= ${startDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       ),
@@ -104,7 +105,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       expired_merchants as (
         select distinct vr.merchant_key as merchant_key
         from vw_rule_merchant_dim vr
-        where upper(vr.period)::date <@ daterange((${startDate}::date + 1), (${endDate}::date + 1), '[)')
+        where vr.end_period >= ${startDate}::date
+          and vr.end_period < ${endDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       )
@@ -145,13 +147,14 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       with active_merchants as (
         select
           vr.merchant_key as merchant_key,
-          min(lower(vr.period))::date as start_period,
-          max((upper(vr.period) - interval '1 day')::date)::date as end_period,
+          min(vr.start_period)::date as start_period,
+          max(vr.end_period)::date as end_period,
           max(vr.branch) as branch,
           max(vr.merchant_name) as merchant,
           max(vr.keyword_code) as keyword
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+        where vr.start_period < ${endDate}::date
+          and vr.end_period >= ${startDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
         group by vr.merchant_key
@@ -185,7 +188,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         vr.start_period as start_period,
         vr.end_period as end_period
       from vw_rule_merchant_dim vr
-      where upper(vr.period)::date <@ daterange((${startDate}::date + 1), (${endDate}::date + 1), '[)')
+      where vr.end_period >= ${startDate}::date
+        and vr.end_period < ${endDate}::date
         ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
         ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       order by vr.end_period desc
@@ -198,7 +202,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
           vr.category as category,
           vr.uniq_merchant as uniq_merchant
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+        where vr.start_period < ${endDate}::date
+          and vr.end_period >= ${startDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       ),
@@ -255,7 +260,8 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
           vr.cluster_id as cluster_id,
           vr.uniq_merchant as uniq_merchant
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${startDate}::date, ${endDate}::date, '[)')
+        where vr.start_period < ${endDate}::date
+          and vr.end_period >= ${startDate}::date
           ${hasCategoryFilter ? sql`and vr.category in (${inClause(selectedCategories)})` : sql``}
           ${hasBranchFilter ? sql`and vr.branch in (${inClause(selectedBranches)})` : sql``}
       ),

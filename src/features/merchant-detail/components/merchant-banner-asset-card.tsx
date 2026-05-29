@@ -207,7 +207,7 @@ export function MerchantBannerAssetCard({
               <div className="space-y-1">
                 <CardTitle className="text-xl">Program Banner Image</CardTitle>
                 <CardDescription>
-                  Banner visual untuk active program card merchant ini.
+                  Banner visual untuk current program card merchant ini.
                 </CardDescription>
               </div>
             </div>
@@ -229,7 +229,7 @@ export function MerchantBannerAssetCard({
                 variant={asset.isActive ? "default" : "outline"}
                 className="rounded-full px-3 py-1"
               >
-                {asset.isActive ? "Active" : "Inactive"}
+                {asset.isActive ? "Enabled" : "Disabled"}
               </Badge>
             ) : (
               <Badge variant="outline" className="rounded-full px-3 py-1">

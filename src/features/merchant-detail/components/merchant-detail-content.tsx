@@ -32,7 +32,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MerchantBannerAssetCard } from "@/features/merchant-detail/components/merchant-banner-asset-card";
 import type { MonthOption } from "@/features/shared/get-month-options";
 import { QueryParamSelect } from "@/features/shared/components/query-param-select";
@@ -60,6 +59,7 @@ type MerchantDetailContentProps = {
       branch: string;
       cluster: string;
       region: string;
+      pointRedeem: number;
     };
     cards: {
       totalTransactions: { current: number; previous: number };
@@ -84,6 +84,7 @@ type MerchantDetailContentProps = {
     ruleStatuses: {
       keyword: string;
       status: string;
+      activityStatus: string;
       startPeriod: string;
       endPeriod: string;
       daysLeft: number;
@@ -195,10 +196,10 @@ function MetricCard({
 
 function StatusBadge({ status }: { status: string }) {
   const normalized = status.toLowerCase();
-  if (normalized === "active") {
+  if (normalized === "alive") {
     return (
       <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/15">
-        Active
+        Alive
       </Badge>
     );
   }
@@ -226,6 +227,36 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Badge className="border-transparent bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
       Expired
+    </Badge>
+  );
+}
+
+function ActivityStatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  if (normalized === "productive") {
+    return (
+      <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/15">
+        Productive
+      </Badge>
+    );
+  }
+  if (normalized === "active") {
+    return (
+      <Badge className="border-transparent bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/15">
+        Active
+      </Badge>
+    );
+  }
+  if (normalized === "expired") {
+    return (
+      <Badge className="border-transparent bg-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
+        Expired
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15">
+      Not Active
     </Badge>
   );
 }
@@ -369,23 +400,30 @@ export function MerchantDetailContent({
                 </div>
               </div>
               <div className="hidden h-8 w-px bg-border sm:block" />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-border bg-background px-3 text-base font-bold text-foreground shadow-sm transition-colors hover:bg-accent"
-                  >
-                    {primaryRule ? formatNumber(primaryRule.daysLeft) : "-"}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Day left</p>
-                </TooltipContent>
-              </Tooltip>
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-muted-foreground">
+                  Point
+                </div>
+                <div className="text-base font-semibold text-foreground">
+                  {formatNumber(data.identity.pointRedeem)}
+                </div>
+              </div>
+              <div className="hidden h-8 w-px bg-border sm:block" />
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-muted-foreground">
+                  Day Left
+                </div>
+                <div className="text-base font-semibold text-foreground">
+                  {primaryRule ? formatNumber(primaryRule.daysLeft) : "-"}
+                </div>
+              </div>
             </div>
           </div>
           <div className="flex w-full flex-col items-stretch gap-3 lg:w-auto lg:items-end">
-            {primaryRule ? <StatusBadge status={primaryRule.status} /> : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {primaryRule ? <StatusBadge status={primaryRule.status} /> : null}
+              {primaryRule ? <ActivityStatusBadge status={primaryRule.activityStatus} /> : null}
+            </div>
             <QueryParamSelect
               value={data.month}
               options={monthOptions}

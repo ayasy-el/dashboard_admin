@@ -10,6 +10,12 @@ import { db } from "@/lib/db";
 
 const PRODUCTIVE_THRESHOLD = 5;
 const toInt = (value: unknown) => Number(value ?? 0);
+const resolveActivityStatus = (ruleStatus: string, redeem: number) => {
+  if (ruleStatus === "expired") return "expired";
+  if (redeem >= PRODUCTIVE_THRESHOLD) return "productive";
+  if (redeem >= 1) return "active";
+  return "not-active";
+};
 
 export class MerchantDirectoryRepositoryDrizzle implements MerchantDirectoryRepository {
   async getMerchantDirectoryRawData({
@@ -40,14 +46,13 @@ export class MerchantDirectoryRepositoryDrizzle implements MerchantDirectoryRepo
           vr.keyword_code as keyword,
           vr.point_redeem::int as point_redeem,
           case
-            when vr.end_period < current_date then 'expired'
-            when vr.start_period > current_date then 'scheduled'
-            else 'active'
+            when vr.end_period < ${monthStartDate}::date then 'expired'
+            when vr.start_period >= ${monthEndDate}::date then 'scheduled'
+            else 'alive'
           end as rule_status,
           vr.start_period::text as start_period,
           vr.end_period::text as end_period
         from vw_rule_merchant_dim vr
-        where vr.period && daterange(${monthStartDate}::date, ${monthEndDate}::date, '[)')
         order by vr.keyword_code, vr.end_period desc, vr.start_period desc
       )
       select
@@ -59,7 +64,7 @@ export class MerchantDirectoryRepositoryDrizzle implements MerchantDirectoryRepo
         dcl.cluster as cluster,
         dcl.region as region,
         coalesce(cr.point_redeem, 0)::int as point_redeem,
-        coalesce(cr.rule_status, 'inactive') as rule_status,
+        coalesce(cr.rule_status, 'no_rule') as rule_status,
         cr.start_period as start_period,
         cr.end_period as end_period,
         coalesce(tx.redeem, 0)::int as redeem,
@@ -83,7 +88,11 @@ export class MerchantDirectoryRepositoryDrizzle implements MerchantDirectoryRepo
       cluster: String(row.cluster ?? ""),
       region: String(row.region ?? ""),
       pointRedeem: toInt(row.point_redeem),
-      ruleStatus: String(row.rule_status ?? "inactive"),
+      ruleStatus: String(row.rule_status ?? "no_rule"),
+      activityStatus: resolveActivityStatus(
+        String(row.rule_status ?? "no_rule"),
+        toInt(row.redeem),
+      ),
       startPeriod: row.start_period ? String(row.start_period) : null,
       endPeriod: row.end_period ? String(row.end_period) : null,
       redeem: toInt(row.redeem),
@@ -94,11 +103,13 @@ export class MerchantDirectoryRepositoryDrizzle implements MerchantDirectoryRepo
 
     const uniqueMerchants = new Set(merchants.map((row) => row.uniqMerchant).filter(Boolean));
 
-    return {
+      return {
       summary: {
         totalKeywords: merchants.length,
         totalUniqueMerchants: uniqueMerchants.size,
-        activeKeywords: merchants.filter((row) => row.ruleStatus === "active").length,
+        aliveKeywords: merchants.filter((row) => row.ruleStatus === "alive").length,
+        expiredKeywords: merchants.filter((row) => row.ruleStatus === "expired").length,
+        scheduledKeywords: merchants.filter((row) => row.ruleStatus === "scheduled").length,
         productiveKeywords: merchants.filter((row) => row.redeem >= PRODUCTIVE_THRESHOLD).length,
         totalTransactions: merchants.reduce((total, row) => total + row.redeem, 0),
         totalPoint: merchants.reduce((total, row) => total + row.totalPoint, 0),
