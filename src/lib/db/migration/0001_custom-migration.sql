@@ -40,44 +40,9 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- ─────────────────────────────────────────────
--- 4. GiST INDEX pada dim_rule.period
---    (Drizzle hanya support btree di index builder;
---     GiST harus pakai SQL langsung)
--- ─────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS dim_rule_idx_dim_rule_period
-  ON public.dim_rule USING gist (period);
-
--- ─────────────────────────────────────────────
--- 5. EXCLUDE CONSTRAINT — dim_rule
---    Mencegah period overlap untuk merchant yang sama.
---    Membutuhkan extension btree_gist (sudah di-create di atas).
--- ─────────────────────────────────────────────
-DO $$ BEGIN
-  ALTER TABLE public.dim_rule
-    ADD CONSTRAINT ex_dim_rule_no_overlap
-      EXCLUDE USING gist (rule_merchant WITH =, period WITH &&);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- ─────────────────────────────────────────────
--- 6. CHECK CONSTRAINTS
+-- 4. CHECK CONSTRAINTS
 -- ─────────────────────────────────────────────
 
--- dim_rule: period tidak boleh empty range
-DO $$ BEGIN
-  ALTER TABLE public.dim_rule
-    ADD CONSTRAINT ck_dim_rule_period_valid CHECK (NOT isempty(period));
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- dim_rule: point_redeem >= 0
-DO $$ BEGIN
-  ALTER TABLE public.dim_rule
-    ADD CONSTRAINT ck_dim_rule_point_positive CHECK (point_redeem >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- fact_transaction: msisdn hanya digit 8–20 karakter
 DO $$ BEGIN
   ALTER TABLE public.fact_transaction
     ADD CONSTRAINT ck_fact_transaction_msisdn_digits
@@ -85,21 +50,18 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- fact_transaction: point_redeem >= 0
 DO $$ BEGIN
   ALTER TABLE public.fact_transaction
     ADD CONSTRAINT ck_fact_transaction_point_positive CHECK (point_redeem >= 0);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- fact_transaction: qty >= 1
 DO $$ BEGIN
   ALTER TABLE public.fact_transaction
     ADD CONSTRAINT ck_fact_transaction_qty_valid CHECK (qty >= 1);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- users: role hanya 'merchant' atau 'admin'
 DO $$ BEGIN
   ALTER TABLE public.users
     ADD CONSTRAINT users_role_check
@@ -107,7 +69,6 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- merchant_feedback: status
 DO $$ BEGIN
   ALTER TABLE public.merchant_feedback
     ADD CONSTRAINT merchant_feedback_status_check
@@ -115,7 +76,6 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- merchant_feedback: type
 DO $$ BEGIN
   ALTER TABLE public.merchant_feedback
     ADD CONSTRAINT merchant_feedback_type_check
@@ -124,11 +84,17 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- ─────────────────────────────────────────────
--- 7. VIEWS
+-- 5. MATERIALIZED VIEWS
 -- ─────────────────────────────────────────────
 
--- vw_overview_transaction
-CREATE OR REPLACE VIEW public.vw_overview_transaction AS
+DROP MATERIALIZED VIEW IF EXISTS public.vw_overview_transaction CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS public.vw_merchant_tx_monthly_agg CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS public.vw_rule_merchant_dim CASCADE;
+DROP VIEW IF EXISTS public.vw_overview_transaction CASCADE;
+DROP VIEW IF EXISTS public.vw_merchant_tx_monthly_agg CASCADE;
+DROP VIEW IF EXISTS public.vw_rule_merchant_dim CASCADE;
+
+CREATE MATERIALIZED VIEW public.vw_overview_transaction AS
 SELECT
   ft.transaction_key,
   ft.transaction_at,
@@ -148,12 +114,14 @@ SELECT
   dcl.branch,
   dcl.region
 FROM public.fact_transaction ft
-JOIN public.dim_merchant  dm   ON dm.merchant_key   = ft.merchant_key
-JOIN public.dim_category  dcat ON dcat.category_id  = dm.category_id
-JOIN public.dim_cluster   dcl  ON dcl.cluster_id    = dm.cluster_id;
+JOIN public.dim_merchant dm ON dm.merchant_key = ft.merchant_key
+JOIN public.dim_category dcat ON dcat.category_id = dm.category_id
+JOIN public.dim_cluster dcl ON dcl.cluster_id = dm.cluster_id;
 
--- vw_merchant_tx_monthly_agg
-CREATE OR REPLACE VIEW public.vw_merchant_tx_monthly_agg AS
+CREATE UNIQUE INDEX IF NOT EXISTS vw_overview_transaction_transaction_key_idx
+  ON public.vw_overview_transaction USING btree (transaction_key);
+
+CREATE MATERIALIZED VIEW public.vw_merchant_tx_monthly_agg AS
 SELECT
   date_trunc('month', transaction_at)::date AS month_year,
   merchant_key,
@@ -161,16 +129,15 @@ SELECT
   branch,
   cluster,
   uniq_merchant,
-  count(*)::integer                                                                    AS tx_count,
-  count(*) FILTER (WHERE status = 'success'::public.transaction_status)::integer      AS success_tx_count,
-  count(*) FILTER (WHERE status = 'failed'::public.transaction_status)::integer       AS failed_tx_count,
-  count(DISTINCT msisdn)::integer                                                      AS unique_redeemer,
-  count(DISTINCT msisdn) FILTER (WHERE status = 'success'::public.transaction_status)::integer
-                                                                                       AS unique_redeemer_success,
+  count(*)::integer AS tx_count,
+  count(*) FILTER (WHERE status = 'success'::public.transaction_status)::integer AS success_tx_count,
+  count(*) FILTER (WHERE status = 'failed'::public.transaction_status)::integer AS failed_tx_count,
+  count(DISTINCT msisdn)::integer AS unique_redeemer,
+  count(DISTINCT msisdn) FILTER (WHERE status = 'success'::public.transaction_status)::integer AS unique_redeemer_success,
   COALESCE(
     sum(total_point) FILTER (WHERE status = 'success'::public.transaction_status),
     0
-  )::bigint                                                                            AS total_point_success
+  )::bigint AS total_point_success
 FROM public.vw_overview_transaction vt
 GROUP BY
   date_trunc('month', transaction_at)::date,
@@ -180,15 +147,17 @@ GROUP BY
   cluster,
   uniq_merchant;
 
--- vw_rule_merchant_dim
-CREATE OR REPLACE VIEW public.vw_rule_merchant_dim AS
+CREATE UNIQUE INDEX IF NOT EXISTS vw_merchant_tx_monthly_agg_month_merchant_idx
+  ON public.vw_merchant_tx_monthly_agg USING btree (month_year, merchant_key);
+
+CREATE MATERIALIZED VIEW public.vw_rule_merchant_dim AS
 SELECT
-  dr.rule_key,
-  dr.rule_merchant          AS merchant_key,
-  dr.point_redeem,
-  dr.period,
-  lower(dr.period)          AS start_period,
-  (upper(dr.period) - '1 day'::interval)::date AS end_period,
+  dm.rule_key,
+  dm.merchant_key,
+  dm.point_redeem,
+  daterange(dm.start_period, (dm.end_period + 1), '[)') AS period,
+  dm.start_period,
+  dm.end_period,
   dm.merchant_name,
   dm.keyword_code,
   dm.uniq_merchant,
@@ -197,14 +166,22 @@ SELECT
   dcat.category,
   dcl.branch,
   dcl.cluster,
-  dcl.region
-FROM public.dim_rule        dr
-JOIN public.dim_merchant  dm   ON dm.merchant_key  = dr.rule_merchant
-JOIN public.dim_category  dcat ON dcat.category_id = dm.category_id
-JOIN public.dim_cluster   dcl  ON dcl.cluster_id   = dm.cluster_id;
+  dcl.region,
+  CASE
+    WHEN dm.end_period < current_date THEN 'expired'
+    WHEN dm.start_period > current_date THEN 'scheduled'
+    ELSE 'active'
+  END AS status,
+  GREATEST((dm.end_period - current_date), 0)::int AS days_left
+FROM public.dim_merchant dm
+JOIN public.dim_category dcat ON dcat.category_id = dm.category_id
+JOIN public.dim_cluster dcl ON dcl.cluster_id = dm.cluster_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS vw_rule_merchant_dim_rule_key_idx
+  ON public.vw_rule_merchant_dim USING btree (rule_key);
 
 -- ─────────────────────────────────────────────
--- 8. BANNER MANAGEMENT
+-- 6. BANNER MANAGEMENT
 -- ─────────────────────────────────────────────
 DO $$ BEGIN
   ALTER TABLE public.provider_banners
@@ -221,9 +198,9 @@ DO $$ BEGIN
     is_active boolean DEFAULT true NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT program_banner_assets_target_check CHECK (num_nonnulls(rule_key, keyword_code) = 1),
-    CONSTRAINT program_banner_assets_rule_key_dim_rule_rule_key_fk
+    CONSTRAINT program_banner_assets_rule_key_dim_merchant_rule_key_fk
       FOREIGN KEY (rule_key)
-      REFERENCES public.dim_rule(rule_key)
+      REFERENCES public.dim_merchant(rule_key)
       ON DELETE cascade
       ON UPDATE no action,
     CONSTRAINT program_banner_assets_keyword_code_dim_merchant_keyword_code_fk
@@ -245,3 +222,80 @@ CREATE UNIQUE INDEX IF NOT EXISTS program_banner_assets_rule_key_unique
   ON public.program_banner_assets USING btree (rule_key);
 CREATE UNIQUE INDEX IF NOT EXISTS program_banner_assets_keyword_code_unique
   ON public.program_banner_assets USING btree (keyword_code);
+
+-- ─────────────────────────────────────────────
+-- 7. USER ACCOUNT LEGACY MIGRATION
+-- ─────────────────────────────────────────────
+DO $$
+begin
+  if to_regclass('public.user_accounts') is null and to_regclass('public.users') is not null then
+    alter table public.users rename to user_accounts;
+  end if;
+end $$;
+--> statement-breakpoint
+DO $$
+begin
+  alter table public.user_accounts rename constraint users_email_unique to user_accounts_email_unique;
+exception
+  when undefined_object or duplicate_object then null;
+end $$;
+--> statement-breakpoint
+DO $$
+begin
+  alter table public.user_accounts rename constraint users_username_unique to user_accounts_username_unique;
+exception
+  when undefined_object or duplicate_object then null;
+end $$;
+--> statement-breakpoint
+alter table public.dim_merchant
+  add column if not exists user_account_id bigint;
+--> statement-breakpoint
+DO $$
+begin
+  if to_regclass('public.merchant_users') is not null then
+    update public.dim_merchant dm
+    set user_account_id = active_mapping.user_id
+    from (
+      select distinct on (merchant_key)
+        merchant_key,
+        user_id
+      from public.merchant_users
+      where is_active = true
+      order by merchant_key, updated_at desc nulls last, created_at desc nulls last
+    ) active_mapping
+    where dm.merchant_key = active_mapping.merchant_key
+      and dm.user_account_id is null;
+  end if;
+end $$;
+--> statement-breakpoint
+DO $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'dim_merchant_user_account_id_user_accounts_id_fk'
+  ) then
+    alter table public.dim_merchant
+      add constraint dim_merchant_user_account_id_user_accounts_id_fk
+      foreign key (user_account_id)
+      references public.user_accounts(id)
+      on delete set null;
+  end if;
+end $$;
+--> statement-breakpoint
+create index if not exists dim_merchant_idx_user_account_id
+  on public.dim_merchant using btree (user_account_id);
+--> statement-breakpoint
+drop table if exists public.merchant_users;
+--> statement-breakpoint
+drop table if exists public.merchant_canonical_map;
+--> statement-breakpoint
+drop type if exists public.merchant_scope_type;
+--> statement-breakpoint
+DO $$
+begin
+  if to_regclass('public.user_accounts') is not null then
+    alter table public.user_accounts drop constraint if exists users_role_check;
+    alter table public.user_accounts drop column if exists role;
+  end if;
+end $$;

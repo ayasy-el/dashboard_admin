@@ -4,7 +4,11 @@ import json
 
 from prefect import flow, get_run_logger, task
 
-from ingestion_service.db import get_batch, touch_batch
+from ingestion_service.db import (
+    get_batch,
+    refresh_materialized_views_background,
+    touch_batch,
+)
 from ingestion_service.pipeline import (
     BatchError,
     clean_data,
@@ -84,6 +88,7 @@ def quality_step(batch_id: str) -> None:
 def mark_success(batch_id: str) -> None:
     touch_batch(batch_id, status="SUCCESS", failed_step=None, failed_reason=None)
     _log_snapshot("SUCCESS", batch_id)
+    refresh_materialized_views_background()
 
 
 @task(log_prints=True)

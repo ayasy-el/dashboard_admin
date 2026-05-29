@@ -15,13 +15,6 @@
       "when": 1775808260418,
       "tag": "0001_custom-migration",
       "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1779176628000,
-      "tag": "0002_user_accounts_direct_merchant",
-      "breakpoints": true
     }
   ]
 }

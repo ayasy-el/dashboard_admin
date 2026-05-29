@@ -75,10 +75,11 @@ Untuk observability UI Prefect, jalankan worker/server Prefect sesuai environmen
 ## Catatan `Solve & Apply`
 
 - Tidak semua error bisa auto-solve.
-- Auto-solve saat ini hanya untuk conflict `dim_rule` overlap dengan period yang sama persis:
-  - sistem akan update `point_redeem` di rule existing
-  - lalu hapus rejected row dan rerun batch
-- Error FK/dependency (merchant/cluster/rule tidak ditemukan) tetap butuh perbaikan data referensi terlebih dahulu.
+- Auto-solve saat ini fokus ke update current rule state di `dim_merchant`:
+  - sistem akan update `point_redeem`, `start_period`, dan `end_period` pada merchant existing
+  - lalu hapus rejected row dan rerun batch bila perlu
+- Error FK/dependency (merchant/cluster tidak ditemukan) tetap butuh perbaikan data referensi terlebih dahulu.
+- Setelah ingestion, solve, ignore, atau rerun yang mengubah data warehouse, materialized view akan di-refresh di background.
 
 ## Integrasi Dashboard (Next.js)
 

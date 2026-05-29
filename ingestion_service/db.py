@@ -4,6 +4,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
+import threading
+import logging
 
 import psycopg
 from psycopg.rows import dict_row
@@ -11,6 +13,13 @@ from psycopg.rows import dict_row
 from ingestion_service.config import DATABASE_URL
 
 _UNSET = object()
+
+logger = logging.getLogger(__name__)
+MATERIALIZED_VIEWS = (
+    "public.vw_overview_transaction",
+    "public.vw_merchant_tx_monthly_agg",
+    "public.vw_rule_merchant_dim",
+)
 
 
 @contextmanager
@@ -348,3 +357,21 @@ def resolve_issue_and_delete_links(batch_id: str, rejected_id: int, resolved_by_
         )
         conn.commit()
         return affected_batches
+
+
+def refresh_materialized_views() -> None:
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    try:
+        conn.autocommit = True
+        conn.execute("SET search_path TO public, audit, stg;")
+        with conn.cursor() as cur:
+            for view_name in MATERIALIZED_VIEWS:
+                logger.info("Refreshing materialized view: %s", view_name)
+                cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {view_name};")
+    finally:
+        conn.close()
+
+
+def refresh_materialized_views_background() -> None:
+    thread = threading.Thread(target=refresh_materialized_views, daemon=True)
+    thread.start()

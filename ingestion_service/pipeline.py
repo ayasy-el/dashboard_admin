@@ -12,7 +12,12 @@ from psycopg import sql
 from psycopg.types.json import Json
 
 from ingestion_service.config import REJECT_THRESHOLD
-from ingestion_service.db import get_batch, get_conn, touch_batch
+from ingestion_service.db import (
+    get_batch,
+    get_conn,
+    refresh_materialized_views_background,
+    touch_batch,
+)
 from ingestion_service.issues import issue_fields
 from ingestion_service.utils import (
     normalize_status,
@@ -98,60 +103,6 @@ def _build_master_load_error(cur, row: dict[str, Any], exc: Exception) -> tuple[
         "end_period": _iso_date(row.get("end_period")),
     }
 
-    if isinstance(exc, errors.ExclusionViolation):
-        constraint = getattr(getattr(exc, "diag", None), "constraint_name", "")
-        if constraint == "ex_dim_rule_no_overlap":
-            cur.execute(
-                """
-                select
-                    rule_key::text as rule_key,
-                    rule_merchant::text as rule_merchant,
-                    dm.keyword_code as keyword,
-                    dm.merchant_name,
-                    dm.uniq_merchant,
-                    point_redeem,
-                    lower(period)::date as start_period,
-                    (upper(period) - interval '1 day')::date as end_period
-                from public.dim_rule
-                join public.dim_merchant dm on dm.merchant_key = dim_rule.rule_merchant
-                where rule_merchant = %s
-                  and period && daterange(%s::date, (%s::date + 1), '[)')
-                order by lower(period) asc
-                limit 5
-                """,
-                (row["merchant_key"], row["start_period"], row["end_period"]),
-            )
-            conflicts = cur.fetchall()
-            existing = [
-                {
-                    "rule_key": c["rule_key"],
-                    "rule_merchant": c["rule_merchant"],
-                    "keyword": c["keyword"],
-                    "merchant_name": c["merchant_name"],
-                    "uniq_merchant": c["uniq_merchant"],
-                    "point_redeem": int(c["point_redeem"] or 0),
-                    "start_period": _iso_date(c["start_period"]),
-                    "end_period": _iso_date(c["end_period"]),
-                }
-                for c in conflicts
-            ]
-            payload["__conflict"] = {
-                "kind": "RULE_PERIOD_OVERLAP",
-                "constraint": constraint,
-                "incoming": payload["__incoming"],
-                "existing": existing,
-                "can_auto_solve": any(
-                    item["start_period"] == payload["__incoming"]["start_period"]
-                    and item["end_period"] == payload["__incoming"]["end_period"]
-                    for item in existing
-                ),
-            }
-            message = (
-                "Konflik rule period (overlap). "
-                "Bandingkan incoming vs existing, lalu pilih Ignore atau Solve jika period sama persis."
-            )
-            return "CONFLICT_OVERLAP", message, payload
-
     if isinstance(exc, errors.ForeignKeyViolation):
         payload["__conflict"] = {
             "kind": "FK_VIOLATION",
@@ -161,20 +112,11 @@ def _build_master_load_error(cur, row: dict[str, Any], exc: Exception) -> tuple[
         }
         message = (
             "Referensi foreign key tidak valid. Data dependency belum ada "
-            "(contoh merchant/rule/cluster). Upload data referensi dulu lalu rerun."
+            "(contoh merchant/cluster). Upload data referensi dulu lalu rerun."
         )
         return "FK_MISSING", message, payload
 
-    message = str(exc)
-    if "end_period lebih pendek" in message.lower():
-        payload["__conflict"] = {
-            "kind": "RULE_PERIOD_SHORTER",
-            "incoming": payload["__incoming"],
-            "can_auto_solve": False,
-        }
-        return "BUSINESS_RULE", message, payload
-
-    return "LOAD_ERROR", message, payload
+    return "LOAD_ERROR", str(exc), payload
 
 
 
@@ -422,13 +364,7 @@ def clean_data(batch_id: str) -> int:
                     merchant_key = stable_uuid("merchant", keyword)
                     category_id = stable_bigint_id("CAT", category) % 2_000_000_000
                     cluster_id = stable_bigint_id("CLUSTER", region, branch, cluster)
-                    rule_key = stable_uuid(
-                        "rule",
-                        str(merchant_key),
-                        start_period.isoformat(),
-                        end_period.isoformat(),
-                        str(point_redeem),
-                    )
+                    rule_key = stable_uuid("rule", keyword)
 
                     cur.execute(
                         """
@@ -608,13 +544,10 @@ def load_data(batch_id: str) -> int:
                 (batch_id,),
             )
 
-            # dim_cluster is managed only by list_kota ingestion.
-            # Resolve cluster by cluster name from dim_cluster and reject missing/ambiguous rows.
             cur.execute(
                 """
                 with candidates as (
                     select
-                        c.id as clean_id,
                         c.row_num,
                         c.raw_payload,
                         c.cluster,
@@ -656,7 +589,8 @@ def load_data(batch_id: str) -> int:
                 """
                 with dedup as (
                     select
-                        merchant_key, keyword, merchant_name, uniq_merchant, cluster, category_id, row_num,
+                        merchant_key, keyword, merchant_name, uniq_merchant, cluster, category_id,
+                        point_redeem, start_period, end_period, rule_key,
                         row_number() over (
                             partition by keyword
                             order by row_num desc
@@ -675,12 +609,20 @@ def load_data(batch_id: str) -> int:
                     where d.rn = 1
                 )
                 insert into public.dim_merchant
-                  (merchant_key, keyword_code, merchant_name, uniq_merchant, cluster_id, category_id)
+                  (
+                    merchant_key, keyword_code, merchant_name, uniq_merchant,
+                    rule_key, point_redeem, start_period, end_period,
+                    cluster_id, category_id
+                  )
                 select
                     candidates.merchant_key,
                     candidates.keyword,
                     candidates.merchant_name,
                     candidates.uniq_merchant,
+                    candidates.rule_key,
+                    candidates.point_redeem,
+                    candidates.start_period,
+                    candidates.end_period,
                     candidates.resolved_cluster_id,
                     candidates.category_id
                 from candidates
@@ -689,176 +631,31 @@ def load_data(batch_id: str) -> int:
                 set merchant_key = excluded.merchant_key,
                     merchant_name = excluded.merchant_name,
                     uniq_merchant = excluded.uniq_merchant,
+                    rule_key = excluded.rule_key,
+                    point_redeem = excluded.point_redeem,
+                    start_period = excluded.start_period,
+                    end_period = excluded.end_period,
                     cluster_id = excluded.cluster_id,
                     category_id = excluded.category_id
                 """,
                 (batch_id,),
             )
-
-            cur.execute(
-                """
-                select
-                    c.row_num,
-                    c.rule_key,
-                    dm.merchant_key,
-                    c.point_redeem,
-                    c.start_period,
-                    c.end_period,
-                    c.raw_payload
-                from stg.master_clean c
-                join public.dim_merchant dm on dm.keyword_code = c.keyword
-                where c.batch_id = %s::uuid
-                order by c.row_num
-                """,
-                (batch_id,),
-            )
-            rows = cur.fetchall()
-            for row in rows:
-                savepoint = f"sp_rule_{row['row_num']}"
-                cur.execute(sql.SQL("savepoint {};").format(sql.Identifier(savepoint)))
-                try:
-                    # Auto-merge duplicate master rule when only end_period is extended:
-                    # same merchant + same start_period + same point_redeem.
-                    cur.execute(
-                        """
-                        select
-                            rule_key,
-                            (upper(period) - interval '1 day')::date as end_period
-                        from public.dim_rule
-                        where rule_merchant = %s
-                          and lower(period)::date = %s::date
-                          and point_redeem = %s
-                        order by upper(period) desc
-                        limit 1
-                        """,
-                        (
-                            row["merchant_key"],
-                            row["start_period"],
-                            row["point_redeem"],
-                        ),
-                    )
-                    same_rule = cur.fetchone()
-                    if same_rule:
-                        existing_end = same_rule["end_period"]
-                        incoming_end = row["end_period"]
-
-                        # Incoming rule extends existing period -> update in place.
-                        if incoming_end > existing_end:
-                            cur.execute(
-                                """
-                                update public.dim_rule
-                                set period = daterange(%s::date, (%s::date + 1), '[)')
-                                where rule_key = %s
-                                """,
-                                (
-                                    row["start_period"],
-                                    incoming_end,
-                                    same_rule["rule_key"],
-                                ),
-                            )
-                            cur.execute(
-                                sql.SQL("release savepoint {};").format(
-                                    sql.Identifier(savepoint)
-                                )
-                            )
-                            loaded += 1
-                            continue
-
-                        # Exact duplicate is idempotent no-op.
-                        if incoming_end == existing_end:
-                            cur.execute(
-                                sql.SQL("release savepoint {};").format(
-                                    sql.Identifier(savepoint)
-                                )
-                            )
-                            loaded += 1
-                            continue
-
-                        # Incoming end_period is shorter -> reject.
-                        raise ValueError(
-                            f"end_period lebih pendek dari existing rule "
-                            f"(existing={existing_end}, incoming={incoming_end})"
-                        )
-
-                    # Special-case: same merchant+period already exists and current value is 0.
-                    # In this case we only update point_redeem to incoming value.
-                    cur.execute(
-                        """
-                        update public.dim_rule
-                        set point_redeem = %s
-                        where rule_merchant = %s
-                          and period = daterange(%s::date, (%s::date + 1), '[)')
-                          and point_redeem = 0
-                        returning rule_key
-                        """,
-                        (
-                            row["point_redeem"],
-                            row["merchant_key"],
-                            row["start_period"],
-                            row["end_period"],
-                        ),
-                    )
-                    updated = cur.fetchone()
-                    if updated:
-                        cur.execute(
-                            sql.SQL("release savepoint {};").format(
-                                sql.Identifier(savepoint)
-                            )
-                        )
-                        loaded += 1
-                        continue
-
-                    cur.execute(
-                        """
-                        insert into public.dim_rule
-                          (rule_key, rule_merchant, point_redeem, period, created_at)
-                        values
-                          (%s, %s, %s, daterange(%s::date, (%s::date + 1), '[)'), now())
-                        on conflict (rule_key) do update
-                        set point_redeem = excluded.point_redeem,
-                            period = excluded.period
-                        """,
-                        (
-                            row["rule_key"],
-                            row["merchant_key"],
-                            row["point_redeem"],
-                            row["start_period"],
-                            row["end_period"],
-                        ),
-                    )
-                    cur.execute(sql.SQL("release savepoint {};").format(sql.Identifier(savepoint)))
-                    loaded += 1
-                except Exception as exc:
-                    cur.execute(sql.SQL("rollback to savepoint {};").format(sql.Identifier(savepoint)))
-                    cur.execute(sql.SQL("release savepoint {};").format(sql.Identifier(savepoint)))
-                    error_type, error_message, error_payload = _build_master_load_error(cur, row, exc)
-                    _insert_rejected(
-                        cur,
-                        batch_id=batch_id,
-                        dataset=dataset,
-                        row_num=row["row_num"],
-                        error_type=error_type,
-                        error_message=error_message,
-                        raw_payload=error_payload,
-                    )
+            loaded = cur.rowcount
 
         elif dataset == "transactions":
             cur.execute(
                 """
-                select c.row_num,
-                       'FK_MISSING' as error_type,
-                       case
-                         when m.merchant_key is null then 'merchant tidak ditemukan untuk keyword=' || c.keyword
-                         when r.rule_key is null then 'rule tidak ditemukan untuk keyword=' || c.keyword || ' at ' || c.transaction_at::date
-                       end as error_message,
-                       c.raw_payload
+                select
+                  c.row_num,
+                  'FK_MISSING' as error_type,
+                  case
+                    when m.merchant_key is null then 'merchant tidak ditemukan untuk keyword=' || c.keyword
+                  end as error_message,
+                  c.raw_payload
                 from stg.transactions_clean c
                 left join public.dim_merchant m on m.keyword_code = c.keyword
-                left join public.dim_rule r
-                  on r.rule_merchant = m.merchant_key
-                 and r.period @> c.transaction_at::date
                 where c.batch_id = %s::uuid
-                  and (m.merchant_key is null or r.rule_key is null)
+                  and m.merchant_key is null
                 """,
                 (batch_id,),
             )
@@ -873,86 +670,63 @@ def load_data(batch_id: str) -> int:
                     raw_payload=dict(rejected["raw_payload"] or {}),
                 )
 
-            # Recalculate point_redeem for matching transactions from older batches.
             cur.execute(
                 """
-                with resolved as (
-                    select
-                        c.transaction_key,
-                        c.transaction_at,
-                        m.merchant_key,
-                        c.status::transaction_status as status,
-                        c.qty,
-                        c.msisdn,
-                        r.rule_key,
-                        r.point_redeem
-                    from stg.transactions_clean c
-                    join public.dim_merchant m on m.keyword_code = c.keyword
-                    join public.dim_rule r
-                      on r.rule_merchant = m.merchant_key
-                     and r.period @> c.transaction_at::date
-                    where c.batch_id = %s::uuid
-                )
-                update public.fact_transaction ft
-                set rule_key = rs.rule_key,
-                    merchant_key = rs.merchant_key,
-                    point_redeem = rs.point_redeem
-                from resolved rs
-                where ft.transaction_at = rs.transaction_at
-                  and ft.merchant_key = rs.merchant_key
-                  and ft.status = rs.status
-                  and ft.qty = rs.qty
-                  and ft.msisdn = rs.msisdn
-                  and ft.transaction_key <> rs.transaction_key
-                  and (
-                    ft.rule_key is distinct from rs.rule_key
-                    or ft.point_redeem is distinct from rs.point_redeem
-                    or ft.merchant_key is distinct from rs.merchant_key
-                  )
+                insert into public.dim_date
+                  (date_key, full_date, day_num, month_num, month_name, quarter_num, year_num)
+                select distinct
+                  to_char(c.transaction_at::date, 'YYYYMMDD')::int as date_key,
+                  c.transaction_at::date as full_date,
+                  extract(day from c.transaction_at)::int as day_num,
+                  extract(month from c.transaction_at)::int as month_num,
+                  to_char(c.transaction_at::date, 'FMMonth') as month_name,
+                  extract(quarter from c.transaction_at)::int as quarter_num,
+                  extract(year from c.transaction_at)::int as year_num
+                from stg.transactions_clean c
+                where c.batch_id = %s::uuid
+                on conflict (date_key) do update
+                set full_date = excluded.full_date,
+                    day_num = excluded.day_num,
+                    month_num = excluded.month_num,
+                    month_name = excluded.month_name,
+                    quarter_num = excluded.quarter_num,
+                    year_num = excluded.year_num
                 """,
                 (batch_id,),
             )
-            refreshed_rows = cur.rowcount
-            if refreshed_rows > 0:
-                logger.info(
-                    "TRANSACTIONS RECALCULATED_CROSS_BATCH batch_id=%s refreshed_rows=%s",
-                    batch_id,
-                    refreshed_rows,
-                )
 
             cur.execute(
                 """
                 insert into public.fact_transaction
-                  (transaction_key, transaction_at, rule_key, merchant_key, status, qty, point_redeem, msisdn, created_at)
-                select c.transaction_key, c.transaction_at, r.rule_key, m.merchant_key,
-                       c.status::transaction_status, c.qty, r.point_redeem, c.msisdn, now()
+                  (transaction_key, transaction_at, date_key, rule_key, merchant_key, status, qty, point_redeem, msisdn, created_at)
+                select
+                  c.transaction_key,
+                  c.transaction_at,
+                  to_char(c.transaction_at::date, 'YYYYMMDD')::int as date_key,
+                  m.rule_key,
+                  m.merchant_key,
+                  c.status::transaction_status,
+                  c.qty,
+                  m.point_redeem,
+                  c.msisdn,
+                  now()
                 from stg.transactions_clean c
                 join public.dim_merchant m on m.keyword_code = c.keyword
-                join public.dim_rule r
-                  on r.rule_merchant = m.merchant_key
-                 and r.period @> c.transaction_at::date
                 where c.batch_id = %s::uuid
-                  and not exists (
-                    select 1
-                    from public.fact_transaction ft
-                    where ft.transaction_at = c.transaction_at
-                      and ft.merchant_key = m.merchant_key
-                      and ft.status = c.status::transaction_status
-                      and ft.qty = c.qty
-                      and ft.msisdn = c.msisdn
-                  )
                 on conflict (transaction_key) do update
                 set transaction_at = excluded.transaction_at,
+                    date_key = excluded.date_key,
                     rule_key = excluded.rule_key,
                     merchant_key = excluded.merchant_key,
                     status = excluded.status,
                     qty = excluded.qty,
                     point_redeem = excluded.point_redeem,
-                    msisdn = excluded.msisdn
+                    msisdn = excluded.msisdn,
+                    created_at = excluded.created_at
                 """,
                 (batch_id,),
             )
-            loaded = refreshed_rows + cur.rowcount
+            loaded = cur.rowcount
 
         elif dataset == "total_point":
             # dim_cluster is managed only by list_kota ingestion.
@@ -1002,7 +776,7 @@ def load_data(batch_id: str) -> int:
 
             cur.execute(
                 """
-                insert into public.fact_cluster_point
+                insert into public.fact_cluster_balance
                   (point_key, month_year, cluster_id, total_point, point_owner)
                 with candidates as (
                     select
@@ -1109,6 +883,7 @@ def run_batch(batch_id: str) -> BatchMetrics:
     try:
         metrics = quality_check(batch_id)
         touch_batch(batch_id, status="SUCCESS", failed_step=None, failed_reason=None)
+        refresh_materialized_views_background()
         return metrics
     except Exception as exc:
         status = exc.status if isinstance(exc, BatchError) else "FAILED_QUALITY"

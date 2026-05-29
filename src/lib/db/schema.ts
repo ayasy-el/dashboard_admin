@@ -9,9 +9,7 @@
  * Custom migration SQL (migration_custom.sql) handles:
  *   - Extensions  : btree_gist, pgcrypto
  *   - ENUM types  : transaction_status
- *   - GiST index  : dim_rule_idx_dim_rule_period
- *   - EXCLUDE constraint : ex_dim_rule_no_overlap
- *   - VIEWs       : vw_overview_transaction, vw_merchant_tx_monthly_agg, vw_rule_merchant_dim
+ *   - Materialized views : vw_overview_transaction, vw_merchant_tx_monthly_agg, vw_rule_merchant_dim
  *   - CHECK constraints with regex / array literals (Drizzle does not generate these natively)
  */
 
@@ -127,6 +125,17 @@ export const dimCluster = pgTable("dim_cluster", {
   region: varchar("region", { length: 500 }).notNull(),
 });
 
+// ── dim_date ──────────────────────────────────
+export const dimDate = pgTable("dim_date", {
+  dateKey: integer("date_key").primaryKey().notNull(),
+  fullDate: date("full_date").notNull().unique("dim_date_full_date_unique"),
+  dayNum: integer("day_num").notNull(),
+  monthNum: integer("month_num").notNull(),
+  monthName: varchar("month_name", { length: 20 }).notNull(),
+  quarterNum: integer("quarter_num").notNull(),
+  yearNum: integer("year_num").notNull(),
+});
+
 // ── dim_merchant ──────────────────────────────
 export const dimMerchant = pgTable(
   "dim_merchant",
@@ -137,6 +146,10 @@ export const dimMerchant = pgTable(
       .unique("dim_merchant_keyword_code_key"),
     merchantName: varchar("merchant_name", { length: 500 }).notNull(),
     uniqMerchant: varchar("uniq_merchant", { length: 500 }).notNull(),
+    ruleKey: uuid("rule_key").notNull().unique("dim_merchant_rule_key_unique"),
+    pointRedeem: integer("point_redeem").notNull(),
+    startPeriod: date("start_period").notNull(),
+    endPeriod: date("end_period").notNull(),
     clusterId: bigint("cluster_id", { mode: "number" })
       .notNull()
       .references(() => dimCluster.clusterId),
@@ -151,33 +164,14 @@ export const dimMerchant = pgTable(
   (t) => [
     index("dim_merchant_idx_dim_merchant_category_id").on(t.categoryId),
     index("dim_merchant_idx_dim_merchant_cluster_id").on(t.clusterId),
+    index("dim_merchant_idx_rule_key").on(t.ruleKey),
     index("dim_merchant_idx_user_account_id").on(t.userAccountId),
   ],
 );
 
-// ── dim_rule ──────────────────────────────────
-// CHECK constraints and EXCLUDE constraint → migration_custom.sql
-// daterange column uses customType above
-export const dimRule = pgTable(
-  "dim_rule",
-  {
-    ruleKey: uuid("rule_key").primaryKey().notNull(),
-    ruleMerchant: uuid("rule_merchant")
-      .notNull()
-      .references(() => dimMerchant.merchantKey),
-    pointRedeem: integer("point_redeem").notNull(),
-    createdAt: timestamp("created_at", { mode: "string" }).notNull(),
-    period: daterange("period").notNull(),
-  },
-  (t) => [
-    index("dim_rule_idx_dim_rule_merchant").on(t.ruleMerchant),
-    // GiST index on period → migration_custom.sql (dim_rule_idx_dim_rule_period)
-  ],
-);
-
-// ── fact_cluster_point ────────────────────────
-export const factClusterPoint = pgTable(
-  "fact_cluster_point",
+// ── fact_cluster_balance ──────────────────────
+export const factClusterBalance = pgTable(
+  "fact_cluster_balance",
   {
     pointKey: uuid("point_key").primaryKey().notNull(),
     monthYear: date("month_year").notNull(),
@@ -187,7 +181,7 @@ export const factClusterPoint = pgTable(
     totalPoint: bigint("total_point", { mode: "number" }).notNull(),
     pointOwner: bigint("point_owner", { mode: "number" }).notNull(),
   },
-  (t) => [index("fact_cluster_point_idx_fcp_month_cluster").on(t.monthYear, t.clusterId)],
+  (t) => [index("fact_cluster_balance_idx_fcp_month_cluster").on(t.monthYear, t.clusterId)],
 );
 
 // ── fact_transaction ──────────────────────────
@@ -197,9 +191,12 @@ export const factTransaction = pgTable(
   {
     transactionKey: uuid("transaction_key").primaryKey().notNull(),
     transactionAt: timestamp("transaction_at", { mode: "string" }).notNull(),
+    dateKey: integer("date_key")
+      .notNull()
+      .references(() => dimDate.dateKey),
     ruleKey: uuid("rule_key")
       .notNull()
-      .references(() => dimRule.ruleKey),
+      .references(() => dimMerchant.ruleKey),
     merchantKey: uuid("merchant_key")
       .notNull()
       .references(() => dimMerchant.merchantKey),
@@ -215,6 +212,7 @@ export const factTransaction = pgTable(
       t.status,
       t.transactionAt,
     ),
+    index("fact_transaction_date_key_idx").on(t.dateKey),
     index("fact_transaction_index_6").on(t.msisdn),
     index("fact_transaction_rule").on(t.ruleKey),
   ],
@@ -305,8 +303,8 @@ export const programBannerAssets = pgTable(
     check("program_banner_assets_target_check", sql`num_nonnulls(rule_key, keyword_code) = 1`),
     foreignKey({
       columns: [t.ruleKey],
-      foreignColumns: [dimRule.ruleKey],
-      name: "program_banner_assets_rule_key_dim_rule_rule_key_fk",
+      foreignColumns: [dimMerchant.ruleKey],
+      name: "program_banner_assets_rule_key_dim_merchant_rule_key_fk",
     }).onDelete("cascade"),
     foreignKey({
       columns: [t.keywordCode],

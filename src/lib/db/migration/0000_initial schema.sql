@@ -82,6 +82,17 @@ CREATE TABLE "dim_category" (
 	"category" varchar(500) NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "dim_date" (
+	"date_key" integer PRIMARY KEY NOT NULL,
+	"full_date" date NOT NULL,
+	"day_num" integer NOT NULL,
+	"month_num" integer NOT NULL,
+	"month_name" varchar(20) NOT NULL,
+	"quarter_num" integer NOT NULL,
+	"year_num" integer NOT NULL,
+	CONSTRAINT "dim_date_full_date_unique" UNIQUE("full_date")
+);
+--> statement-breakpoint
 CREATE TABLE "dim_cluster" (
 	"cluster_id" bigint PRIMARY KEY NOT NULL,
 	"cluster" varchar(500) NOT NULL,
@@ -94,20 +105,17 @@ CREATE TABLE "dim_merchant" (
 	"keyword_code" varchar(500) NOT NULL,
 	"merchant_name" varchar(500) NOT NULL,
 	"uniq_merchant" varchar(500) NOT NULL,
+	"rule_key" uuid NOT NULL,
+	"point_redeem" integer NOT NULL,
+	"start_period" date NOT NULL,
+	"end_period" date NOT NULL,
 	"cluster_id" bigint NOT NULL,
 	"category_id" integer NOT NULL,
-	CONSTRAINT "dim_merchant_keyword_code_key" UNIQUE("keyword_code")
+	CONSTRAINT "dim_merchant_keyword_code_key" UNIQUE("keyword_code"),
+	CONSTRAINT "dim_merchant_rule_key_unique" UNIQUE("rule_key")
 );
 --> statement-breakpoint
-CREATE TABLE "dim_rule" (
-	"rule_key" uuid PRIMARY KEY NOT NULL,
-	"rule_merchant" uuid NOT NULL,
-	"point_redeem" integer NOT NULL,
-	"created_at" timestamp NOT NULL,
-	"period" daterange NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "fact_cluster_point" (
+CREATE TABLE "fact_cluster_balance" (
 	"point_key" uuid PRIMARY KEY NOT NULL,
 	"month_year" date NOT NULL,
 	"cluster_id" bigint NOT NULL,
@@ -118,6 +126,7 @@ CREATE TABLE "fact_cluster_point" (
 CREATE TABLE "fact_transaction" (
 	"transaction_key" uuid PRIMARY KEY NOT NULL,
 	"transaction_at" timestamp NOT NULL,
+	"date_key" integer NOT NULL,
 	"rule_key" uuid NOT NULL,
 	"merchant_key" uuid NOT NULL,
 	"status" "transaction_status" NOT NULL,
@@ -289,9 +298,9 @@ ALTER TABLE "audit"."batch_issue_links" ADD CONSTRAINT "batch_issue_links_batch_
 ALTER TABLE "audit"."batch_issue_links" ADD CONSTRAINT "batch_issue_links_issue_id_ingestion_issues_issue_id_fk" FOREIGN KEY ("issue_id") REFERENCES "audit"."ingestion_issues"("issue_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dim_merchant" ADD CONSTRAINT "dim_merchant_cluster_id_dim_cluster_cluster_id_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."dim_cluster"("cluster_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dim_merchant" ADD CONSTRAINT "dim_merchant_category_id_dim_category_category_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."dim_category"("category_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "dim_rule" ADD CONSTRAINT "dim_rule_rule_merchant_dim_merchant_merchant_key_fk" FOREIGN KEY ("rule_merchant") REFERENCES "public"."dim_merchant"("merchant_key") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fact_cluster_point" ADD CONSTRAINT "fact_cluster_point_cluster_id_dim_cluster_cluster_id_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."dim_cluster"("cluster_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fact_transaction" ADD CONSTRAINT "fact_transaction_rule_key_dim_rule_rule_key_fk" FOREIGN KEY ("rule_key") REFERENCES "public"."dim_rule"("rule_key") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fact_cluster_balance" ADD CONSTRAINT "fact_cluster_balance_cluster_id_dim_cluster_cluster_id_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."dim_cluster"("cluster_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fact_transaction" ADD CONSTRAINT "fact_transaction_date_key_dim_date_date_key_fk" FOREIGN KEY ("date_key") REFERENCES "public"."dim_date"("date_key") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fact_transaction" ADD CONSTRAINT "fact_transaction_rule_key_dim_merchant_rule_key_fk" FOREIGN KEY ("rule_key") REFERENCES "public"."dim_merchant"("rule_key") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fact_transaction" ADD CONSTRAINT "fact_transaction_merchant_key_dim_merchant_merchant_key_fk" FOREIGN KEY ("merchant_key") REFERENCES "public"."dim_merchant"("merchant_key") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "merchant_feedback" ADD CONSTRAINT "merchant_feedback_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "merchant_users" ADD CONSTRAINT "merchant_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -309,9 +318,10 @@ CREATE INDEX "idx_ingestion_issues_status" ON "audit"."ingestion_issues" USING b
 CREATE INDEX "idx_ingestion_issues_conflict_scope" ON "audit"."ingestion_issues" USING btree ("issue_kind","conflict_merchant_key","conflict_start_period","conflict_end_period");--> statement-breakpoint
 CREATE INDEX "dim_merchant_idx_dim_merchant_category_id" ON "dim_merchant" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "dim_merchant_idx_dim_merchant_cluster_id" ON "dim_merchant" USING btree ("cluster_id");--> statement-breakpoint
-CREATE INDEX "dim_rule_idx_dim_rule_merchant" ON "dim_rule" USING btree ("rule_merchant");--> statement-breakpoint
-CREATE INDEX "fact_cluster_point_idx_fcp_month_cluster" ON "fact_cluster_point" USING btree ("month_year","cluster_id");--> statement-breakpoint
+CREATE INDEX "dim_merchant_idx_rule_key" ON "dim_merchant" USING btree ("rule_key");--> statement-breakpoint
+CREATE INDEX "fact_cluster_balance_idx_fcp_month_cluster" ON "fact_cluster_balance" USING btree ("month_year","cluster_id");--> statement-breakpoint
 CREATE INDEX "fact_transaction_idx_ft_merchant_status_time" ON "fact_transaction" USING btree ("merchant_key","status","transaction_at");--> statement-breakpoint
+CREATE INDEX "fact_transaction_date_key_idx" ON "fact_transaction" USING btree ("date_key");--> statement-breakpoint
 CREATE INDEX "fact_transaction_index_6" ON "fact_transaction" USING btree ("msisdn");--> statement-breakpoint
 CREATE INDEX "fact_transaction_rule" ON "fact_transaction" USING btree ("rule_key");--> statement-breakpoint
 CREATE INDEX "idx_merchant_feedback_merchant" ON "merchant_feedback" USING btree ("merchant_key");--> statement-breakpoint

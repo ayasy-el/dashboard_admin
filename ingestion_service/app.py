@@ -27,6 +27,7 @@ from ingestion_service.db import (
     get_rejected_row,
     get_rejected_rows,
     list_batches,
+    refresh_materialized_views_background,
     resolve_issue_and_delete_links,
     touch_batch,
 )
@@ -218,35 +219,29 @@ def _current_existing_rules_for_incoming(
     incoming: dict[str, Any], limit: int = 5
 ) -> list[dict[str, Any]] | None:
     merchant_key = str(incoming.get("merchant_key") or "").strip()
-    start_period = incoming.get("start_period")
-    end_period = incoming.get("end_period")
     if not merchant_key:
         return []
 
     query = """
         select
             rule_key::text as rule_key,
-            rule_merchant::text as rule_merchant,
+            merchant_key::text as rule_merchant,
             dm.keyword_code as keyword,
             dm.merchant_name,
             dm.uniq_merchant,
             dc.category as category,
             dcl.cluster as cluster,
             point_redeem,
-            lower(period)::date as start_period,
-            (upper(period) - interval '1 day')::date as end_period
-        from public.dim_rule
-        join public.dim_merchant dm on dm.merchant_key = dim_rule.rule_merchant
+            start_period,
+            end_period
+        from public.dim_merchant dm
         left join public.dim_category dc on dc.category_id = dm.category_id
         left join public.dim_cluster dcl on dcl.cluster_id = dm.cluster_id
-        where rule_merchant = %s::uuid
+        where merchant_key = %s::uuid
+        order by start_period asc, end_period asc
+        limit %s
     """
-    params: list[Any] = [merchant_key]
-    if start_period and end_period:
-        query += " and period && daterange(%s::date, (%s::date + 1), '[)')"
-        params.extend([start_period, end_period])
-    query += " order by lower(period) asc limit %s"
-    params.append(limit)
+    params: list[Any] = [merchant_key, limit]
 
     try:
         with get_conn() as conn, conn.cursor() as cur:
@@ -423,42 +418,29 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
     extendable_match = _find_extendable_period_match(incoming, existing)
 
     with get_conn() as conn, conn.cursor() as cur:
-        if resolution["solve_mode"] == "APPLY_TO_EXISTING_EXACT_PERIOD":
-            if not exact_match:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Tidak ditemukan existing rule dengan period yang sama persis",
-                )
-            cur.execute(
-                """
-                update public.dim_rule
-                set point_redeem = %s
-                where rule_key = %s::uuid
-                """,
-                (int(incoming.get("point_redeem") or 0), exact_match["rule_key"]),
-            )
-        elif resolution["solve_mode"] == "EXTEND_EXISTING_PERIOD":
-            if not extendable_match:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Tidak ditemukan rule existing yang bisa di-extend",
-                )
-            cur.execute(
-                """
-                update public.dim_rule
-                set point_redeem = %s,
-                    period = daterange(%s::date, (%s::date + 1), '[)')
-                where rule_key = %s::uuid
-                """,
-                (
-                    int(incoming.get("point_redeem") or 0),
-                    incoming.get("start_period"),
-                    incoming.get("end_period"),
-                    extendable_match["rule_key"],
-                ),
-            )
+        target_rule_key = None
+        if exact_match:
+            target_rule_key = exact_match["rule_key"]
+        elif extendable_match:
+            target_rule_key = extendable_match["rule_key"]
         else:
-            raise HTTPException(status_code=409, detail="Solve mode tidak dikenali")
+            raise HTTPException(status_code=409, detail="Existing rule tidak ditemukan")
+
+        cur.execute(
+            """
+            update public.dim_merchant
+            set point_redeem = %s,
+                start_period = %s::date,
+                end_period = %s::date
+            where rule_key = %s::uuid
+            """,
+            (
+                int(incoming.get("point_redeem") or 0),
+                incoming.get("start_period"),
+                incoming.get("end_period"),
+                target_rule_key,
+            ),
+        )
 
         if cur.rowcount == 0:
             conn.rollback()
@@ -717,6 +699,8 @@ def ignore_rejected(batch_id: str, rejected_id: int):
     if not deleted:
         raise HTTPException(status_code=500, detail="Failed to ignore rejected row")
 
+    refresh_materialized_views_background()
+
     return {
         "batch_id": batch_id,
         "rejected_id": rejected_id,
@@ -747,6 +731,7 @@ def solve_rejected(
         )
 
     metrics = _refresh_batch_metrics_after_solve(batch_id)
+    refresh_materialized_views_background()
     for affected_batch_id in affected_batches:
         if affected_batch_id == batch_id:
             continue
