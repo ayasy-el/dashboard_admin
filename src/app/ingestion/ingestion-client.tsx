@@ -22,7 +22,6 @@ import {
   getBatchDetail,
   getRejected,
   uploadBatch,
-  rerunBatch,
   rollbackBatch,
   ignoreRejected,
   solveRejected,
@@ -43,12 +42,6 @@ const DATASETS: Array<{ value: Dataset; label: string }> = [
   { value: "transactions", label: "Transaction" },
   { value: "total_point", label: "Total Point" },
 ];
-const RERUN_ALLOWED_STATUSES = new Set([
-  "FAILED_STAGE",
-  "FAILED_LOAD",
-  "FAILED_QUALITY",
-  "SUCCESS",
-]);
 const CONFLICT_INFO_FIELDS = ["keyword", "merchant_name", "category", "cluster"];
 const CONFLICT_CHANGE_FIELDS = ["uniq_merchant", "start_period", "end_period", "point_redeem"];
 
@@ -84,10 +77,10 @@ const resolveSuggestion = (row: RejectedRow) => {
   if (msg.includes("cluster ambigu")) return "Pastikan nama cluster unik di list_kota.";
   if (msg.includes("merchant tidak ditemukan"))
     return "Upload master terlebih dahulu agar keyword tersedia.";
-  if (msg.includes("rule tidak ditemukan")) return "Periksa period/rule di master lalu rerun.";
+  if (msg.includes("rule tidak ditemukan")) return "Periksa period/rule di master lalu upload ulang.";
   if (msg.includes("end_period lebih pendek"))
     return "Perpanjang end_period atau Ignore jika data lama valid.";
-  return "Perbaiki data sumber lalu klik Solve & Apply.";
+  return "Perbaiki data sumber lalu klik Solve & Apply atau rollback batch jika perlu.";
 };
 
 const base64ToBlob = (base64: string, contentType?: string | null) => {
@@ -245,32 +238,12 @@ export default function IngestionClient({
     }
   };
 
-  const onRerun = async (batchId: string) => {
-    setBusy(true);
-    setError(null);
-    try {
-      const body = await rerunBatch(batchId);
-      const newBatchId = body?.new_batch_id;
-      await loadBatches();
-      if (newBatchId) {
-        setSelectedBatchId(newBatchId);
-        await loadBatchDetail(newBatchId, 1);
-      } else if (selectedBatchId === batchId) {
-        await loadBatchDetail(batchId, rejectedPage);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal rerun batch");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const onRollback = async (batchId: string) => {
     const target = batches.find((batch) => batch.batch_id === batchId);
     if (!target || target.status !== "SUCCESS") return;
 
     const confirmed = window.confirm(
-      `Rollback batch ${batchId}? Data hasil ingestion batch ini akan dihapus, tetapi rerun turunan tetap dipertahankan.`,
+      `Rollback batch ${batchId}? Data hasil ingestion batch ini akan dihapus.`,
     );
     if (!confirmed) return;
 
@@ -592,32 +565,6 @@ export default function IngestionClient({
                                 <path d="M5 21h14" />
                               </svg>
                             </Button>
-                            <Button
-                              size="sm"
-                              className="h-9 w-9 cursor-pointer p-0 disabled:cursor-not-allowed"
-                              variant="outline"
-                              disabled={busy || !RERUN_ALLOWED_STATUSES.has(batch.status)}
-                              title={`Rerun batch ${batch.batch_id}`}
-                              aria-label={`Rerun batch ${batch.batch_id}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void onRerun(batch.batch_id);
-                              }}
-                              >
-                                <svg
-                                viewBox="0 0 24 24"
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                                <path d="M21 3v6h-6" />
-                                </svg>
-                              </Button>
                             <Button
                               size="sm"
                               className="h-9 w-9 cursor-pointer p-0 disabled:cursor-not-allowed"

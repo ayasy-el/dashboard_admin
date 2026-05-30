@@ -84,40 +84,6 @@ def create_batch(dataset: str, source_file: Path) -> dict[str, str]:
         }
 
 
-def create_rerun_batch(source_batch_id: str) -> dict[str, str]:
-    source_uuid = resolve_batch_uuid(source_batch_id)
-    if not source_uuid:
-        raise ValueError(f"Batch not found: {source_batch_id}")
-
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            select dataset, source_file
-            from audit.batches
-            where batch_id = %s::uuid
-            """,
-            (source_uuid,),
-        )
-        source = cur.fetchone()
-        if not source:
-            raise ValueError(f"Batch not found: {source_batch_id}")
-        public_id = _new_batch_public_id(str(source["dataset"]))
-        cur.execute(
-            """
-            insert into audit.batches (dataset, status, source_file, batch_public_id)
-            values (%s, 'UPLOADED', %s, %s)
-            returning batch_id::text, batch_public_id
-            """,
-            (source["dataset"], source["source_file"], public_id),
-        )
-        row = cur.fetchone()
-        conn.commit()
-        return {
-            "batch_id": row["batch_public_id"],
-            "internal_batch_id": row["batch_id"],
-        }
-
-
 def get_batch(batch_id: str) -> dict[str, Any] | None:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(

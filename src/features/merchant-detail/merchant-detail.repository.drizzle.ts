@@ -62,9 +62,6 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
       };
     }
 
-    const uniqMerchant = String(identityRow.uniq_merchant ?? "");
-    const today = new Date().toISOString().slice(0, 10);
-
     const [currentSummaryRows, previousSummaryRows, monthlyPerformanceRows, keywordCompositionRows, dailyTrendRows] =
       await Promise.all([
         db.execute(sql`
@@ -74,7 +71,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
             coalesce(sum(vt.total_point), 0)::int as total_point
           from vw_overview_transaction vt
           where vt.status = 'success'
-            and vt.uniq_merchant = ${uniqMerchant}
+            and vt.keyword_code = ${keyword}
             and vt.transaction_at >= ${startTs}
             and vt.transaction_at < ${endTs}
         `),
@@ -85,7 +82,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
             coalesce(sum(vt.total_point), 0)::int as total_point
           from vw_overview_transaction vt
           where vt.status = 'success'
-            and vt.uniq_merchant = ${uniqMerchant}
+            and vt.keyword_code = ${keyword}
             and vt.transaction_at >= ${previousStartTs}
             and vt.transaction_at < ${previousEndTs}
         `),
@@ -96,7 +93,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
             count(distinct vt.msisdn)::int as unique_redeem
           from vw_overview_transaction vt
           where vt.status = 'success'
-            and vt.uniq_merchant = ${uniqMerchant}
+            and vt.keyword_code = ${keyword}
             and vt.transaction_at >= ${toSqlTimestamp(yearStart)}
             and vt.transaction_at < ${toSqlTimestamp(yearEnd)}
           group by date_trunc('month', vt.transaction_at)
@@ -108,7 +105,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
             count(*)::int as redeem
           from vw_overview_transaction vt
           where vt.status = 'success'
-            and vt.uniq_merchant = ${uniqMerchant}
+            and vt.keyword_code = ${keyword}
             and vt.transaction_at >= ${startTs}
             and vt.transaction_at < ${endTs}
           group by vt.keyword_code
@@ -122,7 +119,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
             coalesce(sum(vt.total_point), 0)::int as total_point
           from vw_overview_transaction vt
           where vt.status = 'success'
-            and vt.uniq_merchant = ${uniqMerchant}
+            and vt.keyword_code = ${keyword}
             and vt.transaction_at >= ${startTs}
             and vt.transaction_at < ${endTs}
           group by date(vt.transaction_at)
@@ -143,7 +140,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
           vr.end_period::text as end_period,
           greatest((vr.end_period - ${monthEndDate}::date), 0)::int as days_left
         from vw_rule_merchant_dim vr
-        where vr.uniq_merchant = ${uniqMerchant}
+        where vr.keyword_code = ${keyword}
         order by vr.keyword_code, vr.end_period desc, vr.start_period desc
       `),
       db.execute(sql`
@@ -155,7 +152,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
           vt.total_point::int as total_point,
           vt.branch as branch
         from vw_overview_transaction vt
-        where vt.uniq_merchant = ${uniqMerchant}
+        where vt.keyword_code = ${keyword}
           and vt.transaction_at >= ${startTs}
           and vt.transaction_at < ${endTs}
         order by vt.transaction_at desc
@@ -172,7 +169,7 @@ export class MerchantDetailRepositoryDrizzle implements MerchantDetailRepository
         identity: {
           keyword: String(identityRow.keyword ?? ""),
           merchant: String(identityRow.merchant ?? ""),
-          uniqMerchant,
+          uniqMerchant: String(identityRow.uniq_merchant ?? ""),
           category: String(identityRow.category ?? ""),
           branch: String(identityRow.branch ?? ""),
           cluster: String(identityRow.cluster ?? ""),

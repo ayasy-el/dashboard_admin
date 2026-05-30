@@ -127,6 +127,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
   const [isSaving, setIsSaving] = React.useState(false);
 
   useBindGlobalLoading(isNavigating);
+  const hasSelectedAccount = selectedAccount != null;
 
   React.useEffect(() => {
     setPendingAddKeys(new Set());
@@ -396,16 +397,6 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
     setPendingRemoveKeys(new Set());
   };
 
-  if (!selectedAccount) {
-    return (
-      <div className="px-4 pb-6 lg:px-6">
-        <div className="rounded-3xl border border-border/70 bg-card p-6 text-sm text-muted-foreground">
-          Tidak ada user account untuk ditampilkan.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Sheet open={sheetMode !== null} onOpenChange={(open) => !open && closeSheet()}>
@@ -425,7 +416,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
               <Input
                 value={formState.username}
                 onChange={(event) => setFormState((current) => ({ ...current, username: event.target.value }))}
-                placeholder="Contoh: Budi Santoso"
+                placeholder=""
                 required
               />
             </label>
@@ -435,7 +426,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
                 type="email"
                 value={formState.email}
                 onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
-                placeholder="nama@email.com"
+                placeholder=""
                 required
               />
             </label>
@@ -493,7 +484,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
                 <AccountItem
                   key={account.id}
                   account={account}
-                  active={account.id === selectedAccount.id}
+                  active={account.id === selectedAccount?.id}
                   onClick={() => handleSelectAccount(account.id)}
                 />
               ))}
@@ -510,17 +501,26 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1">
                   <div className="text-xs font-semibold tracking-[0.22em] uppercase text-primary">
-                    Account Terpilih
+                    {hasSelectedAccount ? "Account Terpilih" : "Belum Ada Account"}
                   </div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                    {selectedAccount.username ?? selectedAccount.email}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Email: {selectedAccount.email} • {selectedAccount.merchantCount} merchant terhubung
-                  </p>
+                  {hasSelectedAccount ? (
+                    <>
+                      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                        {selectedAccount.username ?? selectedAccount.email}
+                      </h1>
+                      <p className="text-sm text-muted-foreground">
+                        Email: {selectedAccount.email} • {selectedAccount.merchantCount} merchant terhubung
+                      </p>
+                    </>
+                  ) : (
+                    <p className="max-w-2xl text-sm text-muted-foreground">
+                      Belum ada user account yang dibuat. Admin tetap bisa menambahkan account baru dari tombol
+                      Tambah di sisi kiri untuk mulai mengelola merchant.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" className="gap-2" onClick={openEditSheet}>
+                  <Button type="button" variant="outline" className="gap-2" onClick={openEditSheet} disabled={!hasSelectedAccount}>
                     <IconPencil className="size-4" />
                     Ubah
                   </Button>
@@ -529,7 +529,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
                     variant="outline"
                     className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={handleDeleteAccount}
-                    disabled={sheetSubmitting}
+                    disabled={sheetSubmitting || !hasSelectedAccount}
                   >
                     <IconTrash className="size-4" />
                     Hapus
@@ -539,214 +539,72 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "connected" | "available")} className="flex min-h-0 flex-1 flex-col gap-0">
-                <div className="border-b border-border/70 px-5 pt-2">
-                  <TabsList variant="line" className="h-11 gap-6 rounded-none p-0">
-                    <TabsTrigger value="connected" className="rounded-none px-0 pb-2 text-sm">
-                      Merchant Terhubung ({connectedMerchants.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="available" className="rounded-none px-0 pb-2 text-sm">
-                      Tambah Merchant
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-
-                <TabsContent value="connected" className="m-0 flex min-h-0 flex-1 flex-col">
-                  <div className="border-b border-border/70 px-5 py-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <label className="flex items-center gap-3 text-sm text-foreground">
-                        <Checkbox
-                          checked={
-                            filteredConnectedMerchants.length > 0 &&
-                            filteredConnectedMerchants.every((merchant) => pendingRemoveKeys.has(merchant.merchantKey))
-                              ? true
-                              : pendingRemoveKeys.size > 0
-                                ? "indeterminate"
-                                : false
-                          }
-                          onCheckedChange={(checked) => {
-                            const next = new Set(pendingRemoveKeys);
-                            filteredConnectedMerchants.forEach((merchant) => {
-                              if (checked) {
-                                next.add(merchant.merchantKey);
-                              } else {
-                                next.delete(merchant.merchantKey);
-                              }
-                            });
-                            setPendingRemoveKeys(next);
-                          }}
-                        />
-                        <span>Pilih Semua ({connectedSelectedCount} terpilih)</span>
-                      </label>
-                    </div>
+              {hasSelectedAccount ? (
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "connected" | "available")} className="flex min-h-0 flex-1 flex-col gap-0">
+                  <div className="border-b border-border/70 px-5 pt-2">
+                    <TabsList variant="line" className="h-11 gap-6 rounded-none p-0">
+                      <TabsTrigger value="connected" className="rounded-none px-0 pb-2 text-sm">
+                        Merchant Terhubung ({connectedMerchants.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="available" className="rounded-none px-0 pb-2 text-sm">
+                        Tambah Merchant
+                      </TabsTrigger>
+                    </TabsList>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div className="grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] border-b border-border/70 bg-muted/20 px-6 py-3 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                        <div />
-                        <div>Merchant Name</div>
-                        <div>Merchant ID</div>
-                        <div>Branch</div>
-                        <div>Category</div>
-                        <div>Status</div>
+                  <TabsContent value="connected" className="m-0 flex min-h-0 flex-1 flex-col">
+                    <div className="border-b border-border/70 px-5 py-3">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <label className="flex items-center gap-3 text-sm text-foreground">
+                          <Checkbox
+                            checked={
+                              filteredConnectedMerchants.length > 0 &&
+                              filteredConnectedMerchants.every((merchant) => pendingRemoveKeys.has(merchant.merchantKey))
+                                ? true
+                                : pendingRemoveKeys.size > 0
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) => {
+                              const next = new Set(pendingRemoveKeys);
+                              filteredConnectedMerchants.forEach((merchant) => {
+                                if (checked) {
+                                  next.add(merchant.merchantKey);
+                                } else {
+                                  next.delete(merchant.merchantKey);
+                                }
+                              });
+                              setPendingRemoveKeys(next);
+                            }}
+                          />
+                          <span>Pilih Semua ({connectedSelectedCount} terpilih)</span>
+                        </label>
                       </div>
-                      {filteredConnectedMerchants.map((merchant) => (
-                        <div
-                          key={merchant.merchantKey}
-                          onClick={() => togglePendingRemove(merchant.merchantKey)}
-                          className={cn(
-                            "grid cursor-pointer grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border/60 px-6 py-4 transition-colors",
-                            pendingRemoveKeys.has(merchant.merchantKey) && "bg-destructive/5",
-                          )}
-                        >
-                          <div onClick={(event) => event.stopPropagation()}>
-                            <Checkbox
-                              checked={pendingRemoveKeys.has(merchant.merchantKey)}
-                              onCheckedChange={() => togglePendingRemove(merchant.merchantKey)}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-foreground">{merchant.merchantName}</div>
-                            <div className="mt-1 truncate text-xs text-muted-foreground">
-                              {merchant.uniqMerchant}
-                            </div>
-                          </div>
-                          <div className="font-mono text-sm text-muted-foreground">{merchant.keywordCode}</div>
-                          <div className="truncate text-sm text-muted-foreground">{merchant.branchName ?? "-"}</div>
-                          <div className="truncate text-sm text-muted-foreground">{merchant.categoryName ?? "-"}</div>
-                          <div className="min-w-0">
-                            {merchant.ownerUserId != null ? (
-                              <Link
-                                href={`/account-management?userId=${merchant.ownerUserId}`}
-                                className="truncate text-sm font-medium text-primary transition-colors hover:underline"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                Terhubung
-                              </Link>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">Belum terhubung</span>
-                            )}
-                          </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <div className="h-full overflow-y-auto">
+                        <div className="grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] border-b border-border/70 bg-muted/20 px-6 py-3 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                          <div />
+                          <div>Merchant Name</div>
+                          <div>Merchant ID</div>
+                          <div>Branch</div>
+                          <div>Category</div>
+                          <div>Status</div>
                         </div>
-                      ))}
-                      {filteredConnectedMerchants.length === 0 ? (
-                        <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                          Tidak ada merchant terhubung pada account ini.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="available" className="m-0 flex min-h-0 flex-1 flex-col">
-                  <div className="border-b border-border/70 px-5 py-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <label className="flex items-center gap-3 text-sm text-foreground">
-                        <Checkbox
-                          checked={
-                            filteredAvailableMerchants.length > 0 &&
-                            filteredAvailableMerchants.every((merchant) => pendingAddKeys.has(merchant.merchantKey))
-                              ? true
-                              : pendingAddKeys.size > 0
-                                ? "indeterminate"
-                                : false
-                          }
-                          onCheckedChange={(checked) => {
-                            const next = new Set(pendingAddKeys);
-                            filteredAvailableMerchants.forEach((merchant) => {
-                              if (checked) {
-                                next.add(merchant.merchantKey);
-                              } else {
-                                next.delete(merchant.merchantKey);
-                              }
-                            });
-                            setPendingAddKeys(next);
-                          }}
-                        />
-                        <span>Pilih Semua ({availableSelectedCount} terpilih)</span>
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {([
-                          { key: "all", label: "Semua" },
-                          { key: "unlinked", label: "Belum Terhubung" },
-                          { key: "linked", label: "Sudah Terhubung" },
-                        ] as const).map((option) => (
-                          <Button
-                            key={option.key}
-                            type="button"
-                            variant={merchantConnectionFilter === option.key ? "default" : "outline"}
-                            size="sm"
-                            className="h-8"
-                            onClick={() => setMerchantConnectionFilter(option.key)}
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center">
-                      <div className="relative w-full max-w-md">
-                        <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          value={availableMerchantQuery}
-                          onChange={(event) => setAvailableMerchantQuery(event.target.value)}
-                          placeholder="Cari merchant, pisahkan dengan koma"
-                          className="h-10 rounded-xl pl-9"
-                        />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                          Mode Search
-                        </span>
-                        {([
-                          { key: "some", label: "Some" },
-                          { key: "all", label: "All" },
-                        ] as const).map((option) => (
-                          <Button
-                            key={option.key}
-                            type="button"
-                            variant={merchantSearchMode === option.key ? "default" : "outline"}
-                            size="sm"
-                            className="h-8"
-                            onClick={() => setMerchantSearchMode(option.key)}
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div className="grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] border-b border-border/70 bg-muted/20 px-6 py-3 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                        <div />
-                        <div>Merchant Name</div>
-                        <div>Merchant ID</div>
-                        <div>Branch</div>
-                        <div>Category</div>
-                        <div>Status</div>
-                      </div>
-                      {filteredAvailableMerchants.map((merchant) => {
-                        const ownerLabel =
-                          merchant.ownerUserId == null
-                            ? "Belum terhubung"
-                            : merchant.ownerUsername ?? merchant.ownerEmail ?? `Account #${merchant.ownerUserId}`;
-
-                        return (
+                        {filteredConnectedMerchants.map((merchant) => (
                           <div
                             key={merchant.merchantKey}
-                            onClick={() => togglePendingAdd(merchant.merchantKey)}
+                            onClick={() => togglePendingRemove(merchant.merchantKey)}
                             className={cn(
                               "grid cursor-pointer grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border/60 px-6 py-4 transition-colors",
-                              pendingAddKeys.has(merchant.merchantKey) && "bg-primary/5",
+                              pendingRemoveKeys.has(merchant.merchantKey) && "bg-destructive/5",
                             )}
                           >
                             <div onClick={(event) => event.stopPropagation()}>
                               <Checkbox
-                                checked={pendingAddKeys.has(merchant.merchantKey)}
-                                onCheckedChange={() => togglePendingAdd(merchant.merchantKey)}
+                                checked={pendingRemoveKeys.has(merchant.merchantKey)}
+                                onCheckedChange={() => togglePendingRemove(merchant.merchantKey)}
                               />
                             </div>
                             <div className="min-w-0">
@@ -765,24 +623,189 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
                                   className="truncate text-sm font-medium text-primary transition-colors hover:underline"
                                   onClick={(event) => event.stopPropagation()}
                                 >
-                                  {ownerLabel}
+                                  Terhubung
                                 </Link>
                               ) : (
                                 <span className="text-sm text-muted-foreground">Belum terhubung</span>
                               )}
                             </div>
                           </div>
-                        );
-                      })}
-                      {filteredAvailableMerchants.length === 0 ? (
-                        <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                          Tidak ada merchant yang cocok dengan pencarian.
+                        ))}
+                        {filteredConnectedMerchants.length === 0 ? (
+                          <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                            Tidak ada merchant terhubung pada account ini.
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="available" className="m-0 flex min-h-0 flex-1 flex-col">
+                    <div className="border-b border-border/70 px-5 py-3">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <label className="flex items-center gap-3 text-sm text-foreground">
+                          <Checkbox
+                            checked={
+                              filteredAvailableMerchants.length > 0 &&
+                              filteredAvailableMerchants.every((merchant) => pendingAddKeys.has(merchant.merchantKey))
+                                ? true
+                                : pendingAddKeys.size > 0
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            onCheckedChange={(checked) => {
+                              const next = new Set(pendingAddKeys);
+                              filteredAvailableMerchants.forEach((merchant) => {
+                                if (checked) {
+                                  next.add(merchant.merchantKey);
+                                } else {
+                                  next.delete(merchant.merchantKey);
+                                }
+                              });
+                              setPendingAddKeys(next);
+                            }}
+                          />
+                          <span>Pilih Semua ({availableSelectedCount} terpilih)</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {([
+                            { key: "all", label: "Semua" },
+                            { key: "unlinked", label: "Belum Terhubung" },
+                            { key: "linked", label: "Sudah Terhubung" },
+                          ] as const).map((option) => (
+                            <Button
+                              key={option.key}
+                              type="button"
+                              variant={merchantConnectionFilter === option.key ? "default" : "outline"}
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setMerchantConnectionFilter(option.key)}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
                         </div>
-                      ) : null}
+                      </div>
+                      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center">
+                        <div className="relative w-full max-w-md">
+                          <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={availableMerchantQuery}
+                            onChange={(event) => setAvailableMerchantQuery(event.target.value)}
+                            placeholder="Cari merchant, pisahkan dengan koma"
+                            className="h-10 rounded-xl pl-9"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                            Mode Search
+                          </span>
+                          {([
+                            { key: "some", label: "Some" },
+                            { key: "all", label: "All" },
+                          ] as const).map((option) => (
+                            <Button
+                              key={option.key}
+                              type="button"
+                              variant={merchantSearchMode === option.key ? "default" : "outline"}
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setMerchantSearchMode(option.key)}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <div className="h-full overflow-y-auto">
+                        <div className="grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] border-b border-border/70 bg-muted/20 px-6 py-3 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                          <div />
+                          <div>Merchant Name</div>
+                          <div>Merchant ID</div>
+                          <div>Branch</div>
+                          <div>Category</div>
+                          <div>Status</div>
+                        </div>
+                        {filteredAvailableMerchants.map((merchant) => {
+                          const ownerLabel =
+                            merchant.ownerUserId == null
+                              ? "Belum terhubung"
+                              : merchant.ownerUsername ?? merchant.ownerEmail ?? `Account #${merchant.ownerUserId}`;
+
+                          return (
+                            <div
+                              key={merchant.merchantKey}
+                              onClick={() => togglePendingAdd(merchant.merchantKey)}
+                              className={cn(
+                                "grid cursor-pointer grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border/60 px-6 py-4 transition-colors",
+                                pendingAddKeys.has(merchant.merchantKey) && "bg-primary/5",
+                              )}
+                            >
+                              <div onClick={(event) => event.stopPropagation()}>
+                                <Checkbox
+                                  checked={pendingAddKeys.has(merchant.merchantKey)}
+                                  onCheckedChange={() => togglePendingAdd(merchant.merchantKey)}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-foreground">{merchant.merchantName}</div>
+                                <div className="mt-1 truncate text-xs text-muted-foreground">
+                                  {merchant.uniqMerchant}
+                                </div>
+                              </div>
+                              <div className="font-mono text-sm text-muted-foreground">{merchant.keywordCode}</div>
+                              <div className="truncate text-sm text-muted-foreground">{merchant.branchName ?? "-"}</div>
+                              <div className="truncate text-sm text-muted-foreground">{merchant.categoryName ?? "-"}</div>
+                              <div className="min-w-0">
+                                {merchant.ownerUserId != null ? (
+                                  <Link
+                                    href={`/account-management?userId=${merchant.ownerUserId}`}
+                                    className="truncate text-sm font-medium text-primary transition-colors hover:underline"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    {ownerLabel}
+                                  </Link>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Belum terhubung</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {filteredAvailableMerchants.length === 0 ? (
+                          <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                            Tidak ada merchant yang cocok dengan pencarian.
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center px-5 py-10">
+                  <div className="w-full max-w-2xl rounded-3xl border border-dashed border-border/80 bg-muted/20 p-8 text-center">
+                    <div className="text-xs font-semibold tracking-[0.22em] uppercase text-primary">
+                      Empty State
+                    </div>
+                    <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                      Tidak ada user account
+                    </h2>
+                    <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+                      Admin tetap bisa membuat account baru dari tombol Tambah. Setelah account dibuat, merchant
+                      bisa langsung dihubungkan ke account tersebut.
+                    </p>
+                    <div className="mt-6 flex justify-center">
+                      <Button type="button" className="gap-2" onClick={openCreateSheet}>
+                        <IconPlus className="size-4" />
+                        Tambah Account
+                      </Button>
                     </div>
                   </div>
-                </TabsContent>
-              </Tabs>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-border/70 bg-background/95 px-5 py-4 backdrop-blur">

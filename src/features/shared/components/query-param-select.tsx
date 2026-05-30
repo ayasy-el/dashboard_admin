@@ -21,19 +21,15 @@ type QueryParamSelectProps = {
   value: string | null;
   options: QueryParamOption[];
   paramKey: string;
-  allLabel: string;
   placeholder: string;
   ariaLabel: string;
   className?: string;
 };
 
-const ALL_VALUE = "__all__";
-
 export function QueryParamSelect({
   value,
   options,
   paramKey,
-  allLabel,
   placeholder,
   ariaLabel,
   className,
@@ -44,16 +40,11 @@ export function QueryParamSelect({
   const [isPending, startTransition] = React.useTransition();
   useBindGlobalLoading(isPending);
 
-  const selectedValue = value ?? ALL_VALUE;
+  const selectedValue = value ?? options[0]?.value ?? "";
 
   const onValueChange = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
-
-    if (next === ALL_VALUE) {
-      params.delete(paramKey);
-    } else {
-      params.set(paramKey, next);
-    }
+    params.set(paramKey, next);
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`);
@@ -66,9 +57,6 @@ export function QueryParamSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="rounded-xl">
-        <SelectItem value={ALL_VALUE} className="rounded-lg">
-          {allLabel}
-        </SelectItem>
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value} className="rounded-lg">
             {option.label}

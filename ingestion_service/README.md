@@ -1,16 +1,15 @@
 # Data Ingestion Service
 
-FastAPI service untuk upload CSV, trigger pipeline ingestion, monitoring batch, rerun batch gagal, dan melihat rejected rows.
+FastAPI service untuk upload CSV, trigger pipeline ingestion, monitoring batch, rollback batch yang salah, dan melihat rejected rows.
 
 ## Fitur
 
 - `POST /ingest/{dataset}` upload CSV + create batch + trigger Prefect flow
 - `GET /ingest/{batch_id}` status batch dan metrics
 - `GET /ingest` list batch (filter `dataset`, `status`)
-- `POST /ingest/{batch_id}/rerun` buat batch baru dari source file yang sama, lalu jalankan ingestion
 - `GET /ingest/{batch_id}/rejected` list rejected rows
 - `POST /ingest/{batch_id}/rejected/{rejected_id}/ignore` ignore rejected row
-- `POST /ingest/{batch_id}/rejected/{rejected_id}/solve` solve + apply (default tidak rerun, pakai `?rerun=true` jika ingin rerun)
+- `POST /ingest/{batch_id}/rejected/{rejected_id}/solve` solve + apply
 
 Dataset yang didukung:
 
@@ -77,9 +76,9 @@ Untuk observability UI Prefect, jalankan worker/server Prefect sesuai environmen
 - Tidak semua error bisa auto-solve.
 - Auto-solve saat ini fokus ke update current rule state di `dim_merchant`:
   - sistem akan update `point_redeem`, `start_period`, dan `end_period` pada merchant existing
-  - lalu hapus rejected row dan rerun batch bila perlu
+  - lalu hapus rejected row dan upload ulang batch bila perlu
 - Error FK/dependency (merchant/cluster tidak ditemukan) tetap butuh perbaikan data referensi terlebih dahulu.
-- Setelah ingestion, solve, ignore, atau rerun yang mengubah data warehouse, materialized view akan di-refresh di background.
+- Setelah ingestion, solve, ignore, atau rollback yang mengubah data warehouse, materialized view akan di-refresh di background.
 
 ## Integrasi Dashboard (Next.js)
 

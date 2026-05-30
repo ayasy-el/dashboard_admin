@@ -28,7 +28,7 @@ def issue_fields(
     start_period = str(incoming.get("start_period") or "").strip() or None
     end_period = str(incoming.get("end_period") or "").strip() or None
 
-    # Stable key for global issue identity across rerun batches.
+    # Stable key for global issue identity across batch uploads.
     if kind == "RULE_PERIOD_OVERLAP" and merchant_key and start_period and end_period:
         key = f"{dataset}|{kind}|{merchant_key}|{start_period}|{end_period}"
     elif kind in {"FK_VIOLATION", "FK_MISSING", "FK_AMBIGUOUS"} and merchant_key:

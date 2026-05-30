@@ -428,7 +428,6 @@ export function MerchantDetailContent({
               value={data.month}
               options={monthOptions}
               paramKey="month"
-              allLabel="Semua bulan"
               placeholder="Pilih bulan"
               ariaLabel="Pilih bulan detail merchant"
               className="w-full min-w-[220px] bg-background lg:w-[220px]"

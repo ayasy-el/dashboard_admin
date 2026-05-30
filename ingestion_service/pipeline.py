@@ -112,7 +112,7 @@ def _build_master_load_error(cur, row: dict[str, Any], exc: Exception) -> tuple[
         }
         message = (
             "Referensi foreign key tidak valid. Data dependency belum ada "
-            "(contoh merchant/cluster). Upload data referensi dulu lalu rerun."
+            "(contoh merchant/cluster). Upload data referensi dulu lalu upload ulang batch."
         )
         return "FK_MISSING", message, payload
 

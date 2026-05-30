@@ -21,7 +21,6 @@ from ingestion_service.db import (
     count_rejected_rows,
     count_source_file_references,
     create_batch,
-    create_rerun_batch,
     delete_rejected_row,
     get_batch,
     get_conn,
@@ -36,7 +35,6 @@ from ingestion_service.db import (
 from ingestion_service.flows import run_ingestion_flow
 
 app = FastAPI(title="Data Ingestion Service", version="0.1.0")
-RERUN_ALLOWED_STATUSES = FAILED_STATUSES | {"SUCCESS"}
 REQUIRED_CSV_HEADERS: dict[str, set[str]] = {
     "list_kota": {"region", "branch", "cluster"},
     "master": {
@@ -345,7 +343,7 @@ def _resolution_for_row(
             "can_solve": False,
             "solve_mode": "MANUAL_REQUIRED",
             "label": "Tidak bisa auto-solve",
-            "help": "Data referensi/dependency perlu diperbaiki dulu, lalu rerun batch.",
+            "help": "Data referensi/dependency perlu diperbaiki dulu, lalu upload ulang batch.",
         }
 
     if (
@@ -357,14 +355,14 @@ def _resolution_for_row(
             "can_solve": False,
             "solve_mode": "MANUAL_REQUIRED",
             "label": "Tidak bisa auto-solve",
-            "help": "Upload data master/list_kota/dependency yang hilang, lalu rerun.",
+            "help": "Upload data master/list_kota/dependency yang hilang, lalu upload ulang batch.",
         }
 
     return {
         "can_solve": False,
         "solve_mode": "UNKNOWN",
         "label": "Belum ada auto-solve",
-        "help": "Cek payload error, perbaiki data sumber, lalu rerun.",
+        "help": "Cek payload error, perbaiki data sumber, lalu upload ulang batch.",
     }
 
 
@@ -633,32 +631,6 @@ def download_batch_source(batch_id: str):
     )
 
 
-@app.post("/ingest/{batch_id}/rerun")
-def rerun_batch(batch_id: str, background_tasks: BackgroundTasks):
-    batch = get_batch(batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Batch not found")
-
-    if batch["status"] not in RERUN_ALLOWED_STATUSES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Batch status {batch['status']} tidak bisa di-rerun",
-        )
-
-    try:
-        new_batch = create_rerun_batch(batch_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Batch not found")
-
-    background_tasks.add_task(run_ingestion_flow, new_batch["internal_batch_id"])
-    return {
-        "source_batch_id": batch_id,
-        "new_batch_id": new_batch["batch_id"],
-        "source_status": batch["status"],
-        "rerun": "queued",
-    }
-
-
 @app.post("/ingest/{batch_id}/rollback")
 def rollback_ingestion_batch(batch_id: str):
     batch = get_batch(batch_id)
@@ -758,8 +730,6 @@ def ignore_rejected(batch_id: str, rejected_id: int):
 def solve_rejected(
     batch_id: str,
     rejected_id: int,
-    background_tasks: BackgroundTasks,
-    rerun: bool = Query(default=False),
 ):
     batch = get_batch(batch_id)
     if not batch:
@@ -782,21 +752,9 @@ def solve_rejected(
         if affected_batch_id == batch_id:
             continue
         _refresh_batch_metrics_after_rejected_cleanup(affected_batch_id)
-    queued = False
-    rerun_batch_id = None
-    if rerun:
-        rerun_batch_meta = create_rerun_batch(batch_id)
-        rerun_batch_id = rerun_batch_meta["batch_id"]
-        background_tasks.add_task(
-            run_ingestion_flow, rerun_batch_meta["internal_batch_id"]
-        )
-        queued = True
-
     return {
         "batch_id": batch_id,
         "rejected_id": rejected_id,
         "action": "solved",
-        "rerun": "queued" if queued else "skipped",
-        "rerun_batch_id": rerun_batch_id,
         "metrics": metrics,
     }
