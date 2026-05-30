@@ -83,6 +83,15 @@ const resolveSuggestion = (row: RejectedRow) => {
   return "Perbaiki data sumber lalu klik Solve & Apply atau rollback batch jika perlu.";
 };
 
+const getIssueGroupMeta = (row: RejectedRow) => {
+  const errorDescription = row.error_message.trim();
+  const label = errorDescription.length > 0 ? errorDescription : `Row ${row.row_num}`;
+  const key = errorDescription.length > 0 ? `error:${errorDescription.toLowerCase()}` : `row:${row.id}`;
+  const subLabel = row.error_type ? `Type: ${row.error_type}` : null;
+
+  return { key, label, subLabel };
+};
+
 const base64ToBlob = (base64: string, contentType?: string | null) => {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -133,6 +142,7 @@ export default function IngestionClient({
   const [hasMoreRejected, setHasMoreRejected] = useState(false);
   const [selectedRejectedIds, setSelectedRejectedIds] = useState<number[]>([]);
   const [expandedComparisonIds, setExpandedComparisonIds] = useState<number[]>([]);
+  const [expandedIssueGroupKeys, setExpandedIssueGroupKeys] = useState<Set<string>>(new Set());
   const [loadingIssueResolution, setLoadingIssueResolution] = useState(false);
   const [issueSearch, setIssueSearch] = useState("");
   const [issueTypeFilter, setIssueTypeFilter] = useState("ALL");
@@ -401,6 +411,47 @@ export default function IngestionClient({
       return matchesSearch && matchesType && matchesSolve;
     });
   }, [rejected, deferredIssueSearch, issueTypeFilter, issueSolveFilter]);
+
+  const groupedRejected = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        subLabel: string | null;
+        rows: RejectedRow[];
+      }
+    >();
+
+    filteredRejected.forEach((row) => {
+      const meta = getIssueGroupMeta(row);
+      const existing = groups.get(meta.key);
+      if (existing) {
+        existing.rows.push(row);
+        return;
+      }
+
+      groups.set(meta.key, { ...meta, rows: [row] });
+    });
+
+    return Array.from(groups.values());
+  }, [filteredRejected]);
+
+  useEffect(() => {
+    setExpandedIssueGroupKeys(new Set());
+  }, [selectedBatchId]);
+
+  useEffect(() => {
+    if (groupedRejected.length === 0) {
+      setExpandedIssueGroupKeys(new Set());
+      return;
+    }
+
+    setExpandedIssueGroupKeys((current) => {
+      if (current.size > 0) return current;
+      return new Set(groupedRejected.map((group) => group.key));
+    });
+  }, [groupedRejected]);
 
   const totalRejectedPages = Math.max(1, Math.ceil(rejectedCount / REJECTED_PAGE_SIZE));
   const rejectedPageStart = rejectedCount === 0 ? 0 : (rejectedPage - 1) * REJECTED_PAGE_SIZE + 1;
@@ -758,7 +809,7 @@ export default function IngestionClient({
                   onChange={(e) => onToggleAllRejected(e.target.checked)}
                   disabled={busy || loadingIssueResolution || filteredRejected.length === 0}
                 />
-                Select all shown issue
+                Select all shown issues
               </label>
             </div>
             <div className="overflow-x-auto rounded-xl border border-border/80">
@@ -793,209 +844,299 @@ export default function IngestionClient({
                       </td>
                     </tr>
                   ) : (
-                    filteredRejected.map((row) => {
-                      const incoming = row.conflict?.incoming ?? null;
-                      const existingList = row.conflict?.existing ?? [];
-                      const existing = existingList[0] ?? null;
-                      const hasComparison = Boolean(incoming || existing);
-                      const isComparisonExpanded = expandedComparisonIds.includes(row.id);
-                      const visibleConflictFields = COMPACT_CONFLICT_FIELDS.filter((field) => {
-                        const incomingValue = incoming ? toText(incoming[field]) : "-";
-                        const existingValue = existing ? toText(existing[field]) : "-";
-                        return incomingValue !== "-" || existingValue !== "-";
-                      });
-                      const changedFields =
-                        incoming && existing
-                          ? visibleConflictFields.filter((field) =>
-                              fieldChanged(incoming, existing, field),
-                            )
-                          : [];
-                      const hasValueChanges = changedFields.length > 0;
-                      const changedValuePairs =
-                        incoming && existing
-                          ? changedFields.map((field) => ({
-                              field: prettyLabel(field),
-                              before: toText(existing[field]),
-                              after: toText(incoming[field]),
-                            }))
-                          : [];
-                      const comparisonKeyword = incoming
-                        ? toText(incoming.keyword)
-                        : existing
-                          ? toText(existing.keyword)
-                          : "-";
+                    groupedRejected.map((group) => {
+                      const isGroupExpanded = expandedIssueGroupKeys.has(group.key);
+                      const selectedInGroup = group.rows.filter((row) =>
+                        selectedRejectedIds.includes(row.id),
+                      );
+                      const groupAllSelected =
+                        group.rows.length > 0 && selectedInGroup.length === group.rows.length;
+                      const groupSomeSelected =
+                        selectedInGroup.length > 0 && selectedInGroup.length < group.rows.length;
 
                       return (
-                        <Fragment key={`issue-${row.id}`}>
-                          <tr className="border-b align-top hover:bg-muted/50">
-                            <td className="p-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedRejectedIds.includes(row.id)}
-                                onChange={(e) => onToggleRejected(row.id, e.target.checked)}
-                                disabled={busy}
-                              />
-                            </td>
-                            <td className="p-3 font-semibold text-foreground">Row {row.row_num}</td>
-                            <td className="p-3">
-                              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold tracking-wide text-foreground/80">
-                                {row.error_type}
-                              </span>
-                            </td>
-                            <td className="p-3 max-w-[28rem] break-words text-foreground/90">
-                              {row.error_message}
-                            </td>
-                            <td className="p-3 max-w-[22rem] break-words text-foreground/80">
-                              {resolveSuggestion(row)}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex flex-col gap-2">
-                                <Button
-                                  size="sm"
-                                  className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
-                                  variant="outline"
-                                  disabled={busy}
-                                  onClick={() => void onIgnore(row.id)}
-                                >
-                                  Ignore
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
-                                  disabled={busy || !row.resolution?.can_solve}
-                                  onClick={() => void onSolve(row.id)}
-                                  title={
-                                    row.resolution?.can_solve
-                                      ? "Apply solve ke database"
-                                      : (row.resolution?.help ?? "Tidak bisa auto-solve")
-                                  }
-                                >
-                                  Solve & Apply
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                          {hasComparison && hasValueChanges ? (
-                            <tr className="border-b bg-muted/40">
-                              <td className="p-3" colSpan={6}>
-                                <button
-                                  type="button"
-                                  className="w-full rounded-lg border border-border bg-background px-3 py-3 text-left shadow-sm transition-colors hover:border-primary/20 hover:bg-accent/50"
-                                  onClick={() => onToggleComparison(row.id)}
-                                  aria-expanded={isComparisonExpanded}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="flex min-w-0 items-center gap-2">
-                                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs font-semibold text-muted-foreground">
-                                          <svg
-                                            viewBox="0 0 24 24"
-                                            className={`h-3.5 w-3.5 transition-transform ${isComparisonExpanded ? "rotate-90" : ""}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <path d="M9 6l6 6-6 6" />
-                                          </svg>
-                                        </span>
-                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                          Keyword
-                                        </span>
-                                        <span className="truncate font-mono text-sm font-semibold text-foreground">
-                                          {comparisonKeyword}
-                                        </span>
-                                      </div>
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8">
-                                        {changedValuePairs.length > 0 ? (
-                                          changedValuePairs.map((item) => (
-                                            <span
-                                              key={`diff-summary-${row.id}-${item.field}`}
-                                              className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-1 text-xs"
-                                            >
-                                              <span className="font-medium text-muted-foreground">
-                                                {item.field}
-                                              </span>
-                                              <span className="max-w-[8rem] truncate rounded bg-primary/10 px-1 py-0.5 font-mono text-primary">
-                                                {item.before}
-                                              </span>
-                                              <span className="text-muted-foreground">-&gt;</span>
-                                              <span className="max-w-[8rem] truncate rounded bg-emerald-500/10 px-1 py-0.5 font-mono text-emerald-700 dark:text-emerald-300">
-                                                {item.after}
-                                              </span>
-                                            </span>
-                                          ))
-                                        ) : (
-                                          <span className="text-xs text-muted-foreground">
-                                            Tidak ada perubahan nilai.
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold tracking-wide text-primary uppercase">
-                                      {changedFields.length} changed
+                        <Fragment key={group.key}>
+                          <tr className="border-b bg-muted/30">
+                            <td className="p-0" colSpan={6}>
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50"
+                                onClick={() => {
+                                  setExpandedIssueGroupKeys((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(group.key)) {
+                                      next.delete(group.key);
+                                    } else {
+                                      next.add(group.key);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                aria-expanded={isGroupExpanded}
+                              >
+                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className={`h-4 w-4 transition-transform ${isGroupExpanded ? "rotate-90" : ""}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M9 6l6 6-6 6" />
+                                  </svg>
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={groupAllSelected}
+                                  ref={(element) => {
+                                    if (element) {
+                                      element.indeterminate = groupSomeSelected;
+                                    }
+                                  }}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) => {
+                                    const checked = event.target.checked;
+                                    const next = new Set(selectedRejectedIds);
+                                    group.rows.forEach((row) => {
+                                      if (checked) {
+                                        next.add(row.id);
+                                      } else {
+                                        next.delete(row.id);
+                                      }
+                                    });
+                                    setSelectedRejectedIds(Array.from(next));
+                                  }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <span
+                                      className="truncate font-semibold text-foreground"
+                                      title={group.label}
+                                    >
+                                      {group.label}
+                                    </span>
+                                    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                      {group.rows.length} issues
                                     </span>
                                   </div>
-                                </button>
-                                {isComparisonExpanded ? (
-                                  <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-background">
-                                    <table className="min-w-[860px] w-full">
-                                      <thead>
-                                        <tr className="border-b bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-                                          <th className="p-2.5 text-left">Field Name</th>
-                                          <th className="p-2.5 text-left text-emerald-700 dark:text-emerald-300">
-                                            Incoming Data
-                                          </th>
-                                          <th className="p-2.5 text-left text-amber-700 dark:text-amber-300">
-                                            Existing Data
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {visibleConflictFields.map((field) => {
-                                          const changed =
-                                            incoming && existing
-                                              ? fieldChanged(incoming, existing, field)
-                                              : false;
-                                          return (
-                                            <tr
-                                              key={`compare-row-${row.id}-${field}`}
-                                              className={`border-b ${changed ? "bg-primary/5" : ""}`}
-                                            >
-                                              <td
-                                                className={`p-2.5 text-sm font-medium ${changed ? "text-primary" : "text-muted-foreground"}`}
-                                              >
-                                                {prettyLabel(field)}
-                                              </td>
-                                              <td className="p-2.5 text-sm text-foreground">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="break-words">
-                                                    {incoming ? toText(incoming[field]) : "-"}
+                                  {group.subLabel ? (
+                                    <div className="mt-1 text-xs text-muted-foreground">{group.subLabel}</div>
+                                  ) : null}
+                                </div>
+                              </button>
+                            </td>
+                          </tr>
+                          {isGroupExpanded
+                            ? group.rows.map((row) => {
+                                const incoming = row.conflict?.incoming ?? null;
+                                const existingList = row.conflict?.existing ?? [];
+                                const existing = existingList[0] ?? null;
+                                const hasComparison = Boolean(incoming || existing);
+                                const isComparisonExpanded = expandedComparisonIds.includes(row.id);
+                                const visibleConflictFields = COMPACT_CONFLICT_FIELDS.filter((field) => {
+                                  const incomingValue = incoming ? toText(incoming[field]) : "-";
+                                  const existingValue = existing ? toText(existing[field]) : "-";
+                                  return incomingValue !== "-" || existingValue !== "-";
+                                });
+                                const changedFields =
+                                  incoming && existing
+                                    ? visibleConflictFields.filter((field) =>
+                                        fieldChanged(incoming, existing, field),
+                                      )
+                                    : [];
+                                const hasValueChanges = changedFields.length > 0;
+                                const changedValuePairs =
+                                  incoming && existing
+                                    ? changedFields.map((field) => ({
+                                        field: prettyLabel(field),
+                                        before: toText(existing[field]),
+                                        after: toText(incoming[field]),
+                                      }))
+                                    : [];
+                                const comparisonKeyword = incoming
+                                  ? toText(incoming.keyword)
+                                  : existing
+                                    ? toText(existing.keyword)
+                                    : "-";
+
+                                return (
+                                  <Fragment key={`issue-${row.id}`}>
+                                    <tr className="border-b align-top hover:bg-muted/50">
+                                      <td className="p-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedRejectedIds.includes(row.id)}
+                                          onChange={(e) => onToggleRejected(row.id, e.target.checked)}
+                                          disabled={busy}
+                                        />
+                                      </td>
+                                      <td className="p-3 font-semibold text-foreground">Row {row.row_num}</td>
+                                      <td className="p-3">
+                                        <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold tracking-wide text-foreground/80">
+                                          {row.error_type}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 max-w-[28rem] break-words text-foreground/90">
+                                        {row.error_message}
+                                      </td>
+                                      <td className="p-3 max-w-[22rem] break-words text-foreground/80">
+                                        {resolveSuggestion(row)}
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="flex flex-col gap-2">
+                                          <Button
+                                            size="sm"
+                                            className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
+                                            variant="outline"
+                                            disabled={busy}
+                                            onClick={() => void onIgnore(row.id)}
+                                          >
+                                            Ignore
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            className="h-9 w-full cursor-pointer disabled:cursor-not-allowed"
+                                            disabled={busy || !row.resolution?.can_solve}
+                                            onClick={() => void onSolve(row.id)}
+                                            title={
+                                              row.resolution?.can_solve
+                                                ? "Apply solve ke database"
+                                                : (row.resolution?.help ?? "Tidak bisa auto-solve")
+                                            }
+                                          >
+                                            Solve & Apply
+                                          </Button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    {hasComparison && hasValueChanges ? (
+                                      <tr className="border-b bg-muted/40">
+                                        <td className="p-3" colSpan={6}>
+                                          <button
+                                            type="button"
+                                            className="w-full rounded-lg border border-border bg-background px-3 py-3 text-left shadow-sm transition-colors hover:border-primary/20 hover:bg-accent/50"
+                                            onClick={() => onToggleComparison(row.id)}
+                                            aria-expanded={isComparisonExpanded}
+                                          >
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs font-semibold text-muted-foreground">
+                                                    <svg
+                                                      viewBox="0 0 24 24"
+                                                      className={`h-3.5 w-3.5 transition-transform ${isComparisonExpanded ? "rotate-90" : ""}`}
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      aria-hidden="true"
+                                                    >
+                                                      <path d="M9 6l6 6-6 6" />
+                                                    </svg>
                                                   </span>
-                                                  {changed ? (
-                                                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground uppercase">
-                                                      Changed
-                                                    </span>
-                                                  ) : null}
+                                                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                    Keyword
+                                                  </span>
+                                                  <span className="truncate font-mono text-sm font-semibold text-foreground">
+                                                    {comparisonKeyword}
+                                                  </span>
                                                 </div>
-                                              </td>
-                                              <td
-                                                className={`p-2.5 text-sm ${changed ? "text-muted-foreground line-through" : "text-muted-foreground"}`}
-                                              >
-                                                {existing ? toText(existing[field]) : "-"}
-                                              </td>
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                ) : null}
-                              </td>
-                            </tr>
-                          ) : null}
+                                                <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8">
+                                                  {changedValuePairs.length > 0 ? (
+                                                    changedValuePairs.map((item) => (
+                                                      <span
+                                                        key={`diff-summary-${row.id}-${item.field}`}
+                                                        className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-1 text-xs"
+                                                      >
+                                                        <span className="font-medium text-muted-foreground">
+                                                          {item.field}
+                                                        </span>
+                                                        <span className="max-w-[8rem] truncate rounded bg-primary/10 px-1 py-0.5 font-mono text-primary">
+                                                          {item.before}
+                                                        </span>
+                                                        <span className="text-muted-foreground">-&gt;</span>
+                                                        <span className="max-w-[8rem] truncate rounded bg-emerald-500/10 px-1 py-0.5 font-mono text-emerald-700 dark:text-emerald-300">
+                                                          {item.after}
+                                                        </span>
+                                                      </span>
+                                                    ))
+                                                  ) : (
+                                                    <span className="text-xs text-muted-foreground">
+                                                      Tidak ada perubahan nilai.
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold tracking-wide text-primary uppercase">
+                                                {changedFields.length} changed
+                                              </span>
+                                            </div>
+                                          </button>
+                                          {isComparisonExpanded ? (
+                                            <div className="mt-2 overflow-x-auto rounded-lg border border-border bg-background">
+                                              <table className="min-w-[860px] w-full">
+                                                <thead>
+                                                  <tr className="border-b bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+                                                    <th className="p-2.5 text-left">Field Name</th>
+                                                    <th className="p-2.5 text-left text-emerald-700 dark:text-emerald-300">
+                                                      Incoming Data
+                                                    </th>
+                                                    <th className="p-2.5 text-left text-amber-700 dark:text-amber-300">
+                                                      Existing Data
+                                                    </th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {visibleConflictFields.map((field) => {
+                                                    const changed =
+                                                      incoming && existing
+                                                        ? fieldChanged(incoming, existing, field)
+                                                        : false;
+                                                    return (
+                                                      <tr
+                                                        key={`compare-row-${row.id}-${field}`}
+                                                        className={`border-b ${changed ? "bg-primary/5" : ""}`}
+                                                      >
+                                                        <td
+                                                          className={`p-2.5 text-sm font-medium ${changed ? "text-primary" : "text-muted-foreground"}`}
+                                                        >
+                                                          {prettyLabel(field)}
+                                                        </td>
+                                                        <td className="p-2.5 text-sm text-foreground">
+                                                          <div className="flex items-center gap-2">
+                                                            <span className="break-words">
+                                                              {incoming ? toText(incoming[field]) : "-"}
+                                                            </span>
+                                                            {changed ? (
+                                                              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground uppercase">
+                                                                Changed
+                                                              </span>
+                                                            ) : null}
+                                                          </div>
+                                                        </td>
+                                                        <td
+                                                          className={`p-2.5 text-sm ${changed ? "text-muted-foreground line-through" : "text-muted-foreground"}`}
+                                                        >
+                                                          {existing ? toText(existing[field]) : "-"}
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          ) : null}
+                                        </td>
+                                      </tr>
+                                    ) : null}
+                                  </Fragment>
+                                );
+                              })
+                            : null}
                         </Fragment>
                       );
                     })
