@@ -12,6 +12,10 @@ type ListResponse<T> = {
   items?: T[];
 };
 
+export type UploadBatchResult =
+  | { ok: true; batch_id: string }
+  | { ok: false; error: string };
+
 const toBaseUrl = () => (API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE);
 
 const requestJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -42,12 +46,20 @@ export async function getRejected(batchId: string, limit = 100, offset = 0): Pro
   return requestJson<RejectedListResponse>(`/ingest/${batchId}/rejected?limit=${limit}&offset=${offset}`);
 }
 
-export async function uploadBatch(dataset: Dataset, formData: FormData): Promise<{ batch_id: string }> {
+export async function uploadBatch(dataset: Dataset, formData: FormData): Promise<UploadBatchResult> {
   await requireAdminUser("/ingestion");
-  return requestJson<{ batch_id: string }>(`/ingest/${dataset}`, {
-    method: "POST",
-    body: formData,
-  });
+  try {
+    const body = await requestJson<{ batch_id: string }>(`/ingest/${dataset}`, {
+      method: "POST",
+      body: formData,
+    });
+    return { ok: true, batch_id: body.batch_id };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Upload gagal",
+    };
+  }
 }
 
 export async function rollbackBatch(batchId: string): Promise<RollbackBatchResponse> {

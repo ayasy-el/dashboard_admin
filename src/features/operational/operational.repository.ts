@@ -21,7 +21,7 @@ export type OperationalRawData = {
     merchantAktif: number;
     merchantProduktif: number;
     merchantNotActive: number;
-    merchantExpired: number;
+    merchantExpiring: number;
   };
   successCurrent: number;
   failedCurrent: number;
@@ -36,7 +36,7 @@ export type OperationalRawData = {
     transactionCount: number;
     uniqRedeemer: number;
   }[];
-  expiredRules: {
+  expiringRules: {
     branch: string;
     merchant: string;
     keyword: string;

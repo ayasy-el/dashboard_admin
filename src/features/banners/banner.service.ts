@@ -79,7 +79,6 @@ const normalizeBannerPatchPayload = (payload: z.infer<typeof bannerPatchSchema>)
 };
 
 const normalizeProgramAssetPayload = (payload: z.infer<typeof programAssetPayloadSchema>) => ({
-  ruleKey: null,
   keywordCode: payload.keywordCode.trim(),
   imageUrl: payload.imageUrl.trim(),
   isActive: payload.isActive,

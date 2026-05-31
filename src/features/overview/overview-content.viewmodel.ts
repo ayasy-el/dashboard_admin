@@ -161,7 +161,7 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     {},
   );
 
-  const expiredCountByBranch = data.expiredMerchants.reduce<Record<string, number>>(
+  const expiringCountByBranch = data.expiringMerchants.reduce<Record<string, number>>(
     (accumulator, merchant) => {
       accumulator[merchant.branch] = (accumulator[merchant.branch] ?? 0) + 1;
       return accumulator;
@@ -170,17 +170,17 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
   );
 
   const alertBranches = Array.from(
-    new Set([...Object.keys(inactiveCountByBranch), ...Object.keys(expiredCountByBranch)]),
+    new Set([...Object.keys(inactiveCountByBranch), ...Object.keys(expiringCountByBranch)]),
   );
 
   const inactiveRows: RankedRow[] = alertBranches
     .map((branch) => ({
       branch,
       notActive: inactiveCountByBranch[branch] ?? 0,
-      expired: expiredCountByBranch[branch] ?? 0,
+      expiring: expiringCountByBranch[branch] ?? 0,
     }))
-    .sort((left, right) => right.notActive + right.expired - (left.notActive + left.expired))
-    .map((row) => [row.branch, formatNumber(row.notActive), formatNumber(row.expired)]);
+    .sort((left, right) => right.notActive + right.expiring - (left.notActive + left.expiring))
+    .map((row) => [row.branch, formatNumber(row.notActive), formatNumber(row.expiring)]);
 
   const inactiveDetailRows: RankedRow[] = data.notActiveMerchants.map((merchant) => [
     merchant.branch,
@@ -188,7 +188,7 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     merchant.keyword,
   ]);
 
-  const expiredRows: RankedRow[] = data.expiredMerchants.map((merchant) => [
+  const expiringRows: RankedRow[] = data.expiringMerchants.map((merchant) => [
     merchant.branch,
     merchant.merchant,
     merchant.keyword,
@@ -217,8 +217,8 @@ export function buildOverviewContentViewModel(data: OverviewResponse) {
     productiveRows,
     inactiveRows,
     inactiveDetailRows,
-    expiredRows,
-    totalExpiredMerchants: data.expiredMerchants.length,
+    expiringRows,
+    totalExpiringMerchants: data.expiringMerchants.length,
     merchantPerMonthRows,
   };
 }

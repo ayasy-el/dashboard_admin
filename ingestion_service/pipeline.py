@@ -364,8 +364,6 @@ def clean_data(batch_id: str) -> int:
                     merchant_key = stable_uuid("merchant", keyword)
                     category_id = stable_bigint_id("CAT", category) % 2_000_000_000
                     cluster_id = stable_bigint_id("CLUSTER", region, branch, cluster)
-                    rule_key = stable_uuid("rule", keyword)
-
                     cur.execute(
                         """
                         insert into stg.master_clean
@@ -373,10 +371,10 @@ def clean_data(batch_id: str) -> int:
                             batch_id, row_num, uniq_merchant, merchant_name, keyword,
                             category, point_redeem, start_period, end_period,
                             region, branch, cluster,
-                            merchant_key, category_id, cluster_id, rule_key, raw_payload
+                            merchant_key, category_id, cluster_id, raw_payload
                           )
                         values
-                          (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                          (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             batch_id,
@@ -394,7 +392,6 @@ def clean_data(batch_id: str) -> int:
                             merchant_key,
                             category_id,
                             cluster_id,
-                            rule_key,
                             Json(raw_payload),
                         ),
                     )
@@ -592,7 +589,7 @@ def load_data(batch_id: str) -> int:
                 with dedup as (
                     select
                         merchant_key, keyword, merchant_name, uniq_merchant, cluster, category_id,
-                        point_redeem, start_period, end_period, rule_key,
+                        point_redeem, start_period, end_period,
                         row_number() over (
                             partition by keyword
                             order by row_num desc
@@ -613,7 +610,7 @@ def load_data(batch_id: str) -> int:
                 insert into public.dim_merchant
                   (
                     merchant_key, keyword_code, merchant_name, uniq_merchant,
-                    rule_key, point_redeem, start_period, end_period,
+                    point_redeem, start_period, end_period,
                     cluster_id, category_id, source_batch_id
                   )
                 select
@@ -621,7 +618,6 @@ def load_data(batch_id: str) -> int:
                     candidates.keyword,
                     candidates.merchant_name,
                     candidates.uniq_merchant,
-                    candidates.rule_key,
                     candidates.point_redeem,
                     candidates.start_period,
                     candidates.end_period,
@@ -634,7 +630,6 @@ def load_data(batch_id: str) -> int:
                 set merchant_key = excluded.merchant_key,
                     merchant_name = excluded.merchant_name,
                     uniq_merchant = excluded.uniq_merchant,
-                    rule_key = excluded.rule_key,
                     point_redeem = excluded.point_redeem,
                     start_period = excluded.start_period,
                     end_period = excluded.end_period,
@@ -702,12 +697,11 @@ def load_data(batch_id: str) -> int:
             cur.execute(
                 """
                 insert into public.fact_transaction
-                  (transaction_key, transaction_at, date_key, rule_key, merchant_key, status, qty, point_redeem, msisdn, created_at, source_batch_id)
+                  (transaction_key, transaction_at, date_key, merchant_key, status, qty, point_redeem, msisdn, created_at, source_batch_id)
                 select
                   c.transaction_key,
                   c.transaction_at,
                   to_char(c.transaction_at::date, 'YYYYMMDD')::int as date_key,
-                  m.rule_key,
                   m.merchant_key,
                   c.status::transaction_status,
                   c.qty,
@@ -721,7 +715,6 @@ def load_data(batch_id: str) -> int:
                 on conflict (transaction_key) do update
                 set transaction_at = excluded.transaction_at,
                     date_key = excluded.date_key,
-                    rule_key = excluded.rule_key,
                     merchant_key = excluded.merchant_key,
                     status = excluded.status,
                     qty = excluded.qty,

@@ -5,6 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useBindGlobalLoading } from "@/components/global-loading-provider";
 import {
+  DASHBOARD_FILTER_COOKIE_MAX_AGE,
+  DASHBOARD_FILTER_COOKIE_NAME,
+  parseDashboardFilterCookie,
+  serializeDashboardFilterCookie,
+} from "@/lib/dashboard-filters";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -26,6 +32,19 @@ type QueryParamSelectProps = {
   className?: string;
 };
 
+const updateDashboardFilterCookie = (month: string) => {
+  const cookieValue = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith(`${DASHBOARD_FILTER_COOKIE_NAME}=`))
+    ?.split("=")
+    .slice(1)
+    .join("=");
+  const currentFilters = parseDashboardFilterCookie(cookieValue);
+  const nextFilters = { ...currentFilters, month };
+
+  document.cookie = `${DASHBOARD_FILTER_COOKIE_NAME}=${serializeDashboardFilterCookie(nextFilters)}; path=/; max-age=${DASHBOARD_FILTER_COOKIE_MAX_AGE}; samesite=lax`;
+};
+
 export function QueryParamSelect({
   value,
   options,
@@ -45,6 +64,9 @@ export function QueryParamSelect({
   const onValueChange = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set(paramKey, next);
+    if (paramKey === "month") {
+      updateDashboardFilterCookie(next);
+    }
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`);

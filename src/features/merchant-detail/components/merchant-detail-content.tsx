@@ -84,7 +84,7 @@ type MerchantDetailContentProps = {
     ruleStatuses: {
       keyword: string;
       status: string;
-      activityStatus: string;
+      activityStatus: string | null;
       startPeriod: string;
       endPeriod: string;
       daysLeft: number;
@@ -247,13 +247,6 @@ function ActivityStatusBadge({ status }: { status: string }) {
       </Badge>
     );
   }
-  if (normalized === "expired") {
-    return (
-      <Badge className="border-transparent bg-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
-        Expired
-      </Badge>
-    );
-  }
   return (
     <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15">
       Not Active
@@ -354,6 +347,9 @@ export function MerchantDetailContent({
                 {data.identity.keyword}
               </h1>
               <p className="text-base text-muted-foreground">{data.identity.merchant}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Uniq Merchant: <span className="font-semibold text-foreground">{data.identity.uniqMerchant}</span>
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <Badge
@@ -408,21 +404,14 @@ export function MerchantDetailContent({
                   {formatNumber(data.identity.pointRedeem)}
                 </div>
               </div>
-              <div className="hidden h-8 w-px bg-border sm:block" />
-              <div className="space-y-1">
-                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-muted-foreground">
-                  Day Left
-                </div>
-                <div className="text-base font-semibold text-foreground">
-                  {primaryRule ? formatNumber(primaryRule.daysLeft) : "-"}
-                </div>
-              </div>
             </div>
           </div>
           <div className="flex w-full flex-col items-stretch gap-3 lg:w-auto lg:items-end">
             <div className="flex flex-wrap items-center gap-2">
               {primaryRule ? <StatusBadge status={primaryRule.status} /> : null}
-              {primaryRule ? <ActivityStatusBadge status={primaryRule.activityStatus} /> : null}
+              {primaryRule && primaryRule.status === "alive" ? (
+                <ActivityStatusBadge status={primaryRule.activityStatus ?? "not-active"} />
+              ) : null}
             </div>
             <QueryParamSelect
               value={data.month}

@@ -44,13 +44,14 @@ type MerchantDirectoryOverviewProps = {
     merchants: {
       keyword: string;
       merchant: string;
+      uniqMerchant: string;
       category: string;
       branch: string;
       cluster: string;
       region: string;
       pointRedeem: number;
       ruleStatus: string;
-      activityStatus: string;
+      activityStatus: string | null;
       startPeriod: string | null;
       endPeriod: string | null;
       redeem: number;
@@ -72,11 +73,11 @@ const activityTone: Record<string, string> = {
   productive: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   active: "border-transparent bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
   "not-active": "border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  expired: "border-transparent bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200",
 };
 type SortKey =
   | "keyword"
   | "merchant"
+  | "uniqMerchant"
   | "category"
   | "branch"
   | "ruleStatus"
@@ -89,6 +90,7 @@ type SortDirection = "asc" | "desc";
 const sortColumns: { key: SortKey; label: string }[] = [
   { key: "keyword", label: "KEYWORD" },
   { key: "merchant", label: "MERCHANT" },
+  { key: "uniqMerchant", label: "UNIQ MERCHANT" },
   { key: "category", label: "CATEGORY" },
   { key: "branch", label: "BRANCH" },
   { key: "ruleStatus", label: "PERIOD" },
@@ -184,12 +186,13 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
       [
         merchant.keyword,
         merchant.merchant,
+        merchant.uniqMerchant,
         merchant.category,
         merchant.branch,
         merchant.cluster,
         merchant.region,
         merchant.ruleStatus,
-        merchant.activityStatus,
+        merchant.activityStatus ?? "",
         merchant.startPeriod ?? "",
         merchant.endPeriod ?? "",
       ]
@@ -207,6 +210,8 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
           return compareText(left.keyword, right.keyword, sortState.direction);
         case "merchant":
           return compareText(left.merchant, right.merchant, sortState.direction);
+        case "uniqMerchant":
+          return compareText(left.uniqMerchant, right.uniqMerchant, sortState.direction);
         case "category":
           return compareText(left.category, right.category, sortState.direction);
         case "branch":
@@ -214,7 +219,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
         case "ruleStatus":
           return compareText(left.ruleStatus, right.ruleStatus, sortState.direction);
         case "activityStatus":
-          return compareText(left.activityStatus, right.activityStatus, sortState.direction);
+          return compareText(left.activityStatus ?? "", right.activityStatus ?? "", sortState.direction);
         case "pointRedeem":
           return compareNumber(left.pointRedeem, right.pointRedeem, sortState.direction);
         case "redeem":
@@ -351,7 +356,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
               <TableBody>
                 {paginatedMerchants.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                       Merchant tidak ditemukan.
                     </TableCell>
                   </TableRow>
@@ -374,6 +379,7 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                           {merchant.cluster}, {merchant.region}
                         </div>
                       </TableCell>
+                      <TableCell className="text-muted-foreground">{merchant.uniqMerchant}</TableCell>
                       <TableCell>{merchant.category}</TableCell>
                       <TableCell>{merchant.branch}</TableCell>
                       <TableCell>
@@ -389,14 +395,17 @@ export function MerchantDirectoryOverview({ data, monthOptions }: MerchantDirect
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          className={cn(
-                            "hover:bg-inherit",
-                            activityTone[merchant.activityStatus] ?? activityTone["not-active"],
-                          )}
-                        >
-                          {merchant.activityStatus}
-                        </Badge>
+                        {merchant.ruleStatus === "alive" ? (
+                          <Badge
+                            className={cn(
+                              "hover:bg-inherit",
+                              activityTone[merchant.activityStatus ?? "not-active"] ??
+                                activityTone["not-active"],
+                            )}
+                          >
+                            {merchant.activityStatus ?? "not-active"}
+                          </Badge>
+                        ) : null}
                       </TableCell>
                       <TableCell>{formatNumber(merchant.pointRedeem)}</TableCell>
                       <TableCell>{formatNumber(merchant.redeem)}</TableCell>

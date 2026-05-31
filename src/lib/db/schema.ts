@@ -7,7 +7,7 @@
  *   • stg     — staging (ETL) tables
  *
  * Custom migration SQL (migration_custom.sql) handles:
- *   - Extensions  : btree_gist, pgcrypto
+ *   - Extensions  : pgcrypto
  *   - ENUM types  : transaction_status
  *   - Materialized views : vw_overview_transaction, vw_merchant_tx_monthly_agg, vw_rule_merchant_dim
  *   - CHECK constraints with regex / array literals (Drizzle does not generate these natively)
@@ -31,10 +31,8 @@ import {
   jsonb,
   index,
   uniqueIndex,
-  check,
   foreignKey,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 // ─────────────────────────────────────────────
 // Schemas
@@ -138,7 +136,6 @@ export const dimMerchant = pgTable(
       .unique("dim_merchant_keyword_code_key"),
     merchantName: varchar("merchant_name", { length: 500 }).notNull(),
     uniqMerchant: varchar("uniq_merchant", { length: 500 }).notNull(),
-    ruleKey: uuid("rule_key").notNull().unique("dim_merchant_rule_key_unique"),
     pointRedeem: integer("point_redeem").notNull(),
     startPeriod: date("start_period").notNull(),
     endPeriod: date("end_period").notNull(),
@@ -157,7 +154,6 @@ export const dimMerchant = pgTable(
   (t) => [
     index("dim_merchant_idx_dim_merchant_category_id").on(t.categoryId),
     index("dim_merchant_idx_dim_merchant_cluster_id").on(t.clusterId),
-    index("dim_merchant_idx_rule_key").on(t.ruleKey),
     index("dim_merchant_source_batch_id_idx").on(t.sourceBatchId),
     index("dim_merchant_idx_user_account_id").on(t.userAccountId),
   ],
@@ -192,9 +188,6 @@ export const factTransaction = pgTable(
     dateKey: integer("date_key")
       .notNull()
       .references(() => dimDate.dateKey),
-    ruleKey: uuid("rule_key")
-      .notNull()
-      .references(() => dimMerchant.ruleKey),
     merchantKey: uuid("merchant_key")
       .notNull()
       .references(() => dimMerchant.merchantKey),
@@ -213,7 +206,6 @@ export const factTransaction = pgTable(
     ),
     index("fact_transaction_date_key_idx").on(t.dateKey),
     index("fact_transaction_index_6").on(t.msisdn),
-    index("fact_transaction_rule").on(t.ruleKey),
     index("fact_transaction_source_batch_id_idx").on(t.sourceBatchId),
   ],
 );
@@ -288,8 +280,7 @@ export const programBannerAssets = pgTable(
       startWith: 1,
       increment: 1,
     }),
-    ruleKey: uuid("rule_key"),
-    keywordCode: text("keyword_code"),
+    keywordCode: text("keyword_code").notNull(),
     imageUrl: text("image_url").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
@@ -299,19 +290,11 @@ export const programBannerAssets = pgTable(
   (t) => [
     index("idx_program_banner_assets_active").on(t.isActive),
     index("idx_program_banner_assets_keyword_code").on(t.keywordCode),
-    index("idx_program_banner_assets_rule_key").on(t.ruleKey),
-    check("program_banner_assets_target_check", sql`num_nonnulls(rule_key, keyword_code) = 1`),
-    foreignKey({
-      columns: [t.ruleKey],
-      foreignColumns: [dimMerchant.ruleKey],
-      name: "program_banner_assets_rule_key_dim_merchant_rule_key_fk",
-    }).onDelete("cascade"),
     foreignKey({
       columns: [t.keywordCode],
       foreignColumns: [dimMerchant.keywordCode],
       name: "program_banner_assets_keyword_code_dim_merchant_keyword_code_fk",
     }).onDelete("cascade"),
-    uniqueIndex("program_banner_assets_rule_key_unique").on(t.ruleKey),
     uniqueIndex("program_banner_assets_keyword_code_unique").on(t.keywordCode),
   ],
 );
@@ -473,7 +456,6 @@ export const stgMasterClean = stgSchema.table(
     merchantKey: uuid("merchant_key").notNull(),
     categoryId: integer("category_id").notNull(),
     clusterId: bigint("cluster_id", { mode: "number" }).notNull(),
-    ruleKey: uuid("rule_key").notNull(),
     rawPayload: jsonb("raw_payload").notNull(),
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow().notNull(),
   },
@@ -584,7 +566,6 @@ export const vwMerchantTxMonthlyAgg = pgView("vw_merchant_tx_monthly_agg", {
  * DDL dikelola oleh migration_custom.sql — Drizzle tidak akan generate DDL ini.
  */
 export const vwRuleMerchantDim = pgView("vw_rule_merchant_dim", {
-  ruleKey: uuid("rule_key"),
   merchantKey: uuid("merchant_key"),
   pointRedeem: integer("point_redeem"),
   startPeriod: date("start_period", { mode: "string" }),

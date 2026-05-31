@@ -87,7 +87,7 @@ export type OverviewResponse = {
     redeem: number;
     uniqueRedeem: number;
   }[];
-  expiredMerchants: {
+  expiringMerchants: {
     branch: string;
     merchant: string;
     keyword: string;

@@ -39,10 +39,6 @@ export const factTransactionRelations = relations(factTransaction, ({ one }) => 
     fields: [factTransaction.merchantKey],
     references: [dimMerchant.merchantKey],
   }),
-  dimMerchantRule: one(dimMerchant, {
-    fields: [factTransaction.ruleKey],
-    references: [dimMerchant.ruleKey],
-  }),
 }));
 
 export const adminUsersRelations = relations(adminUsers, ({ many }) => ({

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { getProgramBannerAssetByKeyword } from "@/features/banners/banner.service";
@@ -8,6 +9,7 @@ import { MerchantDetailRepositoryDrizzle } from "@/features/merchant-detail/merc
 import { DashboardPageShell } from "@/features/shared/components/dashboard-page-shell";
 import { getMonthOptions } from "@/features/shared/get-month-options";
 import { requireAdminUser } from "@/lib/auth";
+import { DASHBOARD_FILTER_COOKIE_NAME, parseDashboardFilterCookie } from "@/lib/dashboard-filters";
 
 type MerchantDetailPageProps = {
   params: Promise<{ keyword: string }>;
@@ -27,9 +29,17 @@ export default async function MerchantDetailPage({ params, searchParams }: Merch
   const user = await requireAdminUser("/merchant");
   const { keyword } = await params;
   const query = await searchParams;
+  const cookieStore = await cookies();
+  const persistedFilters = parseDashboardFilterCookie(
+    cookieStore.get(DASHBOARD_FILTER_COOKIE_NAME)?.value,
+  );
 
   const monthOptions = await getMonthOptions();
-  const selectedMonth = query.month ?? monthOptions[0]?.value ?? null;
+  const selectedMonth =
+    monthOptions.find((option) => option.value === query.month)?.value ??
+    monthOptions.find((option) => option.value === persistedFilters.month)?.value ??
+    monthOptions[0]?.value ??
+    null;
   const decodedKeyword = decodeURIComponent(keyword);
   const [detailData, programBannerAsset] = await Promise.all([
     getMerchantDetailDashboard(new MerchantDetailRepositoryDrizzle(), decodedKeyword, selectedMonth),

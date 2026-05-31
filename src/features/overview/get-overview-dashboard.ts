@@ -184,7 +184,7 @@ export async function getOverviewDashboard(
     uniqueRedeem: row.uniqueRedeem,
   }));
 
-  const expiredMerchants = raw.expiredMerchantRaw.map((row) => ({
+  const expiringMerchants = raw.expiringMerchantRaw.map((row) => ({
     branch: row.branch,
     merchant: row.merchant,
     keyword: row.keyword,
@@ -225,7 +225,7 @@ export async function getOverviewDashboard(
     categoryTable,
     notActiveMerchants,
     merchantPerMonth,
-    expiredMerchants,
+    expiringMerchants,
   };
 }
 const formatDisplayDate = (value: string) => {

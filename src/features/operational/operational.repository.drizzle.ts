@@ -102,7 +102,7 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         where vm.month_year <@ daterange(${startDate}::date, ${endDate}::date, '[)')
         group by vm.merchant_key
       ),
-      expired_merchants as (
+      expiring_merchants as (
         select distinct vr.merchant_key as merchant_key
         from vw_rule_merchant_dim vr
         where vr.end_period >= ${startDate}::date
@@ -118,7 +118,7 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
           (select count(*)::int from active_merchants) -
           (select count(*)::int from merchant_tx where tx_count >= 1)
         ) as merchant_not_active,
-        (select count(*)::int from expired_merchants) as merchant_expired
+        (select count(*)::int from expiring_merchants) as merchant_expiring
     `);
 
     const compactSummary = (compactSummaryResult.rows as Array<Record<string, unknown>>)[0];
@@ -180,7 +180,7 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
       order by am.branch, am.merchant
     `);
 
-    const expiredRules = await db.execute(sql`
+    const expiringRules = await db.execute(sql`
       select
         vr.branch as branch,
         vr.merchant_name as merchant,
@@ -310,7 +310,7 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         merchantAktif: toNumber(compactSummary?.merchant_aktif),
         merchantProduktif: toNumber(compactSummary?.merchant_productif),
         merchantNotActive: toNumber(compactSummary?.merchant_not_active),
-        merchantExpired: toNumber(compactSummary?.merchant_expired),
+        merchantExpiring: toNumber(compactSummary?.merchant_expiring),
       },
       successCurrent: toNumber(successSummary?.total),
       failedCurrent: toNumber(failedSummary?.total),
@@ -331,7 +331,7 @@ export class OperationalRepositoryDrizzle implements OperationalRepository {
         transactionCount: toNumber(row.tx_count),
         uniqRedeemer: toNumber(row.uniq_redeemer),
       })),
-      expiredRules: (expiredRules.rows as Array<Record<string, unknown>>).map((row) => ({
+      expiringRules: (expiringRules.rows as Array<Record<string, unknown>>).map((row) => ({
         branch: String(row.branch ?? ""),
         merchant: String(row.merchant ?? ""),
         keyword: String(row.keyword ?? ""),

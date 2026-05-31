@@ -33,7 +33,7 @@ export type OperationalResponse = {
     merchantAktif: number;
     merchantProduktif: number;
     merchantNotActive: number;
-    merchantExpired: number;
+    merchantExpiring: number;
   };
   cards: {
     success: {
@@ -67,7 +67,7 @@ export type OperationalResponse = {
     keyword: string;
     transactionCount: number;
   }[];
-  expiredRules: {
+  expiringRules: {
     branch: string;
     merchant: string;
     keyword: string;
@@ -112,7 +112,7 @@ type OperationalContentProps = {
   selectedMonth: string;
 };
 
-type MerchantStatusTab = "active" | "productive" | "not-active" | "expired";
+type MerchantStatusTab = "active" | "productive" | "not-active" | "expiring";
 const formatShare = (value: number, total: number) => {
   if (total <= 0) return `${value.toLocaleString("id-ID")} (0%)`;
   const percent = (value / total) * 100;
@@ -183,10 +183,10 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     keywordLink(row.keyword, `not-active-keyword-${row.keyword}`),
     row.transactionCount.toLocaleString("id-ID"),
   ]);
-  const expiredRuleRows = data.expiredRules.map((row) => [
-    branchLink(row.branch, `expired-branch-${row.keyword}`),
+  const expiringRuleRows = data.expiringRules.map((row) => [
+    branchLink(row.branch, `expiring-branch-${row.keyword}`),
     row.merchant,
-    keywordLink(row.keyword, `expired-keyword-${row.keyword}`),
+    keywordLink(row.keyword, `expiring-keyword-${row.keyword}`),
     row.startPeriod,
     row.endPeriod,
   ]);
@@ -239,7 +239,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     }
     return {
       headers: ["Branch", "Nama Merchant", "Keyword", "Mulai", "Berakhir"],
-      rows: expiredRuleRows,
+      rows: expiringRuleRows,
       sortableColumns: [true, true, true, true, true],
       columnClassNames: ["", "font-medium", "", "tabular-nums", "tabular-nums"],
     };
@@ -248,13 +248,13 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
     activeMerchantRows,
     productiveMerchantRows,
     notActiveMerchantRows,
-    expiredRuleRows,
+    expiringRuleRows,
   ]);
   const merchantStatusTitleMap: Record<MerchantStatusTab, string> = {
     active: "Merchant Active Bulan Ini",
     productive: "Merchant Productive Bulan Ini",
     "not-active": "Merchant Not Active Bulan Ini",
-    expired: "Merchant Expired Bulan Ini",
+    expiring: "Merchant Expiring Bulan Ini",
   };
   const compactStatItems = [
     {
@@ -278,9 +278,9 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
       value: data.compactStats.merchantNotActive,
     },
     {
-      id: "merchant-expired",
-      label: "Merchant Expired",
-      value: data.compactStats.merchantExpired,
+      id: "merchant-expiring",
+      label: "Merchant Expiring",
+      value: data.compactStats.merchantExpiring,
     },
   ];
 
@@ -355,7 +355,7 @@ export function OperationalContent({ data, monthOptions, selectedMonth }: Operat
                   <TabsTrigger value="active">Active</TabsTrigger>
                   <TabsTrigger value="productive">Productive</TabsTrigger>
                   <TabsTrigger value="not-active">Not Active</TabsTrigger>
-                  <TabsTrigger value="expired">Expired</TabsTrigger>
+                  <TabsTrigger value="expiring">Expiring</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>

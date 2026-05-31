@@ -224,7 +224,6 @@ def _current_existing_rules_for_incoming(
 
     query = """
         select
-            rule_key::text as rule_key,
             merchant_key::text as rule_merchant,
             dm.keyword_code as keyword,
             dm.merchant_name,
@@ -240,7 +239,7 @@ def _current_existing_rules_for_incoming(
         where merchant_key = %s::uuid
         order by start_period asc, end_period asc
         limit %s
-    """
+        """
     params: list[Any] = [merchant_key, limit]
 
     try:
@@ -252,7 +251,7 @@ def _current_existing_rules_for_incoming(
 
     return [
         {
-            "rule_key": row["rule_key"],
+            "merchant_key": row["rule_merchant"],
             "rule_merchant": row["rule_merchant"],
             "keyword": row["keyword"],
             "merchant_name": row["merchant_name"],
@@ -418,11 +417,11 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
     extendable_match = _find_extendable_period_match(incoming, existing)
 
     with get_conn() as conn, conn.cursor() as cur:
-        target_rule_key = None
+        target_merchant_key = None
         if exact_match:
-            target_rule_key = exact_match["rule_key"]
+            target_merchant_key = exact_match["rule_merchant"]
         elif extendable_match:
-            target_rule_key = extendable_match["rule_key"]
+            target_merchant_key = extendable_match["rule_merchant"]
         else:
             raise HTTPException(status_code=409, detail="Existing rule tidak ditemukan")
 
@@ -432,13 +431,13 @@ def _apply_solve_for_row(row: dict[str, Any]) -> None:
             set point_redeem = %s,
                 start_period = %s::date,
                 end_period = %s::date
-            where rule_key = %s::uuid
+            where merchant_key = %s::uuid
             """,
             (
                 int(incoming.get("point_redeem") or 0),
                 incoming.get("start_period"),
                 incoming.get("end_period"),
-                target_rule_key,
+                target_merchant_key,
             ),
         )
 

@@ -13,7 +13,7 @@ export type MerchantDirectoryItem = {
   region: string;
   pointRedeem: number;
   ruleStatus: string;
-  activityStatus: string;
+  activityStatus: string | null;
   startPeriod: string | null;
   endPeriod: string | null;
   redeem: number;

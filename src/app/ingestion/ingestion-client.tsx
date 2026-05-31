@@ -28,6 +28,7 @@ import {
   downloadSource,
 } from "./actions";
 import type { BatchDetail, BatchListItem, Dataset, RejectedRow } from "./types";
+import type { UploadBatchResult } from "./actions";
 import type { AuthenticatedAdmin } from "@/lib/auth";
 
 type IngestionClientProps = {
@@ -42,6 +43,13 @@ const DATASETS: Array<{ value: Dataset; label: string }> = [
   { value: "transactions", label: "Transaction" },
   { value: "total_point", label: "Total Point" },
 ];
+
+const DATASET_SCHEMAS: Record<Dataset, string> = {
+  list_kota: "region;branch;cluster;city",
+  master: "uniq_merchant;merchant_name;keyword;category;point_redeem;start_period;end_period;branch;region;cluster",
+  transactions: "timestamp;keyword;msisdn;quantity;status",
+  total_point: "cluster,period,poin,own",
+};
 const CONFLICT_INFO_FIELDS = ["keyword", "merchant_name", "category", "cluster"];
 const CONFLICT_CHANGE_FIELDS = ["uniq_merchant", "start_period", "end_period", "point_redeem"];
 
@@ -209,8 +217,12 @@ export default function IngestionClient({
       const formData = new FormData();
       formData.append("file", file);
 
-      const body = await uploadBatch(dataset, formData);
-      const batchId = body.batch_id as string;
+      const body: UploadBatchResult = await uploadBatch(dataset, formData);
+      if (!body.ok) {
+        setError(body.error);
+        return;
+      }
+      const batchId = body.batch_id;
       setSelectedBatchId(batchId);
       await loadBatches();
       await loadBatchDetail(batchId, 1);
@@ -518,6 +530,14 @@ export default function IngestionClient({
               >
                 Refresh
               </Button>
+            </div>
+            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              <div className="font-semibold uppercase tracking-[0.14em] text-foreground/75">
+                Schema CSV
+              </div>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5 text-foreground/80">
+{DATASET_SCHEMAS[dataset]}
+              </pre>
             </div>
             {error ? (
               <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">

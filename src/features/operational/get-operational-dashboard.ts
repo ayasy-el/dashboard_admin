@@ -156,7 +156,7 @@ export async function getOperationalDashboard(
     activeMerchants,
     productiveMerchants,
     notActiveMerchants,
-    expiredRules: raw.expiredRules,
+    expiringRules: raw.expiringRules,
     categoryMetrics: raw.categoryMetrics,
     clusterMetrics,
   };

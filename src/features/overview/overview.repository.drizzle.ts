@@ -318,7 +318,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
       order by redeem desc, unique_redeem desc, ar.merchant_name
     `);
 
-    const expiredMerchantRaw = await db.execute(sql`
+    const expiringMerchantRaw = await db.execute(sql`
       select
         vr.branch as branch,
         vr.merchant_name as merchant,
@@ -450,7 +450,7 @@ export class OverviewRepositoryDrizzle implements OverviewRepository {
           uniqueRedeem: toNumber(row.unique_redeem),
         }),
       ),
-      expiredMerchantRaw: (expiredMerchantRaw.rows as Array<Record<string, unknown>>).map(
+      expiringMerchantRaw: (expiringMerchantRaw.rows as Array<Record<string, unknown>>).map(
         (row) => ({
           branch: String(row.branch ?? ""),
           merchant: String(row.merchant ?? ""),

@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 const toInt = (value: unknown) => Number(value ?? 0);
 const PRODUCTIVE_THRESHOLD = 5;
 const resolveActivityStatus = (ruleStatus: string, redeem: number) => {
-  if (ruleStatus === "expired") return "expired";
+  if (ruleStatus !== "alive") return null;
   if (redeem >= PRODUCTIVE_THRESHOLD) return "productive";
   if (redeem >= 1) return "active";
   return "not-active";

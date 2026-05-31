@@ -83,7 +83,7 @@ export type OverviewRawData = {
     redeem: number;
     uniqueRedeem: number;
   }[];
-  expiredMerchantRaw: {
+  expiringMerchantRaw: {
     branch: string;
     merchant: string;
     keyword: string;

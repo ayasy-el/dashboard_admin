@@ -42,7 +42,7 @@ export type MerchantDetailRawData = {
   ruleStatuses: {
     keyword: string;
     status: string;
-    activityStatus: string;
+    activityStatus: string | null;
     startPeriod: string;
     endPeriod: string;
     daysLeft: number;

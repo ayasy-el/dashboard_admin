@@ -38,8 +38,8 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     productiveRows,
     inactiveRows,
     inactiveDetailRows,
-    expiredRows,
-    totalExpiredMerchants,
+    expiringRows,
+    totalExpiringMerchants,
   } = buildOverviewContentViewModel(data);
   const filterLinkClassName = "font-medium";
   const keywordLinkClassName =
@@ -99,10 +99,10 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
     keywordLink(merchant.keyword, `inactive-keyword-${merchant.keyword}`),
   ]);
 
-  const expiredRowsWithLinks = data.expiredMerchants.map((merchant) => [
-    branchLink(merchant.branch, `expired-branch-${merchant.branch}-${merchant.keyword}`),
+  const expiringRowsWithLinks = data.expiringMerchants.map((merchant) => [
+    branchLink(merchant.branch, `expiring-branch-${merchant.branch}-${merchant.keyword}`),
     merchant.merchant,
-    keywordLink(merchant.keyword, `expired-keyword-${merchant.keyword}`),
+    keywordLink(merchant.keyword, `expiring-keyword-${merchant.keyword}`),
   ]);
 
   const merchantPerMonthRowsWithLinks = [...data.merchantPerMonth]
@@ -220,17 +220,17 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
             sortableColumns={[false, true, true, true]}
             pagination={{ enabled: true, pageSize: 6 }}
           />
-          <RankedMetricsTableCard
-            className="min-w-0 lg:col-span-2 2xl:col-span-1"
-            title="Merchant Alert"
-            tone="red"
-            icon={<IconMessage2Exclamation className="size-4 text-primary" />}
-            headerCols={["BRANCH", "NOT ACTIVE", "EXPIRED"]}
-            rows={inactiveRowsWithLinks}
-            pagination={{ enabled: true, pageSize: 6 }}
-            sortableColumns={[false, true, true]}
-            paginationInfo={`Not Active: ${inactiveDetailRows.length} • Expired: ${totalExpiredMerchants}`}
-          />
+        <RankedMetricsTableCard
+          className="min-w-0 lg:col-span-2 2xl:col-span-1"
+          title="Merchant Alert"
+          tone="red"
+          icon={<IconMessage2Exclamation className="size-4 text-primary" />}
+          headerCols={["BRANCH", "NOT ACTIVE", "EXPIRING"]}
+          rows={inactiveRowsWithLinks}
+          pagination={{ enabled: true, pageSize: 6 }}
+          sortableColumns={[false, true, true]}
+          paginationInfo={`Not Active: ${inactiveDetailRows.length} • Expiring: ${totalExpiringMerchants}`}
+        />
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <RankedMetricsTableCard
@@ -245,13 +245,13 @@ export function OverviewContent({ data, monthOptions, selectedMonth }: OverviewC
           />
           <RankedMetricsTableCard
             className="min-w-0"
-            title="Merchant Expired Detail"
+            title="Merchant Expiring Detail"
             tone="yellow"
             icon={<IconHourglassOff className="size-4 text-yellow-500" />}
             headerCols={["BRANCH", "MERCHANT", "KEYWORD"]}
-            rows={expiredRowsWithLinks}
+            rows={expiringRowsWithLinks}
             pagination={{ enabled: true, pageSize: 6 }}
-            paginationInfo={`Total: ${expiredRows.length}`}
+            paginationInfo={`Total: ${expiringRows.length}`}
           />
         </div>
         <DataTableCard

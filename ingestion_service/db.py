@@ -435,8 +435,7 @@ def rollback_batch(batch_id: str) -> dict[str, Any]:
                 select count(*) as total
                 from public.program_banner_assets pba
                 join public.dim_merchant dm
-                  on dm.rule_key = pba.rule_key
-                  or dm.keyword_code = pba.keyword_code
+                  on dm.keyword_code = pba.keyword_code
                 where dm.source_batch_id = %s::uuid
                 """,
                 (internal_batch_id,),
@@ -464,8 +463,7 @@ def rollback_batch(batch_id: str) -> dict[str, Any]:
                   and not exists (
                     select 1
                     from public.program_banner_assets pba
-                    where pba.rule_key = dm.rule_key
-                       or pba.keyword_code = dm.keyword_code
+                    where pba.keyword_code = dm.keyword_code
                   )
                 """,
                 (internal_batch_id,),
