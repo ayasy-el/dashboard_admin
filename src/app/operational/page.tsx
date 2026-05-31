@@ -8,6 +8,7 @@ import { DashboardPageShell } from "@/features/shared/components/dashboard-page-
 import { getMonthOptions } from "@/features/shared/get-month-options";
 import { requireAdminUser } from "@/lib/auth";
 import { DASHBOARD_FILTER_COOKIE_NAME, parseDashboardFilterCookie } from "@/lib/dashboard-filters";
+import { normalizeErrorMessage } from "@/lib/error-message";
 
 export const metadata: Metadata = {
   title: "Operational | Telkomsel Poin Merchant Dashboard",
@@ -19,19 +20,34 @@ export default async function Page() {
   const cookieStore = await cookies();
   const persistedFilters = parseDashboardFilterCookie(cookieStore.get(DASHBOARD_FILTER_COOKIE_NAME)?.value);
 
-  const monthOptions = await getMonthOptions();
-  const effectiveMonth =
-    monthOptions.find((option) => option.value === persistedFilters.month)?.value ?? monthOptions[0]?.value ?? null;
+  try {
+    const monthOptions = await getMonthOptions();
+    const effectiveMonth =
+      monthOptions.find((option) => option.value === persistedFilters.month)?.value ??
+      monthOptions[0]?.value ??
+      null;
 
-  const repo = new OperationalRepositoryDrizzle();
-  const data = await getOperationalDashboard(repo, effectiveMonth, {
-    categories: persistedFilters.categories,
-    branches: persistedFilters.branches,
-  });
+    const repo = new OperationalRepositoryDrizzle();
+    const data = await getOperationalDashboard(repo, effectiveMonth, {
+      categories: persistedFilters.categories,
+      branches: persistedFilters.branches,
+    });
 
-  return (
-    <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
-      <OperationalContent data={data} monthOptions={monthOptions} selectedMonth={data.month} />
-    </DashboardPageShell>
-  );
+    return (
+      <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
+        <OperationalContent data={data} monthOptions={monthOptions} selectedMonth={data.month} />
+      </DashboardPageShell>
+    );
+  } catch (error) {
+    const message = normalizeErrorMessage(error instanceof Error ? error.message : "Gagal memuat operational");
+    return (
+      <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
+        <div className="px-4 py-6 lg:px-6">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {message}
+          </div>
+        </div>
+      </DashboardPageShell>
+    );
+  }
 }

@@ -28,7 +28,7 @@ import {
   downloadSource,
 } from "./actions";
 import type { BatchDetail, BatchListItem, Dataset, RejectedRow } from "./types";
-import type { UploadBatchResult } from "./actions";
+import type { RollbackBatchResult, UploadBatchResult } from "./actions";
 import type { AuthenticatedAdmin } from "@/lib/auth";
 
 type IngestionClientProps = {
@@ -272,7 +272,12 @@ export default function IngestionClient({
     setBusy(true);
     setError(null);
     try {
-      const result = await rollbackBatch(batchId);
+      const result: RollbackBatchResult = await rollbackBatch(batchId);
+      if (!result.ok) {
+        setError(result.error);
+        toast.error(result.error);
+        return;
+      }
       const deletedSummary = Object.entries(result.deleted_rows)
         .map(([key, value]) => `${key}=${value}`)
         .join(", ");

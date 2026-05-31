@@ -8,6 +8,7 @@ import { DashboardPageShell } from "@/features/shared/components/dashboard-page-
 import { getMonthOptions } from "@/features/shared/get-month-options";
 import { requireAdminUser } from "@/lib/auth";
 import { DASHBOARD_FILTER_COOKIE_NAME, parseDashboardFilterCookie } from "@/lib/dashboard-filters";
+import { normalizeErrorMessage } from "@/lib/error-message";
 
 export const metadata: Metadata = {
   title: "Merchant | Telkomsel Poin Merchant Dashboard",
@@ -20,24 +21,37 @@ type MerchantPageProps = {
 
 export default async function MerchantPage({ searchParams }: MerchantPageProps) {
   const user = await requireAdminUser("/merchant");
-  const query = await searchParams;
-  const cookieStore = await cookies();
-  const persistedFilters = parseDashboardFilterCookie(
-    cookieStore.get(DASHBOARD_FILTER_COOKIE_NAME)?.value,
-  );
+  try {
+    const query = await searchParams;
+    const cookieStore = await cookies();
+    const persistedFilters = parseDashboardFilterCookie(
+      cookieStore.get(DASHBOARD_FILTER_COOKIE_NAME)?.value,
+    );
 
-  const monthOptions = await getMonthOptions();
-  const selectedMonth =
-    monthOptions.find((option) => option.value === query.month)?.value ??
-    monthOptions.find((option) => option.value === persistedFilters.month)?.value ??
-    monthOptions[0]?.value ??
-    null;
-  const repo = new MerchantDirectoryRepositoryDrizzle();
-  const data = await getMerchantDirectory(repo, selectedMonth);
+    const monthOptions = await getMonthOptions();
+    const selectedMonth =
+      monthOptions.find((option) => option.value === query.month)?.value ??
+      monthOptions.find((option) => option.value === persistedFilters.month)?.value ??
+      monthOptions[0]?.value ??
+      null;
+    const repo = new MerchantDirectoryRepositoryDrizzle();
+    const data = await getMerchantDirectory(repo, selectedMonth);
 
-  return (
-    <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
-      <MerchantDirectoryOverview data={data} monthOptions={monthOptions} />
-    </DashboardPageShell>
-  );
+    return (
+      <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
+        <MerchantDirectoryOverview data={data} monthOptions={monthOptions} />
+      </DashboardPageShell>
+    );
+  } catch (error) {
+    const message = normalizeErrorMessage(error instanceof Error ? error.message : "Gagal memuat merchant");
+    return (
+      <DashboardPageShell sidebarWidth="calc(var(--spacing) * 72)" contentClassName="" user={user}>
+        <div className="px-4 py-6 lg:px-6">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {message}
+          </div>
+        </div>
+      </DashboardPageShell>
+    );
+  }
 }

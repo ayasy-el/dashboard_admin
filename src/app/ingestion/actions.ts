@@ -2,6 +2,7 @@
 
 import { BatchDetail, BatchListItem, Dataset, RejectedListResponse, RollbackBatchResponse } from "./types";
 import { requireAdminUser } from "@/lib/auth";
+import { normalizeErrorMessage } from "@/lib/error-message";
 
 const API_BASE =
   process.env.INGESTION_API_URL ??
@@ -16,6 +17,10 @@ export type UploadBatchResult =
   | { ok: true; batch_id: string }
   | { ok: false; error: string };
 
+export type RollbackBatchResult =
+  | ({ ok: true } & RollbackBatchResponse)
+  | { ok: false; error: string };
+
 const toBaseUrl = () => (API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE);
 
 const requestJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -25,7 +30,16 @@ const requestJson = async <T,>(path: string, init?: RequestInit): Promise<T> => 
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(body || "Request gagal");
+    try {
+      const parsed = body ? (JSON.parse(body) as { detail?: unknown; message?: unknown }) : null;
+      const detail = parsed?.detail ?? parsed?.message;
+      if (typeof detail === "string" && detail.trim()) {
+        throw new Error(normalizeErrorMessage(detail));
+      }
+    } catch {
+      // fall through to string fallback
+    }
+    throw new Error(normalizeErrorMessage(body || "Request gagal"));
   }
   return (await res.json()) as T;
 };
@@ -62,11 +76,19 @@ export async function uploadBatch(dataset: Dataset, formData: FormData): Promise
   }
 }
 
-export async function rollbackBatch(batchId: string): Promise<RollbackBatchResponse> {
+export async function rollbackBatch(batchId: string): Promise<RollbackBatchResult> {
   await requireAdminUser("/ingestion");
-  return requestJson<RollbackBatchResponse>(`/ingest/${batchId}/rollback`, {
-    method: "POST",
-  });
+  try {
+    const body = await requestJson<RollbackBatchResponse>(`/ingest/${batchId}/rollback`, {
+      method: "POST",
+    });
+    return { ok: true, ...body };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Gagal rollback batch",
+    };
+  }
 }
 
 export async function ignoreRejected(batchId: string, rejectedId: number): Promise<void> {
