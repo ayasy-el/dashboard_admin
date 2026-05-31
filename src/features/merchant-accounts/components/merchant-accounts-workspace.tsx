@@ -833,7 +833,7 @@ export function MerchantAccountsWorkspace({ data }: MerchantAccountsWorkspacePro
                   </Button>
                   <Button type="button" className="gap-2 px-6" onClick={handleSaveChanges} disabled={isSaving}>
                     <IconDeviceFloppy className="size-4" />
-                    Review Ringkasan &amp; Simpan
+                    Apply
                   </Button>
                 </div>
               </div>
