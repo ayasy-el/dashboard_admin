@@ -47,6 +47,7 @@ Isi nilainya sesuai environment:
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
 INGEST_UPLOAD_DIR=./ingestion_service/uploads
 INGEST_REJECT_THRESHOLD=0.2
+PREFECT_API_URL=http://127.0.0.1:4200/api
 INGEST_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
@@ -69,7 +70,14 @@ Flow ada di `ingestion_service/flows.py` (`csv-ingestion`):
 - logging run dan status step
 - business logic tetap di `ingestion_service/pipeline.py`
 
-Untuk observability UI Prefect, jalankan worker/server Prefect sesuai environment Anda.
+Supaya run dan log muncul di UI Prefect lokal:
+
+- set `PREFECT_API_URL=http://127.0.0.1:4200/api`
+- jalankan `prefect server start`
+- jalankan ingestion service dengan env yang sama
+
+Tidak perlu `PREFECT_API_KEY` untuk Prefect server lokal. API key hanya dipakai untuk Prefect Cloud.
+Kalau Prefect tidak terjangkau, service akan fallback ke eksekusi lokal agar ingestion tetap jalan.
 
 ## Catatan `Solve & Apply`
 

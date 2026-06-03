@@ -431,23 +431,10 @@ def rollback_batch(batch_id: str) -> dict[str, Any]:
                     (internal_batch_id,),
                 )
                 master_transaction_refs = int((cur.fetchone() or {}).get("total") or 0)
-                cur.execute(
-                    """
-                    select count(*) as total
-                    from public.program_banner_assets pba
-                    join public.dim_merchant dm
-                      on dm.keyword_code = pba.keyword_code
-                    where dm.source_batch_id = %s::uuid
-                    """,
-                    (internal_batch_id,),
-                )
-                master_banner_refs = int((cur.fetchone() or {}).get("total") or 0)
-                if master_transaction_refs > 0 or master_banner_refs > 0:
+                if master_transaction_refs > 0:
                     reasons = []
                     if master_transaction_refs > 0:
                         reasons.append(f"{master_transaction_refs} transaksi")
-                    if master_banner_refs > 0:
-                        reasons.append(f"{master_banner_refs} banner asset")
                     raise RuntimeError(
                         "Batch master tidak bisa di-rollback karena masih ada "
                         f"{' dan '.join(reasons)} yang memakai merchant batch ini"
@@ -457,11 +444,6 @@ def rollback_batch(batch_id: str) -> dict[str, Any]:
                     """
                     delete from public.dim_merchant dm
                     where dm.source_batch_id = %s::uuid
-                      and not exists (
-                        select 1
-                        from public.program_banner_assets pba
-                        where pba.keyword_code = dm.keyword_code
-                      )
                     """,
                     (internal_batch_id,),
                 )

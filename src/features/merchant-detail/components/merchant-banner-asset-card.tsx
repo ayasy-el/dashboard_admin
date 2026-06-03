@@ -7,6 +7,7 @@ import {
   IconRefresh,
   IconSparkles,
   IconUpload,
+  IconTrash,
 } from "@tabler/icons-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -186,6 +187,34 @@ export function MerchantBannerAssetCard({
     }
   };
 
+  const deleteAsset = async () => {
+    if (!asset) return;
+
+    const confirmed = window.confirm(
+      "Hapus banner image ini? Data dan file image akan dihapus permanen.",
+    );
+
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await readJson<{ success: boolean }>(`/api/admin/program-banner-assets/${asset.id}`, {
+        method: "DELETE",
+      });
+
+      setAsset(null);
+      setForm(emptyAssetForm());
+      setMessage("Banner image berhasil dihapus.");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Gagal menghapus banner image");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const onFileChange = (file: File | null) => {
     if (!file) return;
 
@@ -328,9 +357,9 @@ export function MerchantBannerAssetCard({
 
                 <label className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
                   <div>
-                    <div className="text-sm font-medium text-foreground">Aktifkan banner image</div>
+                    <div className="text-sm font-medium text-foreground">Tampilkan banner image</div>
                     <div className="text-xs text-muted-foreground">
-                      Matikan jika asset ingin disimpan tanpa ditampilkan.
+                      Nonaktif hanya menyembunyikan banner dari tampilan, data tetap disimpan.
                     </div>
                   </div>
                   <input
@@ -362,6 +391,14 @@ export function MerchantBannerAssetCard({
                     onClick={() => void submitAsset()}
                   >
                     {asset ? "Update Banner Image" : "Create Banner Image"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={submitting || uploadingImage || !asset}
+                    onClick={() => void deleteAsset()}
+                  >
+                    <IconTrash className="size-4" />
+                    Hapus
                   </Button>
                   <Button variant="outline" onClick={resetForm}>
                     <IconRefresh className="size-4" />

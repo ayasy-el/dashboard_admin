@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 import json
+import os
+import urllib.request
 
 from prefect import flow, get_run_logger, task
 
@@ -14,8 +17,11 @@ from ingestion_service.pipeline import (
     clean_data,
     load_data,
     quality_check,
+    run_batch,
     stage_csv,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _snapshot_payload(batch: dict | None) -> dict:
@@ -103,6 +109,21 @@ def mark_failed(batch_id: str, step: str, error: str) -> None:
     _log_snapshot("FAILED", batch_id)
 
 
+def _prefect_api_is_reachable(timeout_seconds: float = 2.0) -> bool:
+    api_url = os.getenv("PREFECT_API_URL", "").rstrip("/")
+    if not api_url:
+        return False
+
+    version_url = f"{api_url}/admin/version"
+    request = urllib.request.Request(version_url, method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            return 200 <= getattr(response, "status", 200) < 500
+    except Exception:
+        return False
+
+
 @flow(name="csv-ingestion", flow_run_name="ingest-{dataset}-{batch_id}")
 def ingest_flow(batch_id: str, dataset: str) -> None:
     logger = get_run_logger()
@@ -144,6 +165,11 @@ def ingest_flow(batch_id: str, dataset: str) -> None:
 
 
 def run_ingestion_flow(batch_id: str) -> None:
-    batch = get_batch(batch_id)
-    dataset = batch["dataset"] if batch else "unknown"
-    ingest_flow(batch_id=batch_id, dataset=dataset)
+    if _prefect_api_is_reachable():
+        batch = get_batch(batch_id)
+        dataset = batch["dataset"] if batch else "unknown"
+        ingest_flow(batch_id=batch_id, dataset=dataset)
+        return
+
+    logger.info("Prefect API tidak terjangkau, fallback ke eksekusi lokal batch_id=%s", batch_id)
+    run_batch(batch_id)
